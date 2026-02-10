@@ -3131,6 +3131,38 @@ body.dark-theme .vis-zone-label {
   fill: #a1a1a6;
 }
 
+/* Подпись «транзит» */
+.vis-transit-label {
+  font-size: 9px;
+  font-family: 'DM Sans', sans-serif;
+  fill: var(--text-secondary, #86868b);
+  font-style: italic;
+  opacity: 0.6;
+}
+
+body.dark-theme .vis-transit-label {
+  fill: #a1a1a6;
+}
+
+/* Подпись PP-R */
+.vis-ppr-label {
+  font-size: 9px;
+  font-family: 'DM Sans', sans-serif;
+  fill: #43A047;
+  font-weight: 500;
+}
+
+/* Легенда */
+.vis-legend-text {
+  font-size: 10px;
+  font-family: 'DM Sans', sans-serif;
+  fill: var(--text-secondary, #86868b);
+}
+
+body.dark-theme .vis-legend-text {
+  fill: #a1a1a6;
+}
+
 /* CSS-переменные для SVG в тёмной теме */
 body.dark-theme .vis-schema {
   --vis-grid-color: #38383a;

@@ -370,32 +370,72 @@ function renderVisualization() {
 function renderSectionSVG(sec, si, h1, hn) {
   const floors = sec.floors || 1;
 
-  // Параметры SVG
-  const floorH = 50;          // высота одного этажа в пикселях
-  const topPad = 40;           // отступ сверху
+  // --- Параметры SVG ---
+  const floorH = 50;           // высота одного этажа в пикселях
+  const topPad = 60;           // отступ сверху (для концевых узлов и подписей)
   const bottomPad = 30;        // отступ снизу
-  const leftPad = 70;          // отступ слева (для подписей этажей)
-  const rightPad = 40;         // отступ справа
-  const riserSpacing = 80;     // расстояние между стояками
-  const riserStartX = leftPad + 40; // начало области стояков
+  const leftPad = 70;          // отступ слева (подписи этажей)
+  const rightPad = 50;         // отступ справа
+  const riserIntraSpacing = 36; // расстояние между В1/Т3/Т4 внутри пучка
+  const bundleWidth = riserIntraSpacing * 2; // ширина пучка (3 трубы)
+  const zoneGap = 60;          // горизонтальный отступ между пучками зон
+  const aptBranchLen = 18;     // длина квартирного отвода
+  const aptSpacing = 10;       // расстояние между отводами
+  const pprGap = 20;           // зазор между последним пучком и началом PP-R разводки
 
-  // Три стояка: В1, Т3, Т4
-  const x_V1 = riserStartX;
-  const x_T3 = riserStartX + riserSpacing;
-  const x_T4 = riserStartX + riserSpacing * 2;
+  // Цвета систем
+  const COLOR_V1 = '#007AFF';
+  const COLOR_T3 = '#E53935';
+  const COLOR_T4 = '#FB8C00';
+  const COLOR_PPR = '#43A047'; // PP-R (полипропилен) — зелёный
 
-  const aptBranchLen = 20;     // длина квартирного отвода
-  const aptSpacing = 8;        // расстояние между отводами
+  // --- Определяем зоны и их границы ---
+  let currentFloor = 1;
+  const zoneRanges = [];
+  if (sec.zones && sec.zones.length > 0) {
+    for (const z of sec.zones) {
+      const zoneTo = Math.min(z.to || 0, floors);
+      const zoneFrom = currentFloor;
+      if (zoneTo >= zoneFrom) {
+        zoneRanges.push({ zone: z, from: zoneFrom, to: zoneTo });
+        currentFloor = zoneTo + 1;
+      }
+    }
+  }
+  // Если зон нет — создаём виртуальную на весь дом
+  if (zoneRanges.length === 0) {
+    zoneRanges.push({ zone: { fixedD: { V1: 32, T3: 32, T4: 32 }, name: 'Зона 1' }, from: 1, to: floors });
+  }
 
-  // Считаем макс. количество квартир для определения ширины
+  const numZones = zoneRanges.length;
+
+  // --- Позиции пучков стояков по зонам ---
+  const riserStartX = leftPad + 30;
+  const zoneBundles = []; // { xV1, xT3, xT4, zr }
+  for (let zi = 0; zi < numZones; zi++) {
+    const baseX = riserStartX + zi * (bundleWidth + zoneGap);
+    zoneBundles.push({
+      xV1: baseX,
+      xT3: baseX + riserIntraSpacing,
+      xT4: baseX + riserIntraSpacing * 2,
+      zr: zoneRanges[zi]
+    });
+  }
+
+  // Правый край последнего пучка
+  const lastBundle = zoneBundles[zoneBundles.length - 1];
+  const risersEndX = lastBundle.xT4;
+
+  // Макс. квартир на этаже
   let maxApts = 0;
   for (let f = 1; f <= floors; f++) {
     const a = sec.apts[f] || 0;
     if (a > maxApts) maxApts = a;
   }
 
-  const aptAreaWidth = maxApts > 0 ? (maxApts * aptSpacing + aptBranchLen + 20) : 40;
-  const svgW = x_T4 + aptAreaWidth + rightPad;
+  const aptAreaStartX = risersEndX + pprGap;
+  const aptAreaWidth = maxApts > 0 ? (maxApts * aptSpacing + aptBranchLen + 10) : 30;
+  const svgW = aptAreaStartX + aptAreaWidth + rightPad;
   const svgH = topPad + floors * floorH + bottomPad;
 
   // Y-координата для этажа (1-й этаж — внизу)
@@ -415,103 +455,135 @@ function renderSectionSVG(sec, si, h1, hn) {
   for (let f = 1; f <= floors; f++) {
     const y = floorY(f);
     svg += `<line x1="${leftPad}" y1="${y}" x2="${svgW - rightPad}" y2="${y}" stroke="var(--vis-grid-color, #e0e0e0)" stroke-width="0.5" stroke-dasharray="4 4"/>`;
-
-    // Подпись этажа
     svg += `<text x="${leftPad - 8}" y="${y + 4}" text-anchor="end" class="vis-floor-label">${f} эт.</text>`;
-  }
-
-  // --- Определяем зоны и их границы ---
-  let currentFloor = 1;
-  const zoneRanges = [];
-  if (sec.zones && sec.zones.length > 0) {
-    for (const z of sec.zones) {
-      const zoneTo = Math.min(z.to || 0, floors);
-      const zoneFrom = currentFloor;
-      if (zoneTo >= zoneFrom) {
-        zoneRanges.push({ zone: z, from: zoneFrom, to: zoneTo });
-        currentFloor = zoneTo + 1;
-      }
-    }
   }
 
   // --- Подложки зон (чередующиеся) ---
   zoneRanges.forEach((zr, zi) => {
-    const yTop = floorY(zr.to) - floorH * 0.3;
-    const yBot = floorY(zr.from) + floorH * 0.3;
-    const fillOpacity = zi % 2 === 0 ? 0.03 : 0.06;
-    svg += `<rect x="${leftPad}" y="${yTop}" width="${svgW - leftPad - rightPad}" height="${yBot - yTop}" fill="var(--vis-zone-bg, #007AFF)" fill-opacity="${fillOpacity}" rx="4"/>`;
-    // Подпись зоны
-    svg += `<text x="${svgW - rightPad - 4}" y="${yTop + 14}" text-anchor="end" class="vis-zone-label">${zr.zone.name || 'Зона ' + (zi + 1)}</text>`;
+    const yTop = floorY(zr.to) - floorH * 0.35;
+    const yBot = floorY(zr.from) + floorH * 0.35;
+    const fillOpacity = zi % 2 === 0 ? 0.04 : 0.07;
+    svg += `<rect x="${leftPad}" y="${yTop}" width="${svgW - leftPad - rightPad}" height="${yBot - yTop}" fill="var(--vis-zone-bg, #007AFF)" fill-opacity="${fillOpacity}" rx="6"/>`;
+    // Подпись зоны справа
+    svg += `<text x="${svgW - rightPad - 4}" y="${yTop + 14}" text-anchor="end" class="vis-zone-label">${zr.zone.name || 'Зона ' + (zi + 1)} (${zr.from}–${zr.to} эт.)</text>`;
   });
 
-  // --- Стояки (вертикальные линии) ---
-  const yTop = floorY(floors);
-  const yBot = floorY(1);
+  // --- Стояки по зонам (пучки) ---
+  zoneBundles.forEach((bundle, zi) => {
+    const zr = bundle.zr;
+    const d = zr.zone.fixedD || { V1: 32, T3: 32, T4: 32 };
+    const yZoneTop = floorY(zr.to);
+    const yZoneBot = floorY(zr.from);
+    const yFloor1 = floorY(1);
 
-  // В1 (синий)
-  svg += `<line x1="${x_V1}" y1="${yTop}" x2="${x_V1}" y2="${yBot}" stroke="#007AFF" stroke-width="3" stroke-linecap="round"/>`;
-  svg += `<text x="${x_V1}" y="${yTop - 10}" text-anchor="middle" class="vis-riser-label" fill="#007AFF">В1</text>`;
+    // --- Транзитные стояки (от 1-го этажа до начала зоны, если зона не с 1-го) ---
+    if (zr.from > 1) {
+      const yTransitTop = floorY(zr.from - 1);
+      // В1 транзит (пунктир, тоньше)
+      svg += `<line x1="${bundle.xV1}" y1="${yTransitTop}" x2="${bundle.xV1}" y2="${yFloor1}" stroke="${COLOR_V1}" stroke-width="1.5" stroke-dasharray="6 4" opacity="0.5"/>`;
+      // Т3 транзит
+      svg += `<line x1="${bundle.xT3}" y1="${yTransitTop}" x2="${bundle.xT3}" y2="${yFloor1}" stroke="${COLOR_T3}" stroke-width="1.5" stroke-dasharray="6 4" opacity="0.5"/>`;
+      // Т4 транзит
+      svg += `<line x1="${bundle.xT4}" y1="${yTransitTop}" x2="${bundle.xT4}" y2="${yFloor1}" stroke="${COLOR_T4}" stroke-width="1" stroke-dasharray="6 4" opacity="0.5"/>`;
+      // Подпись «транзит»
+      const yTransitMid = (yTransitTop + yFloor1) / 2;
+      svg += `<text x="${bundle.xV1 - 4}" y="${yTransitMid}" text-anchor="end" class="vis-transit-label">транзит</text>`;
+    }
 
-  // Т3 (красный)
-  svg += `<line x1="${x_T3}" y1="${yTop}" x2="${x_T3}" y2="${yBot}" stroke="#E53935" stroke-width="3" stroke-linecap="round"/>`;
-  svg += `<text x="${x_T3}" y="${yTop - 10}" text-anchor="middle" class="vis-riser-label" fill="#E53935">Т3</text>`;
+    // --- Активные стояки (рабочая зона) ---
+    // В1 (синий)
+    svg += `<line x1="${bundle.xV1}" y1="${yZoneTop}" x2="${bundle.xV1}" y2="${yZoneBot}" stroke="${COLOR_V1}" stroke-width="3" stroke-linecap="round"/>`;
+    // Т3 (красный)
+    svg += `<line x1="${bundle.xT3}" y1="${yZoneTop}" x2="${bundle.xT3}" y2="${yZoneBot}" stroke="${COLOR_T3}" stroke-width="3" stroke-linecap="round"/>`;
+    // Т4 (оранжевый)
+    svg += `<line x1="${bundle.xT4}" y1="${yZoneTop}" x2="${bundle.xT4}" y2="${yZoneBot}" stroke="${COLOR_T4}" stroke-width="2" stroke-linecap="round"/>`;
 
-  // Т4 (оранжевый, тоньше)
-  svg += `<line x1="${x_T4}" y1="${yTop}" x2="${x_T4}" y2="${yBot}" stroke="#FB8C00" stroke-width="2" stroke-linecap="round"/>`;
-  svg += `<text x="${x_T4}" y="${yTop - 10}" text-anchor="middle" class="vis-riser-label" fill="#FB8C00">Т4</text>`;
+    // --- Подписи стояков над верхним этажом зоны ---
+    const yLabel = yZoneTop - 24;
+    svg += `<text x="${bundle.xV1}" y="${yLabel}" text-anchor="middle" class="vis-riser-label" fill="${COLOR_V1}">В1</text>`;
+    svg += `<text x="${bundle.xT3}" y="${yLabel}" text-anchor="middle" class="vis-riser-label" fill="${COLOR_T3}">Т3</text>`;
+    svg += `<text x="${bundle.xT4}" y="${yLabel}" text-anchor="middle" class="vis-riser-label" fill="${COLOR_T4}">Т4</text>`;
 
-  // --- Подписи диаметров на стояках по зонам ---
-  zoneRanges.forEach(zr => {
+    // --- Подписи диаметров (между рабочими этажами зоны) ---
     const midFloor = Math.round((zr.from + zr.to) / 2);
-    const yMid = floorY(midFloor) + floorH * 0.25;
-    const d = zr.zone.fixedD || { V1: 32, T3: 32, T4: 32 };
+    const yDia = floorY(midFloor) + floorH * 0.3;
+    svg += `<text x="${bundle.xV1 + 5}" y="${yDia}" class="vis-dia-label" fill="${COLOR_V1}">Ø${d.V1}</text>`;
+    svg += `<text x="${bundle.xT3 + 5}" y="${yDia}" class="vis-dia-label" fill="${COLOR_T3}">Ø${d.T3}</text>`;
+    svg += `<text x="${bundle.xT4 + 5}" y="${yDia}" class="vis-dia-label" fill="${COLOR_T4}">Ø${d.T4}</text>`;
 
-    svg += `<text x="${x_V1 + 2}" y="${yMid}" class="vis-dia-label" fill="#007AFF">Ø${d.V1}</text>`;
-    svg += `<text x="${x_T3 + 2}" y="${yMid}" class="vis-dia-label" fill="#E53935">Ø${d.T3}</text>`;
-    svg += `<text x="${x_T4 + 2}" y="${yMid}" class="vis-dia-label" fill="#FB8C00">Ø${d.T4}</text>`;
-  });
+    // --- Концевой узел на верхнем этаже зоны (шаровой кран + воздухоотводчик) ---
+    svg += renderEndNode(bundle.xV1, yZoneTop, COLOR_V1);
+    svg += renderEndNode(bundle.xT3, yZoneTop, COLOR_T3);
+    svg += renderEndNode(bundle.xT4, yZoneTop, COLOR_T4);
 
-  // --- Компенсаторы на Т3 и Т4 ---
-  zoneRanges.forEach(zr => {
-    const d = zr.zone.fixedD || { V1: 32, T3: 32, T4: 32 };
+    // --- Компенсаторы на Т3 и Т4 ---
     const zoneFloors = zr.to - zr.from + 1;
     const zoneH = (zr.from === 1 ? h1 : hn) + (zoneFloors > 1 ? (zoneFloors - 1) * hn : 0);
 
     const compCountT3 = calcCompensators(zoneH, d.T3);
     const compCountT4 = calcCompensators(zoneH, d.T4);
 
-    // Размещаем компенсаторы равномерно по зоне
     for (let c = 0; c < compCountT3; c++) {
       const frac = (c + 1) / (compCountT3 + 1);
       const compFloor = zr.from + Math.round(frac * zoneFloors) - 1;
       const compY = floorY(Math.max(zr.from, Math.min(zr.to, compFloor))) + floorH * 0.4;
-      svg += renderCompensatorSymbol(x_T3, compY, '#E53935');
+      svg += renderCompensatorSymbol(bundle.xT3, compY, COLOR_T3);
     }
     for (let c = 0; c < compCountT4; c++) {
       const frac = (c + 1) / (compCountT4 + 1);
       const compFloor = zr.from + Math.round(frac * zoneFloors) - 1;
       const compY = floorY(Math.max(zr.from, Math.min(zr.to, compFloor))) + floorH * 0.4;
-      svg += renderCompensatorSymbol(x_T4, compY, '#FB8C00');
+      svg += renderCompensatorSymbol(bundle.xT4, compY, COLOR_T4);
     }
   });
 
-  // --- Этажные узлы: горизонтальные коллекторы и квартирные отводы ---
+  // --- Этажная разводка PP-R от стояков к квартирам ---
   for (let f = 2; f <= floors; f++) {
     const y = floorY(f);
     const aptsCount = sec.apts[f] || 0;
     if (aptsCount <= 0) continue;
 
-    // Горизонтальный коллектор от Т4 вправо
-    const collectorEndX = x_T4 + 30 + aptsCount * aptSpacing;
-    svg += `<line x1="${x_V1}" y1="${y}" x2="${collectorEndX}" y2="${y}" stroke="var(--vis-collector-color, #90A4AE)" stroke-width="1.5"/>`;
+    // Находим пучок стояков зоны, обслуживающей этот этаж
+    let activeBundle = null;
+    for (const bundle of zoneBundles) {
+      if (f >= bundle.zr.from && f <= bundle.zr.to) {
+        activeBundle = bundle;
+        break;
+      }
+    }
+    if (!activeBundle) continue;
 
-    // Квартирные отводы (вертикальные короткие линии вниз от коллектора)
+    // Горизонтальная магистраль PP-R от пучка до квартир
+    const pprStartX = activeBundle.xT4 + 8;
+    const pprEndX = aptAreaStartX + aptsCount * aptSpacing;
+
+    // Три линии PP-R: ХВС (синяя тонкая), ГВС (красная тонкая), циркуляция (оранжевая)
+    const pprYOffset = 4;
+    svg += `<line x1="${pprStartX}" y1="${y - pprYOffset}" x2="${pprEndX}" y2="${y - pprYOffset}" stroke="${COLOR_V1}" stroke-width="1" opacity="0.6"/>`;
+    svg += `<line x1="${pprStartX}" y1="${y}" x2="${pprEndX}" y2="${y}" stroke="${COLOR_T3}" stroke-width="1" opacity="0.6"/>`;
+    svg += `<line x1="${pprStartX}" y1="${y + pprYOffset}" x2="${pprEndX}" y2="${y + pprYOffset}" stroke="${COLOR_T4}" stroke-width="0.7" opacity="0.5"/>`;
+
+    // Подпись PP-R на первом этаже с квартирами
+    if (f === 2 || (f > 2 && !(sec.apts[f - 1] > 0))) {
+      svg += `<text x="${pprEndX + 4}" y="${y + 3}" class="vis-ppr-label">PP-R</text>`;
+    }
+
+    // Квартирные отводы
     for (let a = 0; a < aptsCount; a++) {
-      const ax = x_T4 + 30 + a * aptSpacing;
-      svg += `<line x1="${ax}" y1="${y}" x2="${ax}" y2="${y + aptBranchLen}" stroke="var(--vis-branch-color, #B0BEC5)" stroke-width="1"/>`;
-      svg += `<circle cx="${ax}" cy="${y + aptBranchLen}" r="2" fill="var(--vis-branch-color, #B0BEC5)"/>`;
+      const ax = aptAreaStartX + a * aptSpacing;
+      // Вертикальный отвод вниз
+      svg += `<line x1="${ax}" y1="${y - pprYOffset}" x2="${ax}" y2="${y + aptBranchLen}" stroke="${COLOR_PPR}" stroke-width="1"/>`;
+      // Точка подключения (квартира)
+      svg += `<circle cx="${ax}" cy="${y + aptBranchLen}" r="2.5" fill="${COLOR_PPR}" opacity="0.7"/>`;
     }
   }
+
+  // --- Легенда внизу ---
+  const legendY = svgH - 12;
+  svg += `<circle cx="${leftPad}" cy="${legendY}" r="4" fill="${COLOR_V1}"/><text x="${leftPad + 8}" y="${legendY + 4}" class="vis-legend-text">В1 (ХВС)</text>`;
+  svg += `<circle cx="${leftPad + 90}" cy="${legendY}" r="4" fill="${COLOR_T3}"/><text x="${leftPad + 98}" y="${legendY + 4}" class="vis-legend-text">Т3 (ГВС)</text>`;
+  svg += `<circle cx="${leftPad + 180}" cy="${legendY}" r="4" fill="${COLOR_T4}"/><text x="${leftPad + 188}" y="${legendY + 4}" class="vis-legend-text">Т4 (цирк.)</text>`;
+  svg += `<line x1="${leftPad + 260}" y1="${legendY}" x2="${leftPad + 275}" y2="${legendY}" stroke="${COLOR_PPR}" stroke-width="1.5"/><text x="${leftPad + 280}" y="${legendY + 4}" class="vis-legend-text">PP-R</text>`;
 
   svg += `</svg>`;
   svg += `</div>`; // vis-svg-wrapper
@@ -525,6 +597,23 @@ function renderCompensatorSymbol(x, y, color) {
   const w = 6;
   const h = 8;
   return `<path d="M${x} ${y} L${x - w} ${y} L${x - w} ${y - h} L${x + w} ${y - h} L${x + w} ${y} L${x} ${y}" fill="none" stroke="${color}" stroke-width="1.5"/>`;
+}
+
+// Концевой узел: шаровой кран (ромб) + воздухоотводчик (кружок с линией вверх)
+function renderEndNode(x, y, color) {
+  let s = '';
+  // Шаровой кран — ромб на стояке
+  const crS = 5; // размер ромба
+  const crY = y - 4;
+  s += `<polygon points="${x},${crY - crS} ${x + crS},${crY} ${x},${crY + crS} ${x - crS},${crY}" fill="${color}" opacity="0.8"/>`;
+  // Воздухоотводчик — кружок выше крана + линия к стояку
+  const avY = crY - crS - 8;
+  s += `<line x1="${x}" y1="${crY - crS}" x2="${x}" y2="${avY + 4}" stroke="${color}" stroke-width="1"/>`;
+  s += `<circle cx="${x}" cy="${avY}" r="4" fill="none" stroke="${color}" stroke-width="1.5"/>`;
+  // Маленькая стрелка вверх (воздух)
+  s += `<line x1="${x}" y1="${avY - 4}" x2="${x}" y2="${avY - 9}" stroke="${color}" stroke-width="1"/>`;
+  s += `<path d="M${x - 2.5} ${avY - 7} L${x} ${avY - 10} L${x + 2.5} ${avY - 7}" fill="none" stroke="${color}" stroke-width="1"/>`;
+  return s;
 }
 
 // Обработчик изменения количества корпусов (если элемент существует)
