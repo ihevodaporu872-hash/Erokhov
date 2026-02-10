@@ -82,7 +82,8 @@ import {
   setActiveTabId,
   setOnTabChange,
   setSpecificationRenderer,
-  setEstimateRenderer
+  setEstimateRenderer,
+  setVisualizationRenderer
 } from './tabs.js';
 
 import {
@@ -337,6 +338,193 @@ function renderEstimate() {
 
   // Рендерим смету
   renderEstimateBlock(estimateData, sections.length);
+}
+
+// Рендеринг вкладки "Визуализация расчёта"
+function renderVisualization() {
+  const container = document.getElementById('visualizationContent');
+  if (!container) return;
+
+  // Если нет корпусов — заглушка
+  if (!sections || sections.length === 0) {
+    container.innerHTML = `<div class="placeholder-block"><p class="note">Нет данных для визуализации. Добавьте корпуса и произведите расчёт.</p></div>`;
+    return;
+  }
+
+  const { h1, hn } = getHeights();
+  if (!h1 && !hn) {
+    container.innerHTML = `<div class="placeholder-block"><p class="note">Нажмите «Произвести расчёт» для формирования схемы.</p></div>`;
+    return;
+  }
+
+  let html = '';
+
+  sections.forEach((sec, si) => {
+    html += renderSectionSVG(sec, si, h1, hn);
+  });
+
+  container.innerHTML = html;
+}
+
+// Генерация SVG-схемы для одного корпуса
+function renderSectionSVG(sec, si, h1, hn) {
+  const floors = sec.floors || 1;
+
+  // Параметры SVG
+  const floorH = 50;          // высота одного этажа в пикселях
+  const topPad = 40;           // отступ сверху
+  const bottomPad = 30;        // отступ снизу
+  const leftPad = 70;          // отступ слева (для подписей этажей)
+  const rightPad = 40;         // отступ справа
+  const riserSpacing = 80;     // расстояние между стояками
+  const riserStartX = leftPad + 40; // начало области стояков
+
+  // Три стояка: В1, Т3, Т4
+  const x_V1 = riserStartX;
+  const x_T3 = riserStartX + riserSpacing;
+  const x_T4 = riserStartX + riserSpacing * 2;
+
+  const aptBranchLen = 20;     // длина квартирного отвода
+  const aptSpacing = 8;        // расстояние между отводами
+
+  // Считаем макс. количество квартир для определения ширины
+  let maxApts = 0;
+  for (let f = 1; f <= floors; f++) {
+    const a = sec.apts[f] || 0;
+    if (a > maxApts) maxApts = a;
+  }
+
+  const aptAreaWidth = maxApts > 0 ? (maxApts * aptSpacing + aptBranchLen + 20) : 40;
+  const svgW = x_T4 + aptAreaWidth + rightPad;
+  const svgH = topPad + floors * floorH + bottomPad;
+
+  // Y-координата для этажа (1-й этаж — внизу)
+  function floorY(f) {
+    return topPad + (floors - f) * floorH;
+  }
+
+  let svg = `<div class="vis-section-block">`;
+  svg += `<h3 class="vis-section-title">Корпус ${si + 1}</h3>`;
+  svg += `<div class="vis-svg-wrapper">`;
+  svg += `<svg width="${svgW}" height="${svgH}" viewBox="0 0 ${svgW} ${svgH}" xmlns="http://www.w3.org/2000/svg" class="vis-schema">`;
+
+  // Фон
+  svg += `<rect width="${svgW}" height="${svgH}" fill="none"/>`;
+
+  // --- Горизонтальные линии этажей (пунктирные) ---
+  for (let f = 1; f <= floors; f++) {
+    const y = floorY(f);
+    svg += `<line x1="${leftPad}" y1="${y}" x2="${svgW - rightPad}" y2="${y}" stroke="var(--vis-grid-color, #e0e0e0)" stroke-width="0.5" stroke-dasharray="4 4"/>`;
+
+    // Подпись этажа
+    svg += `<text x="${leftPad - 8}" y="${y + 4}" text-anchor="end" class="vis-floor-label">${f} эт.</text>`;
+  }
+
+  // --- Определяем зоны и их границы ---
+  let currentFloor = 1;
+  const zoneRanges = [];
+  if (sec.zones && sec.zones.length > 0) {
+    for (const z of sec.zones) {
+      const zoneTo = Math.min(z.to || 0, floors);
+      const zoneFrom = currentFloor;
+      if (zoneTo >= zoneFrom) {
+        zoneRanges.push({ zone: z, from: zoneFrom, to: zoneTo });
+        currentFloor = zoneTo + 1;
+      }
+    }
+  }
+
+  // --- Подложки зон (чередующиеся) ---
+  zoneRanges.forEach((zr, zi) => {
+    const yTop = floorY(zr.to) - floorH * 0.3;
+    const yBot = floorY(zr.from) + floorH * 0.3;
+    const fillOpacity = zi % 2 === 0 ? 0.03 : 0.06;
+    svg += `<rect x="${leftPad}" y="${yTop}" width="${svgW - leftPad - rightPad}" height="${yBot - yTop}" fill="var(--vis-zone-bg, #007AFF)" fill-opacity="${fillOpacity}" rx="4"/>`;
+    // Подпись зоны
+    svg += `<text x="${svgW - rightPad - 4}" y="${yTop + 14}" text-anchor="end" class="vis-zone-label">${zr.zone.name || 'Зона ' + (zi + 1)}</text>`;
+  });
+
+  // --- Стояки (вертикальные линии) ---
+  const yTop = floorY(floors);
+  const yBot = floorY(1);
+
+  // В1 (синий)
+  svg += `<line x1="${x_V1}" y1="${yTop}" x2="${x_V1}" y2="${yBot}" stroke="#007AFF" stroke-width="3" stroke-linecap="round"/>`;
+  svg += `<text x="${x_V1}" y="${yTop - 10}" text-anchor="middle" class="vis-riser-label" fill="#007AFF">В1</text>`;
+
+  // Т3 (красный)
+  svg += `<line x1="${x_T3}" y1="${yTop}" x2="${x_T3}" y2="${yBot}" stroke="#E53935" stroke-width="3" stroke-linecap="round"/>`;
+  svg += `<text x="${x_T3}" y="${yTop - 10}" text-anchor="middle" class="vis-riser-label" fill="#E53935">Т3</text>`;
+
+  // Т4 (оранжевый, тоньше)
+  svg += `<line x1="${x_T4}" y1="${yTop}" x2="${x_T4}" y2="${yBot}" stroke="#FB8C00" stroke-width="2" stroke-linecap="round"/>`;
+  svg += `<text x="${x_T4}" y="${yTop - 10}" text-anchor="middle" class="vis-riser-label" fill="#FB8C00">Т4</text>`;
+
+  // --- Подписи диаметров на стояках по зонам ---
+  zoneRanges.forEach(zr => {
+    const midFloor = Math.round((zr.from + zr.to) / 2);
+    const yMid = floorY(midFloor) + floorH * 0.25;
+    const d = zr.zone.fixedD || { V1: 32, T3: 32, T4: 32 };
+
+    svg += `<text x="${x_V1 + 2}" y="${yMid}" class="vis-dia-label" fill="#007AFF">Ø${d.V1}</text>`;
+    svg += `<text x="${x_T3 + 2}" y="${yMid}" class="vis-dia-label" fill="#E53935">Ø${d.T3}</text>`;
+    svg += `<text x="${x_T4 + 2}" y="${yMid}" class="vis-dia-label" fill="#FB8C00">Ø${d.T4}</text>`;
+  });
+
+  // --- Компенсаторы на Т3 и Т4 ---
+  zoneRanges.forEach(zr => {
+    const d = zr.zone.fixedD || { V1: 32, T3: 32, T4: 32 };
+    const zoneFloors = zr.to - zr.from + 1;
+    const zoneH = (zr.from === 1 ? h1 : hn) + (zoneFloors > 1 ? (zoneFloors - 1) * hn : 0);
+
+    const compCountT3 = calcCompensators(zoneH, d.T3);
+    const compCountT4 = calcCompensators(zoneH, d.T4);
+
+    // Размещаем компенсаторы равномерно по зоне
+    for (let c = 0; c < compCountT3; c++) {
+      const frac = (c + 1) / (compCountT3 + 1);
+      const compFloor = zr.from + Math.round(frac * zoneFloors) - 1;
+      const compY = floorY(Math.max(zr.from, Math.min(zr.to, compFloor))) + floorH * 0.4;
+      svg += renderCompensatorSymbol(x_T3, compY, '#E53935');
+    }
+    for (let c = 0; c < compCountT4; c++) {
+      const frac = (c + 1) / (compCountT4 + 1);
+      const compFloor = zr.from + Math.round(frac * zoneFloors) - 1;
+      const compY = floorY(Math.max(zr.from, Math.min(zr.to, compFloor))) + floorH * 0.4;
+      svg += renderCompensatorSymbol(x_T4, compY, '#FB8C00');
+    }
+  });
+
+  // --- Этажные узлы: горизонтальные коллекторы и квартирные отводы ---
+  for (let f = 2; f <= floors; f++) {
+    const y = floorY(f);
+    const aptsCount = sec.apts[f] || 0;
+    if (aptsCount <= 0) continue;
+
+    // Горизонтальный коллектор от Т4 вправо
+    const collectorEndX = x_T4 + 30 + aptsCount * aptSpacing;
+    svg += `<line x1="${x_V1}" y1="${y}" x2="${collectorEndX}" y2="${y}" stroke="var(--vis-collector-color, #90A4AE)" stroke-width="1.5"/>`;
+
+    // Квартирные отводы (вертикальные короткие линии вниз от коллектора)
+    for (let a = 0; a < aptsCount; a++) {
+      const ax = x_T4 + 30 + a * aptSpacing;
+      svg += `<line x1="${ax}" y1="${y}" x2="${ax}" y2="${y + aptBranchLen}" stroke="var(--vis-branch-color, #B0BEC5)" stroke-width="1"/>`;
+      svg += `<circle cx="${ax}" cy="${y + aptBranchLen}" r="2" fill="var(--vis-branch-color, #B0BEC5)"/>`;
+    }
+  }
+
+  svg += `</svg>`;
+  svg += `</div>`; // vis-svg-wrapper
+  svg += `</div>`; // vis-section-block
+
+  return svg;
+}
+
+// Символ компенсатора (П-образный)
+function renderCompensatorSymbol(x, y, color) {
+  const w = 6;
+  const h = 8;
+  return `<path d="M${x} ${y} L${x - w} ${y} L${x - w} ${y - h} L${x + w} ${y - h} L${x + w} ${y} L${x} ${y}" fill="none" stroke="${color}" stroke-width="1.5"/>`;
 }
 
 // Обработчик изменения количества корпусов (если элемент существует)
@@ -1639,6 +1827,9 @@ window.onload = () => {
 
   // Устанавливаем renderer для вкладки "Смета"
   setEstimateRenderer(renderEstimate);
+
+  // Устанавливаем renderer для вкладки "Визуализация"
+  setVisualizationRenderer(renderVisualization);
 
   // Загружаем проекты из localStorage
   projects = loadProjects();

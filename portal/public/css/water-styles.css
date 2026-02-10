@@ -3029,3 +3029,112 @@ select option {
   padding: 10px 12px;
   line-height: 1.6;
 }
+
+/* ========================= */
+/* Визуализация расчёта       */
+/* ========================= */
+
+.visualization-header {
+  margin-bottom: 24px;
+}
+
+.visualization-title {
+  font-size: 1.3rem;
+  font-weight: 600;
+  color: var(--text-primary, #1d1d1f);
+  margin: 0 0 4px 0;
+}
+
+.visualization-subtitle {
+  font-size: 0.85rem;
+  color: var(--text-secondary, #86868b);
+  margin: 0;
+}
+
+body.dark-theme .visualization-title {
+  color: #f5f5f7;
+}
+
+body.dark-theme .visualization-subtitle {
+  color: #a1a1a6;
+}
+
+.vis-section-block {
+  margin-bottom: 32px;
+  padding: 20px;
+  background: var(--bg-secondary, #f9f9fb);
+  border-radius: 12px;
+  border: 1px solid var(--border-color, #e5e5ea);
+}
+
+body.dark-theme .vis-section-block {
+  background: #1c1c1e;
+  border-color: #38383a;
+}
+
+.vis-section-title {
+  font-size: 1.05rem;
+  font-weight: 600;
+  margin: 0 0 16px 0;
+  color: var(--text-primary, #1d1d1f);
+}
+
+body.dark-theme .vis-section-title {
+  color: #f5f5f7;
+}
+
+.vis-svg-wrapper {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 8px 0;
+}
+
+.vis-schema {
+  display: block;
+  min-width: fit-content;
+}
+
+/* Подписи этажей */
+.vis-floor-label {
+  font-size: 11px;
+  font-family: 'DM Sans', sans-serif;
+  fill: var(--text-secondary, #86868b);
+}
+
+body.dark-theme .vis-floor-label {
+  fill: #a1a1a6;
+}
+
+/* Подписи стояков */
+.vis-riser-label {
+  font-size: 12px;
+  font-weight: 600;
+  font-family: 'DM Sans', sans-serif;
+}
+
+/* Подписи диаметров */
+.vis-dia-label {
+  font-size: 9px;
+  font-family: 'DM Sans', sans-serif;
+  font-weight: 500;
+}
+
+/* Подписи зон */
+.vis-zone-label {
+  font-size: 10px;
+  font-family: 'DM Sans', sans-serif;
+  fill: var(--text-secondary, #86868b);
+  font-style: italic;
+}
+
+body.dark-theme .vis-zone-label {
+  fill: #a1a1a6;
+}
+
+/* CSS-переменные для SVG в тёмной теме */
+body.dark-theme .vis-schema {
+  --vis-grid-color: #38383a;
+  --vis-collector-color: #607D8B;
+  --vis-branch-color: #78909C;
+  --vis-zone-bg: #4a9eff;
+}

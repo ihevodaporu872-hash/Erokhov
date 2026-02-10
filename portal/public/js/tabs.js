@@ -9,6 +9,7 @@ export const TABS = [
   { id: 'external', label: 'Наружные сети' },
   { id: 'specification', label: 'Спецификация' },
   { id: 'estimate', label: 'Смета' },
+  { id: 'visualization', label: 'Визуализация расчёта' },
 ];
 
 // Текущая активная вкладка
@@ -23,6 +24,9 @@ let specificationRenderer = null;
 // Callback для рендеринга сметы
 let estimateRenderer = null;
 
+// Callback для рендеринга визуализации
+let visualizationRenderer = null;
+
 // Установка callback
 export function setOnTabChange(callback) {
   onTabChangeCallback = callback;
@@ -36,6 +40,11 @@ export function setSpecificationRenderer(renderer) {
 // Установка renderer для сметы
 export function setEstimateRenderer(renderer) {
   estimateRenderer = renderer;
+}
+
+// Установка renderer для визуализации
+export function setVisualizationRenderer(renderer) {
+  visualizationRenderer = renderer;
 }
 
 // Получение активной вкладки
@@ -94,6 +103,7 @@ export function renderTabContent() {
   const undergroundContainer = document.getElementById('undergroundContainer');
   const specificationContainer = document.getElementById('specificationContainer');
   const estimateContainer = document.getElementById('estimateContainer');
+  const visualizationContainer = document.getElementById('visualizationContainer');
   const placeholderContainer = document.getElementById('placeholderContainer');
 
   // Скрываем все контейнеры
@@ -101,6 +111,7 @@ export function renderTabContent() {
   if (undergroundContainer) undergroundContainer.style.display = 'none';
   if (specificationContainer) specificationContainer.style.display = 'none';
   if (estimateContainer) estimateContainer.style.display = 'none';
+  if (visualizationContainer) visualizationContainer.style.display = 'none';
   if (placeholderContainer) placeholderContainer.style.display = 'none';
 
   // Показываем нужный контейнер
@@ -119,9 +130,15 @@ export function renderTabContent() {
   } else if (activeTabId === 'estimate') {
     if (estimateContainer) {
       estimateContainer.style.display = 'block';
-      // Вызываем renderer для обновления данных сметы
       if (estimateRenderer) {
         estimateRenderer();
+      }
+    }
+  } else if (activeTabId === 'visualization') {
+    if (visualizationContainer) {
+      visualizationContainer.style.display = 'block';
+      if (visualizationRenderer) {
+        visualizationRenderer();
       }
     }
   } else {
@@ -144,7 +161,8 @@ function renderPlaceholder(container) {
     inlet: 'Здесь будут расчёты узла ввода: водомерный узел, регуляторы давления, обратные клапаны.',
     external: 'Здесь будут расчёты наружных сетей: трассировка, диаметры, гидравлический расчёт.',
     specification: 'Здесь будет формирование спецификации оборудования и материалов для системы водоснабжения.',
-    estimate: 'Здесь будет формирование сметы: расценки, объёмы работ, стоимость материалов и монтажа.'
+    estimate: 'Здесь будет формирование сметы: расценки, объёмы работ, стоимость материалов и монтажа.',
+    visualization: 'Здесь будет визуализация расчёта: вертикальная схема систем В1, Т3, Т4 с поэтажными разводками.'
   };
 
   container.innerHTML = `
@@ -192,6 +210,10 @@ function getTabIcon(tabId) {
       <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
       <path d="M14 2v6h6"/>
       <path d="M8 13h8M8 17h8M8 9h2"/>
+    </svg>`,
+    visualization: `<svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+      <path d="M3 21V3M7 21V8M11 21V5M15 21V10M19 21V7"/>
+      <path d="M3 21h18"/>
     </svg>`
   };
   return icons[tabId] || '';
