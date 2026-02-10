@@ -1077,6 +1077,7 @@ details.accordion-output[open] .accordion-header {
   width: auto;
   min-width: 80px;
   max-width: 100px;
+  text-align: center;
   background: var(--bg-card);
   color: var(--gray-900);
   transition: all 0.2s ease;
