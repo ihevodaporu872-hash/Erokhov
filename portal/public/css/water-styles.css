@@ -1055,7 +1055,7 @@ details.accordion-output[open] .accordion-header {
 
 /* ===== Поля ввода ===== */
 .input-group {
-  margin-bottom: 16px;
+  margin-bottom: 20px;
 }
 
 .input-group label {
@@ -1068,16 +1068,25 @@ details.accordion-output[open] .accordion-header {
 
 .input-group input,
 .input-group select {
-  padding: 11px 14px;
+  padding: 9px 12px;
   border: 1px solid var(--gray-300);
   border-radius: 8px;
   font-family: var(--font-ui);
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 400;
-  width: 100%;
+  width: auto;
+  min-width: 80px;
+  max-width: 100px;
   background: var(--bg-card);
   color: var(--gray-900);
   transition: all 0.2s ease;
+}
+
+/* Текстовые поля и select — допускаем шире */
+.input-group input[type="text"],
+.input-group input[type="email"],
+.input-group select {
+  max-width: 220px;
 }
 
 .input-group input:focus,
@@ -1111,13 +1120,15 @@ details.accordion-output[open] .accordion-header {
 .row {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 16px;
+  gap: 24px;
+  margin-bottom: 8px;
 }
 
 .row-2 {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 16px;
+  gap: 24px;
+  margin-bottom: 8px;
 }
 
 /* ===== Результаты ===== */
@@ -1157,49 +1168,52 @@ th {
 
 .floors-table input,
 .floors-table select {
-  width: 100%;
+  width: auto;
+  max-width: 90px;
   text-align: center;
-  padding: 10px 12px;
-  line-height: 1.6;
-  min-height: 38px;
+  padding: 7px 8px;
+  line-height: 1.4;
+  min-height: 34px;
 }
 
-/* Компактные ячейки для таблицы этажей */
+/* Ячейки таблицы этажей с воздухом */
 .floors-table td {
-  padding: 8px 10px;
+  padding: 10px 12px;
   vertical-align: middle;
 }
 
 .floors-table th {
-  padding: 10px 10px;
+  padding: 12px 12px;
 }
 
 .zone-table input,
 .zone-table select {
-  width: 100%;
+  width: auto;
+  max-width: 90px;
   text-align: center;
-  padding: 10px 12px;
-  line-height: 1.6;
-  min-height: 38px;
+  padding: 7px 8px;
+  line-height: 1.4;
+  min-height: 34px;
 }
 
-/* Компактные ячейки для таблицы зон */
+/* Ячейки таблицы зон с воздухом */
 .zone-table td {
-  padding: 8px 10px;
+  padding: 10px 12px;
   vertical-align: middle;
 }
 
 .zone-table th {
-  padding: 10px 10px;
+  padding: 12px 12px;
 }
 
 /* Унифицированные стили для полей внутри таблиц */
 table input,
 table select {
-  border-radius: 8px;
+  border-radius: 6px;
   border: 1px solid var(--gray-200);
-  padding: 8px 12px;
+  padding: 6px 8px;
   font-size: 13px;
+  max-width: 90px;
   transition: all 0.2s ease;
   background: var(--bg-card);
 }
