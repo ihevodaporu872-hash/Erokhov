@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Инженерный портал - Механические системы</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #ffffff;
+            --bg-secondary: #f8f9fa;
+            --bg-sidebar: #f1f5f9;
+            --text-primary: #212529;
+            --text-secondary: #6c757d;
+            --border-color: #dee2e6;
+            --card-shadow: rgba(0, 0, 0, 0.075);
+            --card-hover-shadow: rgba(0, 0, 0, 0.15);
+        }
+
+        body.dark-theme {
+            --bg-primary: #1e1e1e;
+            --bg-secondary: #2a2a2a;
+            --bg-sidebar: #252525;
+            --text-primary: #e4e4e4;
+            --text-secondary: #a0a0a0;
+            --border-color: #3a3a3a;
+            --card-shadow: rgba(0, 0, 0, 0.4);
+            --card-hover-shadow: rgba(0, 0, 0, 0.6);
+        }
+
+        body.dark-theme .formula-box {
+            background-color: #2a2a2a;
+            border-left-color: #3b82f6;
+        }
+
+        body.dark-theme .formula-box code {
+            color: #93c5fd;
+            font-weight: 600;
+        }
+
+        body.dark-theme .form-label {
+            color: #e4e4e4;
+            font-weight: 500;
+        }
+
+        body.dark-theme .btn-primary {
+            background-color: #3b82f6;
+            border-color: #3b82f6;
+        }
+
+        body.dark-theme .btn-primary:hover {
+            background-color: #2563eb;
+            border-color: #2563eb;
+        }
+
+        body.dark-theme .alert-info {
+            background-color: #2a2a2a;
+            border-color: #3b82f6;
+            color: #e4e4e4;
+        }
+
+        body.dark-theme .result-box {
+            background: linear-gradient(135deg, #3b82f6 0%, #6366f1 100%);
+        }
+
+        body.dark-theme .sidebar {
+            background: var(--bg-sidebar);
+            box-shadow: 2px 0 8px rgba(0, 0, 0, 0.3);
+        }
+
+        body.dark-theme .sidebar h4 {
+            color: var(--text-primary);
+        }
+
+        body.dark-theme .sidebar .nav-link {
+            color: var(--text-primary);
+        }
+
+        body.dark-theme .sidebar .nav-link:hover {
+            background-color: rgba(255, 255, 255, 0.08);
+        }
+
+        body.dark-theme .sidebar .nav-link.active {
+            background-color: #3b82f6;
+            color: #ffffff;
+        }
+
+        body.dark-theme .sidebar .nav-link.active i {
+            color: #ffffff;
+        }
+
+        body.dark-theme .navbar {
+            background-color: var(--bg-secondary);
+            border-bottom-color: var(--border-color);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        }
+
+        body.dark-theme .page-header {
+            background: linear-gradient(135deg, #3b82f6 0%, #6366f1 100%);
+        }
+
+        .alert-secondary {
+            border-radius: 1rem;
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+        }
+
+        body.dark-theme .alert-secondary {
+            background-color: #2a2a2a;
+            border-color: #3a3a3a;
+        }
+
+        body {
+            min-height: 100vh;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            transition: background-color 0.3s, color 0.3s;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+        }
+
+        .navbar {
+            background-color: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+            box-shadow: 0 2px 4px var(--card-shadow);
+        }
+
+        .navbar-brand {
+            font-weight: 600;
+            font-size: 1.15rem;
+        }
+
+        .sidebar {
+            min-height: calc(100vh - 56px);
+            background: var(--bg-sidebar);
+            position: fixed;
+            top: 56px;
+            left: 0;
+            width: 250px;
+            overflow-y: auto;
+            transition: all 0.3s;
+            box-shadow: 2px 0 4px rgba(0, 0, 0, 0.08);
+            padding: 1rem 0.75rem;
+        }
+
+        .sidebar .position-sticky {
+            padding: 0;
+        }
+
+        .sidebar h4 {
+            font-weight: 700;
+            font-size: 1.1rem;
+            letter-spacing: 0.3px;
+            color: var(--text-primary);
+            padding: 0 0.75rem;
+            margin-bottom: 1rem;
+        }
+
+        .sidebar h4 i {
+            margin-right: 0.5rem;
+        }
+
+        .sidebar .nav-link {
+            color: var(--text-primary);
+            padding: 0.75rem 1rem;
+            margin: 0.25rem 0;
+            border-radius: 12px;
+            transition: all 0.2s ease-in-out;
+            font-size: 0.95rem;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            text-decoration: none;
+            border: none;
+        }
+
+        .sidebar .nav-link:hover {
+            background-color: rgba(100, 116, 139, 0.1);
+        }
+
+        .sidebar .nav-link.active {
+            color: #ffffff;
+            background-color: #3b82f6;
+            font-weight: 500;
+        }
+
+        .sidebar .nav-link.active i {
+            color: #ffffff;
+        }
+
+        .sidebar .nav-link i {
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.15rem;
+            flex-shrink: 0;
+        }
+
+        .main-content {
+            margin-left: 250px;
+            margin-top: 56px;
+            padding: 0;
+            min-height: calc(100vh - 56px);
+            width: calc(100% - 250px);
+            max-width: 100%;
+        }
+
+        .content-section {
+            display: none;
+            width: 100%;
+            max-width: 100%;
+            padding: 0;
+            margin: 0;
+        }
+
+        .content-section.active {
+            display: block;
+            animation: fadeIn 0.4s ease-in-out;
+        }
+
+        /* Водоснабжение - контейнер на всю ширину */
+        #water-supply {
+            width: 100%;
+            padding: 0;
+            margin: 0;
+        }
+
+        #water-supply .page-header {
+            margin: 0;
+            border-radius: 0;
+        }
+
+        #vodo-content {
+            width: 100%;
+            margin: 0;
+            padding: 0;
+        }
+
+        /* Убираем отступы у всех карточек внутри контента */
+        .content-section .row {
+            margin: 0;
+            width: 100%;
+        }
+
+        .content-section .col-lg-8,
+        .content-section .col-lg-4 {
+            padding: 1rem;
+        }
+
+        /* Grid layout для полей ввода */
+        .input-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+            width: 100%;
+        }
+
+        .input-grid-2 {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 1.5rem;
+            width: 100%;
+        }
+
+        /* Адаптивность для мобильных */
+        @media (max-width: 768px) {
+            .input-grid,
+            .input-grid-2 {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .page-header {
+            background: linear-gradient(135deg, #3b82f6 0%, #6366f1 100%);
+            color: white;
+            padding: 2.5rem;
+            margin: 0 0 2rem 0;
+            border-radius: 0;
+            box-shadow: 0 4px 6px var(--card-shadow);
+            width: 100%;
+        }
+
+        .card {
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            box-shadow: 0 2px 4px var(--card-shadow);
+            transition: all 0.3s;
+            border-radius: 0.75rem;
+            width: 100%;
+        }
+
+        .content-section .card {
+            margin: 0;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 16px var(--card-hover-shadow);
+        }
+
+        .form-control, .form-select {
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+        }
+
+        .form-control:focus, .form-select:focus {
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            border-color: #0d6efd;
+        }
+
+        .theme-switch {
+            position: relative;
+            display: inline-block;
+            width: 52px;
+            height: 28px;
+        }
+
+        .theme-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #d1d5db;
+            transition: 0.3s ease;
+            border-radius: 28px;
+            box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 22px;
+            width: 22px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: 0.3s ease;
+            border-radius: 50%;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        input:checked + .slider {
+            background-color: #3d8bfd;
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(24px);
+        }
+
+        body.dark-theme .slider {
+            background-color: #3a3a3a;
+        }
+
+        body.dark-theme input:checked + .slider {
+            background-color: #3b82f6;
+        }
+
+        .navbar .text-secondary {
+            transition: color 0.3s ease;
+        }
+
+        body.dark-theme .navbar .text-secondary {
+            color: #a0a0a0 !important;
+        }
+
+        .sidebar .nav {
+            padding-top: 0.5rem;
+            padding-bottom: 0.5rem;
+        }
+
+        .sidebar .nav-item {
+            margin-bottom: 0.15rem;
+        }
+
+        .sidebar ul {
+            list-style: none;
+            padding-left: 0;
+            margin-bottom: 0;
+        }
+
+        .sidebar hr {
+            margin: 1.5rem 0.5rem;
+            opacity: 0.15;
+            border: 0;
+            border-top: 1px solid var(--border-color);
+        }
+
+        body.dark-theme .sidebar hr {
+            opacity: 0.2;
+            border-top-color: var(--border-color);
+        }
+
+        .sidebar .text-white-50 {
+            font-size: 0.8rem;
+            color: var(--text-secondary) !important;
+        }
+
+        .result-box {
+            background: linear-gradient(135deg, #3b82f6 0%, #6366f1 100%);
+            color: white;
+            padding: 1.5rem;
+            border-radius: 0.75rem;
+            text-align: center;
+            font-size: 1.5rem;
+            font-weight: bold;
+            min-height: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .formula-box {
+            background-color: var(--bg-secondary);
+            border-left: 4px solid #0d6efd;
+            padding: 1rem;
+            margin: 1rem 0;
+            border-radius: 0.5rem;
+        }
+
+        .formula-box code {
+            font-size: 1.1rem;
+        }
+
+        body.dark-theme .formula-box strong {
+            color: #e4e4e4;
+        }
+
+        body.dark-theme .formula-box .text-secondary {
+            color: #a0a0a0 !important;
+        }
+
+        body.dark-theme .text-muted {
+            color: #888888 !important;
+        }
+
+        body.dark-theme .card-header {
+            background-color: #2a2a2a;
+            border-bottom-color: #3a3a3a;
+            color: #e4e4e4;
+        }
+
+        body.dark-theme .navbar-brand {
+            color: #e4e4e4;
+        }
+
+        @media (max-width: 768px) {
+            .sidebar {
+                width: 100%;
+                position: relative;
+                top: 0;
+            }
+            .main-content {
+                margin-left: 0;
+                margin-top: 0;
+                width: 100%;
+            }
+            .content-section .col-lg-8,
+            .content-section .col-lg-4 {
+                padding: 0.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Верхняя панель навигации -->
+    <nav class="navbar navbar-expand-lg fixed-top">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="#">
+                <i class="bi bi-gear-fill"></i> Инженерный портал
+            </a>
+            <div class="d-flex align-items-center">
+                <span class="me-2 text-secondary"><i class="bi bi-sun-fill"></i></span>
+                <label class="theme-switch">
+                    <input type="checkbox" id="themeToggle">
+                    <span class="slider"></span>
+                </label>
+                <span class="ms-2 text-secondary"><i class="bi bi-moon-fill"></i></span>
+            </div>
+        </div>
+    </nav>
+
+    <div class="d-flex">
+        <!-- Боковая панель -->
+        <nav class="sidebar">
+            <div class="position-sticky pt-3">
+                <h4 class="mb-4 text-center">
+                    <i class="bi bi-gear-fill"></i> Инженерный портал
+                </h4>
+            <ul class="nav flex-column">
+                <li class="nav-item">
+                    <a class="nav-link active" href="#" data-section="dashboard">
+                        <i class="bi bi-speedometer2"></i>
+                        Панель управления
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="#" data-section="water-supply">
+                        <i class="bi bi-droplet-fill"></i>
+                        Водоснабжение
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="#" data-section="sewage">
+                        <i class="bi bi-arrow-down-circle"></i>
+                        Водоотведение
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="#" data-section="ventilation">
+                        <i class="bi bi-wind"></i>
+                        Вентиляция
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="#" data-section="heating">
+                        <i class="bi bi-thermometer-half"></i>
+                        Отопление
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="#" data-section="fire-safety">
+                        <i class="bi bi-fire"></i>
+                        Пожаротушение
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="#" data-section="conditioning">
+                        <i class="bi bi-snow"></i>
+                        Кондиционирование
+                    </a>
+                </li>
+            </ul>
+            <hr class="my-4">
+            <div class="text-center">
+                <small class="text-white-50">© 2026 Engineering Portal</small>
+            </div>
+            </div>
+        </nav>
+
+        <!-- Основной контент -->
+        <main class="main-content">
+            <!-- Панель управления -->
+            <div id="dashboard" class="content-section active">
+                <div class="page-header">
+                    <h1><i class="bi bi-speedometer2"></i> Панель управления</h1>
+                    <p class="lead mb-0">Добро пожаловать в инженерный портал</p>
+                </div>
+
+                <div class="alert alert-secondary text-center py-5" role="alert">
+                    <i class="bi bi-hourglass-split" style="font-size: 4rem; opacity: 0.6;"></i>
+                    <h4 class="mt-3 mb-2">Функционал будет доступен в ближайших обновлениях</h4>
+                    <p class="text-muted mb-0">Мы работаем над этим разделом</p>
+                </div>
+            </div>
+
+            <!-- Водоснабжение -->
+            <div id="water-supply" class="content-section">
+                <div class="page-header">
+                    <h1><i class="bi bi-droplet-fill"></i> Водоснабжение</h1>
+                </div>
+
+                <div id="vodo-content">
+                    <!-- Встроенный калькулятор -->
+                    <iframe
+                        src="water-calculator.html"
+                        style="width: 100%; min-height: 1200px; height: 100vh; border: none; border-radius: 8px;"
+                        id="waterCalcFrame">
+                    </iframe>
+                </div>
+            </div>
+
+            <!-- Водоотведение -->
+            <div id="sewage" class="content-section">
+                <div class="page-header">
+                    <h1><i class="bi bi-arrow-down-circle"></i> Водоотведение</h1>
+                    <p class="lead mb-0">Управление системами канализации</p>
+                </div>
+
+                <div class="alert alert-secondary text-center py-5" role="alert">
+                    <i class="bi bi-hourglass-split" style="font-size: 4rem; opacity: 0.6;"></i>
+                    <h4 class="mt-3 mb-2">Функционал будет доступен в ближайших обновлениях</h4>
+                    <p class="text-muted mb-0">Мы работаем над этим разделом</p>
+                </div>
+            </div>
+
+            <!-- Вентиляция -->
+            <div id="ventilation" class="content-section">
+                <div class="page-header">
+                    <h1><i class="bi bi-wind"></i> Вентиляция</h1>
+                    <p class="lead mb-0">Управление системами вентиляции</p>
+                </div>
+
+                <div class="alert alert-secondary text-center py-5" role="alert">
+                    <i class="bi bi-hourglass-split" style="font-size: 4rem; opacity: 0.6;"></i>
+                    <h4 class="mt-3 mb-2">Функционал будет доступен в ближайших обновлениях</h4>
+                    <p class="text-muted mb-0">Мы работаем над этим разделом</p>
+                </div>
+            </div>
+
+            <!-- Отопление -->
+            <div id="heating" class="content-section">
+                <div class="page-header">
+                    <h1><i class="bi bi-thermometer-half"></i> Отопление</h1>
+                    <p class="lead mb-0">Управление системами отопления и теплоснабжения</p>
+                </div>
+
+                <div class="alert alert-secondary text-center py-5" role="alert">
+                    <i class="bi bi-hourglass-split" style="font-size: 4rem; opacity: 0.6;"></i>
+                    <h4 class="mt-3 mb-2">Функционал будет доступен в ближайших обновлениях</h4>
+                    <p class="text-muted mb-0">Мы работаем над этим разделом</p>
+                </div>
+            </div>
+
+            <!-- Пожаротушение -->
+            <div id="fire-safety" class="content-section">
+                <div class="page-header">
+                    <h1><i class="bi bi-fire"></i> Пожаротушение</h1>
+                    <p class="lead mb-0">Управление системами пожарной безопасности</p>
+                </div>
+
+                <div class="alert alert-secondary text-center py-5" role="alert">
+                    <i class="bi bi-hourglass-split" style="font-size: 4rem; opacity: 0.6;"></i>
+                    <h4 class="mt-3 mb-2">Функционал будет доступен в ближайших обновлениях</h4>
+                    <p class="text-muted mb-0">Мы работаем над этим разделом</p>
+                </div>
+            </div>
+
+            <!-- Кондиционирование -->
+            <div id="conditioning" class="content-section">
+                <div class="page-header">
+                    <h1><i class="bi bi-snow"></i> Кондиционирование</h1>
+                    <p class="lead mb-0">Управление системами кондиционирования воздуха</p>
+                </div>
+
+                <div class="alert alert-secondary text-center py-5" role="alert">
+                    <i class="bi bi-hourglass-split" style="font-size: 4rem; opacity: 0.6;"></i>
+                    <h4 class="mt-3 mb-2">Функционал будет доступен в ближайших обновлениях</h4>
+                    <p class="text-muted mb-0">Мы работаем над этим разделом</p>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Переключение темы
+        const themeToggle = document.getElementById('themeToggle');
+        const body = document.body;
+
+        // Загрузка сохраненной темы
+        const savedTheme = localStorage.getItem('theme');
+        if (savedTheme === 'dark') {
+            body.classList.add('dark-theme');
+            themeToggle.checked = true;
+        }
+
+        // Отправляем начальную тему iframe'у при его загрузке
+        const waterCalcFrame = document.getElementById('waterCalcFrame');
+        if (waterCalcFrame) {
+            waterCalcFrame.addEventListener('load', function() {
+                const currentTheme = body.classList.contains('dark-theme') ? 'dark' : 'light';
+                waterCalcFrame.contentWindow.postMessage({
+                    type: 'theme-change',
+                    theme: currentTheme
+                }, '*');
+            });
+        }
+
+        themeToggle.addEventListener('change', function() {
+            const theme = this.checked ? 'dark' : 'light';
+
+            if (this.checked) {
+                body.classList.add('dark-theme');
+                localStorage.setItem('theme', 'dark');
+            } else {
+                body.classList.remove('dark-theme');
+                localStorage.setItem('theme', 'light');
+            }
+
+            // Уведомляем iframe о смене темы
+            const waterCalcFrame = document.getElementById('waterCalcFrame');
+            if (waterCalcFrame && waterCalcFrame.contentWindow) {
+                waterCalcFrame.contentWindow.postMessage({
+                    type: 'theme-change',
+                    theme: theme
+                }, '*');
+            }
+        });
+
+        // Навигация между секциями
+        document.querySelectorAll('.sidebar .nav-link').forEach(link => {
+            link.addEventListener('click', function(e) {
+                e.preventDefault();
+
+                // Удаляем активный класс
+                document.querySelectorAll('.sidebar .nav-link').forEach(l => l.classList.remove('active'));
+                this.classList.add('active');
+
+                // Скрываем все секции
+                document.querySelectorAll('.content-section').forEach(section => section.classList.remove('active'));
+
+                // Показываем выбранную секцию
+                const sectionId = this.getAttribute('data-section');
+                document.getElementById(sectionId).classList.add('active');
+            });
+        });
+
+        // Водоснабжение загружается через iframe (water-calculator.html)
+    </script>
+</body>
+</html>

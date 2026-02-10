@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Калькулятор водоснабжения</title>
+    <!-- Google Fonts: DM Sans -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap">
+    <!-- SheetJS для экспорта в Excel -->
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+    <!-- Стили -->
+    <link rel="stylesheet" href="css/water-styles.css">
+    <style>
+        /* Адаптация для встраивания в портал */
+        body {
+            margin: 0;
+            padding: 0;
+            background: transparent;
+        }
+        .app-layout {
+            display: block;
+            height: auto;
+            min-height: auto;
+        }
+        .sidebar {
+            display: none !important;
+        }
+
+        /* Контент на всю ширину */
+        .main-content {
+            width: 100%;
+            max-width: 100%;
+            padding: 0;
+            margin: 0;
+        }
+        .main-container {
+            max-width: 100% !important;
+            width: 100%;
+            padding: 1.5rem;
+            margin: 0;
+        }
+
+        /* Уменьшаем отступы у control-panel */
+        .control-panel {
+            padding: 20px !important;
+        }
+
+        .header {
+            margin-bottom: 1.5rem;
+        }
+
+        /* Оптимизация сеток для полей ввода */
+        .row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)) !important;
+            gap: 16px;
+        }
+
+        .row-2 {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)) !important;
+            gap: 16px;
+        }
+
+        /* Для узких экранов - 1 колонка */
+        @media (max-width: 768px) {
+            .row, .row-2 {
+                grid-template-columns: 1fr !important;
+            }
+            .main-container {
+                padding: 1rem;
+            }
+            .control-panel {
+                padding: 16px !important;
+            }
+        }
+
+        /* Для средних экранов - 2 колонки */
+        @media (min-width: 769px) and (max-width: 1200px) {
+            .row {
+                grid-template-columns: repeat(2, 1fr) !important;
+            }
+        }
+
+        /* Для широких экранов - 3 колонки */
+        @media (min-width: 1201px) {
+            .row {
+                grid-template-columns: repeat(3, 1fr) !important;
+            }
+        }
+
+        /* Адаптивность вкладок */
+        .tab-content {
+            width: 100%;
+            transition: all 0.3s ease;
+        }
+
+        .tabs-nav {
+            overflow-x: auto;
+            flex-wrap: nowrap;
+        }
+
+        /* Улучшение отображения таблиц */
+        .table-responsive {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        /* Компактные аккордеоны */
+        .accordion {
+            margin-bottom: 16px;
+        }
+
+        .accordion-content {
+            padding: 20px !important;
+        }
+
+        /* Оптимизация кнопок */
+        .btn-row {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin: 20px 0;
+        }
+
+        .btn-row button {
+            flex: 1 1 auto;
+            min-width: 200px;
+        }
+
+        @media (max-width: 768px) {
+            .btn-row button {
+                flex: 1 1 100%;
+                min-width: 100%;
+            }
+        }
+
+        /* Жесткие правки для таблиц зон и этажей */
+        .zone-table input,
+        .zone-table select,
+        .floors-table input,
+        .floors-table select {
+            height: 32px !important;
+            padding: 0 8px !important;
+            border-radius: 8px !important;
+            line-height: 1 !important;
+            box-sizing: border-box !important;
+            display: flex !important;
+            align-items: center !important;
+        }
+
+        /* Компактные строки таблиц */
+        .zone-table td,
+        .floors-table td {
+            padding: 4px 0px !important;
+        }
+
+        .zone-table th,
+        .floors-table th {
+            padding-top: 6px !important;
+            padding-bottom: 6px !important;
+        }
+
+        /* Hover эффект для всех строк таблиц */
+        tbody tr:hover {
+            background-color: rgba(0, 122, 255, 0.03) !important;
+            transition: background-color 0.15s ease;
+        }
+
+        /* Hover в темной теме */
+        body.dark-theme tbody tr:hover {
+            background-color: rgba(255, 255, 255, 0.05) !important;
+        }
+
+        /* Скругление для всех select */
+        select {
+            border-radius: 8px !important;
+        }
+    </style>
+</head>
+<body>
+<div class="app-layout">
+    <!-- Основная область с калькулятором -->
+    <main class="main-content">
+        <div class="main-container">
+            <div class="header">
+                <div class="header-left">
+                    <h1>Расчет системы водоснабжения</h1>
+                </div>
+            </div>
+
+            <!-- Панель вкладок -->
+            <div class="tabs-container">
+                <div class="tabs-nav" id="calcTabs">
+                    <!-- Вкладки рендерятся через JS -->
+                </div>
+            </div>
+
+            <!-- Контент вкладок -->
+            <div class="tab-content" id="tabContent">
+                <!-- Контейнер калькулятора (вкладка "Жилая часть") -->
+                <div id="calculatorContainer">
+
+                    <div class="control-panel">
+                        <!-- ========== СЕКЦИЯ: ВВОД ДАННЫХ ========== -->
+                        <div class="panel-section panel-section-input">
+                            <h3 class="panel-section-title">
+                                <span class="panel-section-icon panel-section-icon-input"></span>
+                                Ввод данных
+                            </h3>
+
+                            <!-- Импорт из Excel (вне аккордеона) -->
+                            <div class="row">
+                                <div class="input-group">
+                                    <label>Загрузите файл Excel с данными по этажам и квартирам:</label>
+                                    <div class="file-input-wrapper">
+                                        <input type="file" id="excelFileInput" accept=".xlsx,.xls" style="display: none;">
+                                        <button type="button" id="btnImportExcel" class="btn-secondary">Загрузить из Excel</button>
+                                    </div>
+                                    <div id="importStatus" class="import-status" style="display: none;"></div>
+                                </div>
+                            </div>
+
+                            <!-- Заполнить параметры проекта -->
+                            <details class="accordion accordion-input" open>
+                                <summary class="accordion-header">
+                                    <span class="accordion-icon"></span>
+                                    Параметры проекта
+                                </summary>
+                                <div class="accordion-content">
+                                    <!-- Общие параметры: высоты этажей и ВКП -->
+                                    <h4 class="subsection-title">Высоты этажей</h4>
+                                    <div class="row-2">
+                                        <div class="input-group">
+                                            <label>Высота 1-го этажа, м:</label>
+                                            <input type="number" id="h1" value="4.0" step="0.01" min="0">
+                                        </div>
+                                        <div class="input-group">
+                                            <label>Типовая высота последующих этажей, м:</label>
+                                            <input type="number" id="hn" value="3.3" step="0.01" min="0">
+                                        </div>
+                                    </div>
+
+                                    <!-- ВКП -->
+                                    <div class="row-2">
+                                        <div class="input-group">
+                                            <label class="inline label-checkbox-right">
+                                                <span>Добавить в расчет «устройство внутриквартирного пожаротушения»</span>
+                                                <input type="checkbox" id="ivptEnabled">
+                                            </label>
+                                        </div>
+                                    </div>
+
+                                    <!-- Динамические блоки корпусов -->
+                                    <div id="sectionsBlocks"></div>
+                                </div>
+                            </details>
+                        </div>
+
+                        <!-- Глобальные кнопки -->
+                        <div class="btn-row">
+                            <button id="btnCalculate">Произвести расчёт</button>
+                            <button id="btnExport" class="btn-secondary">Экспорт в Excel</button>
+                        </div>
+
+                        <!-- ========== СЕКЦИЯ: РЕЗУЛЬТАТЫ РАСЧЁТА ========== -->
+                        <div class="panel-section panel-section-output">
+                            <h3 class="panel-section-title">
+                                <span class="panel-section-icon panel-section-icon-output"></span>
+                                Результаты расчёта
+                            </h3>
+
+                            <!-- Блок 3: Трубопроводы -->
+                            <details class="accordion accordion-output">
+                                <summary class="accordion-header">
+                                    <span class="accordion-icon"></span>
+                                    Трубопроводы
+                                </summary>
+                                <div class="accordion-content">
+                                    <div id="pipelinesContent">
+                                        <div class="placeholder-block">
+                                            <p class="note">Нажмите «Произвести расчёт» для отображения данных по трубопроводам.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </details>
+
+                            <!-- Блок 4: Арматура -->
+                            <details class="accordion accordion-output">
+                                <summary class="accordion-header">
+                                    <span class="accordion-icon"></span>
+                                    Арматура
+                                </summary>
+                                <div class="accordion-content">
+                                    <div id="fittingsContent">
+                                        <div class="placeholder-block">
+                                            <p class="note">Нажмите «Произвести расчёт» для отображения данных по арматуре.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </details>
+                        </div>
+                    </div>
+
+                </div><!-- /calculatorContainer -->
+
+                <!-- Контейнер для вкладки "Подземная часть" -->
+                <div id="undergroundContainer" style="display: none;">
+                    <div class="control-panel">
+                        <!-- Блок: Расчет стоимости на м2 -->
+                        <details class="accordion">
+                            <summary class="accordion-header">
+                                <span class="accordion-icon"></span>
+                                Расчет стоимости на м2
+                            </summary>
+                            <div class="accordion-content">
+                                <div class="row">
+                                    <div class="input-group">
+                                        <label>Площадь, м²:</label>
+                                        <input type="number" id="undergroundArea" value="0" min="0" step="0.1">
+                                        <div class="note">Введите общую площадь подземной части здания.</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </details>
+                    </div>
+                </div>
+
+                <!-- Контейнер для вкладки "Спецификация" -->
+                <div id="specificationContainer" style="display: none;">
+                    <div class="control-panel">
+                        <div id="specificationContent">
+                            <!-- Контент спецификации рендерится через JS -->
+                        </div>
+                        <!-- Кнопка запроса КП -->
+                        <div class="btn-row">
+                            <button id="btnRequestQuote" class="btn-primary">Запросить КП</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Контейнер для вкладки "Смета" -->
+                <div id="estimateContainer" style="display: none;">
+                    <div class="control-panel">
+                        <div class="estimate-header">
+                            <h2 class="estimate-title">Смета по системам водоснабжения</h2>
+                            <p class="estimate-subtitle">Группировка работ и материалов по корпусам и системам</p>
+                        </div>
+                        <div id="estimateContent">
+                            <!-- Контент сметы рендерится через JS -->
+                            <div class="placeholder-block">
+                                <p class="note">Нажмите «Произвести расчёт» для формирования сметы.</p>
+                            </div>
+                        </div>
+                        <!-- Кнопка экспорта сметы -->
+                        <div class="btn-row">
+                            <button id="btnExportEstimate" class="btn-secondary">Экспорт сметы в Excel</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Контейнер заглушки (для других вкладок) -->
+                <div id="placeholderContainer">
+                    <!-- Заглушка рендерится через JS -->
+                </div>
+
+            </div><!-- /tab-content -->
+
+        </div>
+    </main>
+</div>
+
+<!-- Диалог выбора получателя КП -->
+<div id="quoteRecipientDialog" class="quote-dialog-overlay" style="display: none;">
+    <div class="quote-dialog quote-dialog-wide">
+        <h3 class="quote-dialog-title">Запрос коммерческого предложения</h3>
+
+        <!-- Разделы спецификации с выбранными поставщиками -->
+        <div class="quote-sections-header">Выберите разделы для запроса:</div>
+        <div class="quote-sections-list" id="quoteSectionsList">
+            <!-- Разделы заполняются динамически из JS -->
+        </div>
+
+        <!-- Кнопки управления выбором -->
+        <div class="quote-selection-controls">
+            <button type="button" id="btnSelectAll" class="btn-link">Выбрать все</button>
+            <button type="button" id="btnDeselectAll" class="btn-link">Снять все</button>
+        </div>
+
+        <!-- Дополнительный email (копия себе) -->
+        <div class="quote-copy-section">
+            <label class="quote-copy-label">
+                <input type="checkbox" id="sendCopyToSelf" checked>
+                <span>Отправить копию себе:</span>
+                <input type="email" id="selfEmailCopy" class="copy-email-input"
+                       value="manager@mycompany.ru" placeholder="Ваш email">
+            </label>
+        </div>
+
+        <div class="quote-dialog-buttons">
+            <button type="button" id="btnQuoteCancel" class="btn-cancel">Отмена</button>
+            <button type="button" id="btnQuoteSend" class="btn-primary">Отправить запросы</button>
+        </div>
+    </div>
+</div>
+
+<!-- Главный модуль -->
+<script type="module" src="js/main.js"></script>
+
+<!-- Синхронизация темы с порталом -->
+<script>
+(function() {
+    // Функция применения темы
+    function applyTheme(theme) {
+        if (theme === 'dark') {
+            document.body.classList.add('dark-theme');
+        } else {
+            document.body.classList.remove('dark-theme');
+        }
+    }
+
+    // Проверяем тему при загрузке
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme) {
+        applyTheme(savedTheme);
+    }
+
+    // Слушаем сообщения от родительского окна
+    window.addEventListener('message', function(event) {
+        if (event.data && event.data.type === 'theme-change') {
+            applyTheme(event.data.theme);
+        }
+    });
+
+    // Уведомляем родительское окно, что мы готовы получать сообщения
+    if (window.parent !== window) {
+        window.parent.postMessage({ type: 'iframe-ready' }, '*');
+    }
+})();
+</script>
+</body>
+</html>
