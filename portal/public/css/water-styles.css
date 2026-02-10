@@ -3105,6 +3105,16 @@ body.dark-theme .vis-floor-label {
   fill: #a1a1a6;
 }
 
+/* Кол-во квартир (правая колонка) */
+.vis-apt-count {
+  font-weight: 500;
+  fill: var(--text-primary, #1d1d1f);
+}
+
+body.dark-theme .vis-apt-count {
+  fill: #e5e5ea;
+}
+
 /* Подписи стояков */
 .vis-riser-label {
   font-size: 12px;

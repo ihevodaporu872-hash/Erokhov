@@ -378,7 +378,8 @@ function renderSectionSVG(sec, si, h1, hn) {
   const topPad = 60;           // отступ сверху (для концевых узлов и подписей)
   const bottomPad = 30;        // отступ снизу
   const leftPad = 70;          // отступ слева (подписи этажей)
-  const rightPad = 50;         // отступ справа
+  const rightPad = 60;         // отступ справа
+  const rightColWidth = 60;    // ширина правой колонки (кол-во квартир)
   const riserIntraSpacing = 36; // расстояние между В1/Т3/Т4 внутри пучка
   const bundleWidth = riserIntraSpacing * 2; // ширина пучка (3 трубы)
   const zoneGap = 60;          // горизонтальный отступ между пучками зон
@@ -438,7 +439,8 @@ function renderSectionSVG(sec, si, h1, hn) {
 
   const aptAreaStartX = risersEndX + pprGap;
   const aptAreaWidth = maxApts > 0 ? (maxApts * aptSpacing + aptBranchLen + 10) : 30;
-  const svgW = aptAreaStartX + aptAreaWidth + rightPad;
+  const rightColX = aptAreaStartX + aptAreaWidth + 12; // начало правой колонки
+  const svgW = rightColX + rightColWidth + rightPad;
   const svgH = topPad + floors * floorH + bottomPad;
 
   // Y-координата для этажа (1-й этаж — внизу)
@@ -454,11 +456,17 @@ function renderSectionSVG(sec, si, h1, hn) {
   // Фон
   svg += `<rect width="${svgW}" height="${svgH}" fill="none"/>`;
 
-  // --- Горизонтальные линии этажей (пунктирные) ---
+  // --- Горизонтальные линии этажей (пунктирные) + подписи ---
   for (let f = 1; f <= floors; f++) {
     const y = floorY(f);
-    svg += `<line x1="${leftPad}" y1="${y}" x2="${svgW - rightPad}" y2="${y}" stroke="var(--vis-grid-color, #e0e0e0)" stroke-width="0.5" stroke-dasharray="4 4"/>`;
+    svg += `<line x1="${leftPad}" y1="${y}" x2="${rightColX - 8}" y2="${y}" stroke="var(--vis-grid-color, #e0e0e0)" stroke-width="0.5" stroke-dasharray="4 4"/>`;
+    // Номер этажа слева
     svg += `<text x="${leftPad - 8}" y="${y + 4}" text-anchor="end" class="vis-floor-label">${f} эт.</text>`;
+    // Количество квартир справа
+    const aptsOnFloor = sec.apts[f] || 0;
+    if (aptsOnFloor > 0) {
+      svg += `<text x="${rightColX + 4}" y="${y + 4}" text-anchor="start" class="vis-floor-label vis-apt-count">${aptsOnFloor} кв.</text>`;
+    }
   }
 
   // --- Подложки зон (чередующиеся) ---
@@ -466,9 +474,11 @@ function renderSectionSVG(sec, si, h1, hn) {
     const yTop = floorY(zr.to) - floorH * 0.35;
     const yBot = floorY(zr.from) + floorH * 0.35;
     const fillOpacity = zi % 2 === 0 ? 0.04 : 0.07;
-    svg += `<rect x="${leftPad}" y="${yTop}" width="${svgW - leftPad - rightPad}" height="${yBot - yTop}" fill="var(--vis-zone-bg, #007AFF)" fill-opacity="${fillOpacity}" rx="6"/>`;
-    // Подпись зоны справа
-    svg += `<text x="${svgW - rightPad - 4}" y="${yTop + 14}" text-anchor="end" class="vis-zone-label">${zr.zone.name || 'Зона ' + (zi + 1)} (${zr.from}–${zr.to} эт.)</text>`;
+    svg += `<rect x="${leftPad}" y="${yTop}" width="${rightColX - leftPad - 8}" height="${yBot - yTop}" fill="var(--vis-zone-bg, #007AFF)" fill-opacity="${fillOpacity}" rx="6"/>`;
+    // Подпись зоны — над пучком стояков (не пересекается с линиями)
+    const bundle = zoneBundles[zi];
+    const zoneLabelX = (bundle.xV1 + bundle.xT4) / 2;
+    svg += `<text x="${zoneLabelX}" y="${yTop - 4}" text-anchor="middle" class="vis-zone-label">${zr.zone.name || 'Зона ' + (zi + 1)} (${zr.from}–${zr.to} эт.)</text>`;
   });
 
   // --- Подсчёт общего количества концевых узлов (3 шт на зону × кол-во зон) ---
@@ -583,7 +593,7 @@ function renderSectionSVG(sec, si, h1, hn) {
     const pprEndX = aptAreaStartX + aptsCount * aptSpacing;
     const pprYOffset = 4;
 
-    const pprTip = `Этажная разводка PP-R\\n${f} этаж, ${aptsCount} кв.\\nМатериал: полипропилен (PP-R)`;
+    const pprTip = `Этажный распределительный коллектор на ${aptsCount} выходов\\nЭтажная разводка PP-R\\n${f} этаж, ${aptsCount} кв.\\nМатериал: полипропилен (PP-R)`;
     svg += `<g class="vis-hover vis-ppr-hover" data-tip="${pprTip}">`;
     svg += `<line x1="${pprStartX}" y1="${y - pprYOffset}" x2="${pprEndX}" y2="${y - pprYOffset}" stroke="${COLOR_V1}" stroke-width="1" opacity="0.6"/>`;
     svg += `<line x1="${pprStartX}" y1="${y}" x2="${pprEndX}" y2="${y}" stroke="${COLOR_T3}" stroke-width="1" opacity="0.6"/>`;
