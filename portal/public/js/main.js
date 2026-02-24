@@ -665,12 +665,23 @@ function renderSectionSVG(sec, si, h1, hn) {
 function renderCompensatorSymbol(x, y, color, tip) {
   const w = 4;      // амплитуда зигзага (влево-вправо от оси стояка)
   const halfH = 6;  // половина высоты символа
+  const crossSize = 3; // половина размера крестика НО
+  const crossGap = 3;  // отступ крестика от края зигзага
   // Зигзаг-гармошка (типовое обозначение сильфонного компенсатора):
   // 3 полных волны вдоль оси стояка, от (x, y+6) до (x, y-6)
+  // + неподвижные опоры (×) сверху и снизу
   let s = `<g class="vis-hover vis-comp-hover" data-tip="${tip || ''}">`;
   s += `<path d="M${x} ${y + halfH} L${x + w} ${y + 4} L${x - w} ${y + 2} L${x + w} ${y} L${x - w} ${y - 2} L${x + w} ${y - 4} L${x} ${y - halfH}" fill="none" stroke="${color}" stroke-width="1.5" stroke-linejoin="round"/>`;
-  // Невидимая область для наведения
-  s += `<rect x="${x - w - 2}" y="${y - halfH - 2}" width="${w * 2 + 4}" height="${halfH * 2 + 4}" fill="transparent"/>`;
+  // НО сверху (×)
+  const cyTop = y - halfH - crossGap;
+  s += `<line x1="${x - crossSize}" y1="${cyTop - crossSize}" x2="${x + crossSize}" y2="${cyTop + crossSize}" stroke="${color}" stroke-width="1.5"/>`;
+  s += `<line x1="${x + crossSize}" y1="${cyTop - crossSize}" x2="${x - crossSize}" y2="${cyTop + crossSize}" stroke="${color}" stroke-width="1.5"/>`;
+  // НО снизу (×)
+  const cyBot = y + halfH + crossGap;
+  s += `<line x1="${x - crossSize}" y1="${cyBot - crossSize}" x2="${x + crossSize}" y2="${cyBot + crossSize}" stroke="${color}" stroke-width="1.5"/>`;
+  s += `<line x1="${x + crossSize}" y1="${cyBot - crossSize}" x2="${x - crossSize}" y2="${cyBot + crossSize}" stroke="${color}" stroke-width="1.5"/>`;
+  // Невидимая область для наведения (расширена под крестики)
+  s += `<rect x="${x - w - 2}" y="${cyTop - crossSize - 1}" width="${w * 2 + 4}" height="${cyBot + crossSize + 1 - (cyTop - crossSize - 1)}" fill="transparent"/>`;
   s += `</g>`;
   return s;
 }
