@@ -507,7 +507,9 @@ function renderSectionSVG(sec, si, h1, hn) {
   // --- Подложки зон (чередующиеся) ---
   zoneGroups.forEach((group, zi) => {
     const zr = group.zr;
-    const yTop = floorY(zr.to) - floorH * 0.35;
+    // Запас сверху: 45px покрывает подписи стояков (24px), номера ст.N (38px),
+    // концевые узлы с воздухоотводчиками (~27px) и стрелки
+    const yTop = floorY(zr.to) - 45;
     const yBot = floorY(zr.from) + floorH * 0.35;
     const fillOpacity = zi % 2 === 0 ? 0.04 : 0.07;
     svg += `<rect x="${leftPad}" y="${yTop}" width="${rightColX - leftPad - 8}" height="${yBot - yTop}" fill="var(--vis-zone-bg, #007AFF)" fill-opacity="${fillOpacity}" rx="6"/>`;
