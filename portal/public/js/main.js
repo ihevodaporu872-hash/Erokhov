@@ -491,7 +491,22 @@ function renderSectionSVG(sec, si, h1, hn) {
   // Фон
   svg += `<rect width="${svgW}" height="${svgH}" fill="none"/>`;
 
-  // --- Горизонтальные линии этажей (пунктирные) + подписи ---
+  // --- Подложки зон (отрисовываются первым слоем — под всей графикой) ---
+  zoneGroups.forEach((group, zi) => {
+    const zr = group.zr;
+    // Верх: 45px покрывает подписи стояков, концевые узлы, стрелки
+    // Низ: 4px — минимальный отступ, чтобы соседние зоны не накладывались
+    // (45 + 4 = 49 < floorH = 50 → 1px зазор между зонами)
+    const yTop = floorY(zr.to) - 45;
+    const yBot = floorY(zr.from) + 4;
+    const fillOpacity = zi % 2 === 0 ? 0.04 : 0.07;
+    svg += `<rect x="${leftPad}" y="${yTop}" width="${rightColX - leftPad - 8}" height="${yBot - yTop}" fill="var(--vis-zone-bg, #007AFF)" fill-opacity="${fillOpacity}" rx="6"/>`;
+    // Подпись зоны — вертикальный текст слева от номеров этажей
+    const yMid = (floorY(zr.to) + floorY(zr.from)) / 2;
+    svg += `<text x="14" y="${yMid}" text-anchor="middle" class="vis-zone-label" transform="rotate(-90, 14, ${yMid})">${zr.zone.name || 'Зона ' + (zi + 1)} (${zr.from}–${zr.to} эт.)</text>`;
+  });
+
+  // --- Горизонтальные линии этажей (пунктирные) + подписи (поверх подложек) ---
   for (let f = 1; f <= floors; f++) {
     const y = floorY(f);
     svg += `<line x1="${leftPad}" y1="${y}" x2="${rightColX - 8}" y2="${y}" stroke="var(--vis-grid-color, #e0e0e0)" stroke-width="0.5" stroke-dasharray="4 4"/>`;
@@ -503,19 +518,6 @@ function renderSectionSVG(sec, si, h1, hn) {
       svg += `<text x="${rightColX + 4}" y="${y + 4}" text-anchor="start" class="vis-floor-label vis-apt-count">${aptsOnFloor} кв.</text>`;
     }
   }
-
-  // --- Подложки зон (чередующиеся) ---
-  zoneGroups.forEach((group, zi) => {
-    const zr = group.zr;
-    // Запас сверху: 45px покрывает подписи стояков (24px), номера ст.N (38px),
-    // концевые узлы с воздухоотводчиками (~27px) и стрелки
-    const yTop = floorY(zr.to) - 45;
-    const yBot = floorY(zr.from) + floorH * 0.35;
-    const fillOpacity = zi % 2 === 0 ? 0.04 : 0.07;
-    svg += `<rect x="${leftPad}" y="${yTop}" width="${rightColX - leftPad - 8}" height="${yBot - yTop}" fill="var(--vis-zone-bg, #007AFF)" fill-opacity="${fillOpacity}" rx="6"/>`;
-    // Подпись зоны — внутри фона зоны, слева (не пересекается с трубами)
-    svg += `<text x="${leftPad + 4}" y="${yTop + 14}" text-anchor="start" class="vis-zone-label">${zr.zone.name || 'Зона ' + (zi + 1)} (${zr.from}–${zr.to} эт.)</text>`;
-  });
 
   // --- Подсчёт общего количества концевых узлов (3 шт на стояк × все стояки) ---
   let totalEndNodes = 0;
