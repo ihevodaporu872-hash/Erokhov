@@ -602,14 +602,16 @@ function renderSectionSVG(sec, si, h1, hn) {
         const cf = Math.max(zr.from, Math.min(zr.to, zr.from + Math.round(frac * zoneFloors) - 1));
         const compY = floorY(cf) + floorH * 0.4;
         const compTip = `Сильфонный компенсатор\\nТ3 (ГВС подача) Ø${d.T3}\\n${zoneName}${riserLabel}, ~${cf} эт.\\nКомпенсация температурных деформаций`;
-        svg += renderCompensatorSymbol(bundle.xT3, compY, COLOR_T3, compTip);
+        const supTipT3 = `Неподвижная опора (НО)\\n${zoneName}${riserLabel}`;
+        svg += renderCompensatorSymbol(bundle.xT3, compY, COLOR_T3, compTip, supTipT3);
       }
       for (let c = 0; c < compCountT4; c++) {
         const frac = (c + 1) / (compCountT4 + 1);
         const cf = Math.max(zr.from, Math.min(zr.to, zr.from + Math.round(frac * zoneFloors) - 1));
         const compY = floorY(cf) + floorH * 0.4;
         const compTip = `Сильфонный компенсатор\\nТ4 (ГВС циркуляция) Ø${d.T4}\\n${zoneName}${riserLabel}, ~${cf} эт.\\nКомпенсация температурных деформаций`;
-        svg += renderCompensatorSymbol(bundle.xT4, compY, COLOR_T4, compTip);
+        const supTipT4 = `Неподвижная опора (НО)\\n${zoneName}${riserLabel}`;
+        svg += renderCompensatorSymbol(bundle.xT4, compY, COLOR_T4, compTip, supTipT4);
       }
 
       // --- Индивидуальный коллектор + PP-R для каждого стояка на каждом этаже ---
@@ -661,27 +663,31 @@ function renderSectionSVG(sec, si, h1, hn) {
   return svg;
 }
 
-// Символ компенсатора (П-образный) с тултипом
-function renderCompensatorSymbol(x, y, color, tip) {
+// Символ компенсатора (зигзаг) с тултипом + неподвижные опоры (×)
+function renderCompensatorSymbol(x, y, color, tip, supportTip) {
   const w = 4;      // амплитуда зигзага (влево-вправо от оси стояка)
   const halfH = 6;  // половина высоты символа
   const crossSize = 3; // половина размера крестика НО
   const crossGap = 3;  // отступ крестика от края зигзага
-  // Зигзаг-гармошка (типовое обозначение сильфонного компенсатора):
-  // 3 полных волны вдоль оси стояка, от (x, y+6) до (x, y-6)
-  // + неподвижные опоры (×) сверху и снизу
-  let s = `<g class="vis-hover vis-comp-hover" data-tip="${tip || ''}">`;
-  s += `<path d="M${x} ${y + halfH} L${x + w} ${y + 4} L${x - w} ${y + 2} L${x + w} ${y} L${x - w} ${y - 2} L${x + w} ${y - 4} L${x} ${y - halfH}" fill="none" stroke="${color}" stroke-width="1.5" stroke-linejoin="round"/>`;
-  // НО сверху (×)
   const cyTop = y - halfH - crossGap;
-  s += `<line x1="${x - crossSize}" y1="${cyTop - crossSize}" x2="${x + crossSize}" y2="${cyTop + crossSize}" stroke="${color}" stroke-width="1.5"/>`;
-  s += `<line x1="${x + crossSize}" y1="${cyTop - crossSize}" x2="${x - crossSize}" y2="${cyTop + crossSize}" stroke="${color}" stroke-width="1.5"/>`;
-  // НО снизу (×)
   const cyBot = y + halfH + crossGap;
-  s += `<line x1="${x - crossSize}" y1="${cyBot - crossSize}" x2="${x + crossSize}" y2="${cyBot + crossSize}" stroke="${color}" stroke-width="1.5"/>`;
-  s += `<line x1="${x + crossSize}" y1="${cyBot - crossSize}" x2="${x - crossSize}" y2="${cyBot + crossSize}" stroke="${color}" stroke-width="1.5"/>`;
-  // Невидимая область для наведения (расширена под крестики)
-  s += `<rect x="${x - w - 2}" y="${cyTop - crossSize - 1}" width="${w * 2 + 4}" height="${cyBot + crossSize + 1 - (cyTop - crossSize - 1)}" fill="transparent"/>`;
+  let s = '';
+  // НО сверху (×) — чёрный крестик с собственным тултипом
+  s += `<g class="vis-hover" data-tip="${supportTip || ''}">`;
+  s += `<line x1="${x - crossSize}" y1="${cyTop - crossSize}" x2="${x + crossSize}" y2="${cyTop + crossSize}" stroke="#000" stroke-width="1.5"/>`;
+  s += `<line x1="${x + crossSize}" y1="${cyTop - crossSize}" x2="${x - crossSize}" y2="${cyTop + crossSize}" stroke="#000" stroke-width="1.5"/>`;
+  s += `<rect x="${x - crossSize - 2}" y="${cyTop - crossSize - 2}" width="${crossSize * 2 + 4}" height="${crossSize * 2 + 4}" fill="transparent"/>`;
+  s += `</g>`;
+  // Зигзаг-гармошка (компенсатор)
+  s += `<g class="vis-hover vis-comp-hover" data-tip="${tip || ''}">`;
+  s += `<path d="M${x} ${y + halfH} L${x + w} ${y + 4} L${x - w} ${y + 2} L${x + w} ${y} L${x - w} ${y - 2} L${x + w} ${y - 4} L${x} ${y - halfH}" fill="none" stroke="${color}" stroke-width="1.5" stroke-linejoin="round"/>`;
+  s += `<rect x="${x - w - 2}" y="${y - halfH - 1}" width="${w * 2 + 4}" height="${halfH * 2 + 2}" fill="transparent"/>`;
+  s += `</g>`;
+  // НО снизу (×) — чёрный крестик с собственным тултипом
+  s += `<g class="vis-hover" data-tip="${supportTip || ''}">`;
+  s += `<line x1="${x - crossSize}" y1="${cyBot - crossSize}" x2="${x + crossSize}" y2="${cyBot + crossSize}" stroke="#000" stroke-width="1.5"/>`;
+  s += `<line x1="${x + crossSize}" y1="${cyBot - crossSize}" x2="${x - crossSize}" y2="${cyBot + crossSize}" stroke="#000" stroke-width="1.5"/>`;
+  s += `<rect x="${x - crossSize - 2}" y="${cyBot - crossSize - 2}" width="${crossSize * 2 + 4}" height="${crossSize * 2 + 4}" fill="transparent"/>`;
   s += `</g>`;
   return s;
 }
