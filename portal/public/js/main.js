@@ -703,25 +703,26 @@ function renderCompensatorSymbol(x, y, color, tip, supportTip) {
 }
 
 // Концевой узел: бабочка (переход) + кран (квадрат) + воздухоотводчик (треугольник)
+// Все символы стандартизированы: 8×8 px, центрированы по оси x
 function renderEndNode(x, y, color, tip) {
+  const S = 4; // полуразмер = 4, габарит 8×8
+  const gap = 3; // зазор между символами
   let s = `<g class="vis-hover vis-endnode-hover" data-tip="${tip || ''}">`;
-  // Бабочка (переход) — два треугольника вершинами друг к другу по вертикали
-  const bw = 5; const bh = 5;
-  const bY = y - 4;
-  s += `<polygon points="${x - bw},${bY - bh} ${x + bw},${bY - bh} ${x},${bY}" fill="${color}" opacity="0.8"/>`;
-  s += `<polygon points="${x - bw},${bY + bh} ${x + bw},${bY + bh} ${x},${bY}" fill="${color}" opacity="0.8"/>`;
-  // Кран — квадрат выше бабочки
-  const sqS = 4;
-  const sqY = bY - bh - 3 - sqS;
-  s += `<line x1="${x}" y1="${bY - bh}" x2="${x}" y2="${sqY + sqS}" stroke="${color}" stroke-width="1"/>`;
-  s += `<rect x="${x - sqS}" y="${sqY - sqS}" width="${sqS * 2}" height="${sqS * 2}" fill="${color}" opacity="0.8"/>`;
-  // Воздухоотводчик — равносторонний треугольник вершиной вверх
-  const tS = 5;
-  const tY = sqY - sqS - 3 - tS;
-  s += `<line x1="${x}" y1="${sqY - sqS}" x2="${x}" y2="${tY + tS}" stroke="${color}" stroke-width="1"/>`;
-  s += `<polygon points="${x},${tY - tS} ${x - tS},${tY + tS} ${x + tS},${tY + tS}" fill="none" stroke="${color}" stroke-width="1.5"/>`;
+  // Бабочка (переход) — два треугольника 8×8, вершинами друг к другу
+  const bY = y - 4; // центр бабочки
+  s += `<polygon points="${x - S},${bY - S} ${x + S},${bY - S} ${x},${bY}" fill="${color}" opacity="0.8"/>`;
+  s += `<polygon points="${x - S},${bY + S} ${x + S},${bY + S} ${x},${bY}" fill="${color}" opacity="0.8"/>`;
+  // Кран — квадрат 8×8
+  const sqTop = bY - S - gap - S * 2; // верхний край квадрата
+  s += `<line x1="${x}" y1="${bY - S}" x2="${x}" y2="${sqTop + S * 2}" stroke="${color}" stroke-width="1"/>`;
+  s += `<rect x="${x - S}" y="${sqTop}" width="${S * 2}" height="${S * 2}" fill="${color}" opacity="0.8"/>`;
+  // Воздухоотводчик — треугольник 8×8, вершиной вверх
+  const tBot = sqTop - gap; // нижний край треугольника
+  const tTop = tBot - S * 2; // верхний край (вершина)
+  s += `<line x1="${x}" y1="${sqTop}" x2="${x}" y2="${tBot}" stroke="${color}" stroke-width="1"/>`;
+  s += `<polygon points="${x},${tTop} ${x - S},${tBot} ${x + S},${tBot}" fill="none" stroke="${color}" stroke-width="1.5"/>`;
   // Невидимая область для наведения
-  s += `<rect x="${x - bw - 3}" y="${tY - tS - 3}" width="${bw * 2 + 6}" height="${bY + bh - tY + tS + 6}" fill="transparent"/>`;
+  s += `<rect x="${x - S - 3}" y="${tTop - 3}" width="${S * 2 + 6}" height="${bY + S - tTop + 6}" fill="transparent"/>`;
   s += `</g>`;
   return s;
 }
