@@ -702,22 +702,26 @@ function renderCompensatorSymbol(x, y, color, tip, supportTip) {
   return s;
 }
 
-// Концевой узел: шаровой кран (ромб) + воздухоотводчик (кружок с линией вверх)
+// Концевой узел: бабочка (переход) + кран (квадрат) + воздухоотводчик (треугольник)
 function renderEndNode(x, y, color, tip) {
   let s = `<g class="vis-hover vis-endnode-hover" data-tip="${tip || ''}">`;
-  // Шаровой кран — ромб на стояке
-  const crS = 5;
-  const crY = y - 4;
-  s += `<polygon points="${x},${crY - crS} ${x + crS},${crY} ${x},${crY + crS} ${x - crS},${crY}" fill="${color}" opacity="0.8"/>`;
-  // Воздухоотводчик — кружок выше крана + линия к стояку
-  const avY = crY - crS - 8;
-  s += `<line x1="${x}" y1="${crY - crS}" x2="${x}" y2="${avY + 4}" stroke="${color}" stroke-width="1"/>`;
-  s += `<circle cx="${x}" cy="${avY}" r="4" fill="none" stroke="${color}" stroke-width="1.5"/>`;
-  // Маленькая стрелка вверх (воздух)
-  s += `<line x1="${x}" y1="${avY - 4}" x2="${x}" y2="${avY - 9}" stroke="${color}" stroke-width="1"/>`;
-  s += `<path d="M${x - 2.5} ${avY - 7} L${x} ${avY - 10} L${x + 2.5} ${avY - 7}" fill="none" stroke="${color}" stroke-width="1"/>`;
+  // Бабочка (переход) — два треугольника вершинами друг к другу по вертикали
+  const bw = 5; const bh = 5;
+  const bY = y - 4;
+  s += `<polygon points="${x - bw},${bY - bh} ${x + bw},${bY - bh} ${x},${bY}" fill="${color}" opacity="0.8"/>`;
+  s += `<polygon points="${x - bw},${bY + bh} ${x + bw},${bY + bh} ${x},${bY}" fill="${color}" opacity="0.8"/>`;
+  // Кран — квадрат выше бабочки
+  const sqS = 4;
+  const sqY = bY - bh - 3 - sqS;
+  s += `<line x1="${x}" y1="${bY - bh}" x2="${x}" y2="${sqY + sqS}" stroke="${color}" stroke-width="1"/>`;
+  s += `<rect x="${x - sqS}" y="${sqY - sqS}" width="${sqS * 2}" height="${sqS * 2}" fill="${color}" opacity="0.8"/>`;
+  // Воздухоотводчик — равносторонний треугольник вершиной вверх
+  const tS = 5;
+  const tY = sqY - sqS - 3 - tS;
+  s += `<line x1="${x}" y1="${sqY - sqS}" x2="${x}" y2="${tY + tS}" stroke="${color}" stroke-width="1"/>`;
+  s += `<polygon points="${x},${tY - tS} ${x - tS},${tY + tS} ${x + tS},${tY + tS}" fill="none" stroke="${color}" stroke-width="1.5"/>`;
   // Невидимая область для наведения
-  s += `<rect x="${x - crS - 3}" y="${avY - 12}" width="${crS * 2 + 6}" height="${crY + crS - avY + 14}" fill="transparent"/>`;
+  s += `<rect x="${x - bw - 3}" y="${tY - tS - 3}" width="${bw * 2 + 6}" height="${bY + bh - tY + tS + 6}" fill="transparent"/>`;
   s += `</g>`;
   return s;
 }
