@@ -602,7 +602,7 @@ function renderSectionSVG(sec, si, h1, hn) {
         const cf = Math.max(zr.from, Math.min(zr.to, zr.from + Math.round(frac * zoneFloors) - 1));
         const compY = floorY(cf) + floorH * 0.4;
         const compTip = `Сильфонный компенсатор\\nТ3 (ГВС подача) Ø${d.T3}\\n${zoneName}${riserLabel}, ~${cf} эт.\\nКомпенсация температурных деформаций`;
-        const supTipT3 = `Неподвижная опора (НО)\\n${zoneName}${riserLabel}`;
+        const supTipT3 = `Неподвижная опора (НО)\\nДиаметр: Ø${d.T3}\\n${zoneName}${riserLabel}`;
         svg += renderCompensatorSymbol(bundle.xT3, compY, COLOR_T3, compTip, supTipT3);
       }
       for (let c = 0; c < compCountT4; c++) {
@@ -610,7 +610,7 @@ function renderSectionSVG(sec, si, h1, hn) {
         const cf = Math.max(zr.from, Math.min(zr.to, zr.from + Math.round(frac * zoneFloors) - 1));
         const compY = floorY(cf) + floorH * 0.4;
         const compTip = `Сильфонный компенсатор\\nТ4 (ГВС циркуляция) Ø${d.T4}\\n${zoneName}${riserLabel}, ~${cf} эт.\\nКомпенсация температурных деформаций`;
-        const supTipT4 = `Неподвижная опора (НО)\\n${zoneName}${riserLabel}`;
+        const supTipT4 = `Неподвижная опора (НО)\\nДиаметр: Ø${d.T4}\\n${zoneName}${riserLabel}`;
         svg += renderCompensatorSymbol(bundle.xT4, compY, COLOR_T4, compTip, supTipT4);
       }
 
@@ -672,10 +672,10 @@ function renderCompensatorSymbol(x, y, color, tip, supportTip) {
   const cyTop = y - halfH - crossGap;
   const cyBot = y + halfH + crossGap;
   let s = '';
-  // НО сверху (×) — чёрный крестик с собственным тултипом
-  s += `<g class="vis-hover" data-tip="${supportTip || ''}">`;
-  s += `<line x1="${x - crossSize}" y1="${cyTop - crossSize}" x2="${x + crossSize}" y2="${cyTop + crossSize}" stroke="#000" stroke-width="1.5"/>`;
-  s += `<line x1="${x + crossSize}" y1="${cyTop - crossSize}" x2="${x - crossSize}" y2="${cyTop + crossSize}" stroke="#000" stroke-width="1.5"/>`;
+  // НО сверху (×) — адаптивный цвет (CSS: светлая/тёмная тема)
+  s += `<g class="vis-hover vis-support-cross" data-tip="${supportTip || ''}">`;
+  s += `<line x1="${x - crossSize}" y1="${cyTop - crossSize}" x2="${x + crossSize}" y2="${cyTop + crossSize}" stroke-width="1.5"/>`;
+  s += `<line x1="${x + crossSize}" y1="${cyTop - crossSize}" x2="${x - crossSize}" y2="${cyTop + crossSize}" stroke-width="1.5"/>`;
   s += `<rect x="${x - crossSize - 2}" y="${cyTop - crossSize - 2}" width="${crossSize * 2 + 4}" height="${crossSize * 2 + 4}" fill="transparent"/>`;
   s += `</g>`;
   // Зигзаг-гармошка (компенсатор)
@@ -683,10 +683,10 @@ function renderCompensatorSymbol(x, y, color, tip, supportTip) {
   s += `<path d="M${x} ${y + halfH} L${x + w} ${y + 4} L${x - w} ${y + 2} L${x + w} ${y} L${x - w} ${y - 2} L${x + w} ${y - 4} L${x} ${y - halfH}" fill="none" stroke="${color}" stroke-width="1.5" stroke-linejoin="round"/>`;
   s += `<rect x="${x - w - 2}" y="${y - halfH - 1}" width="${w * 2 + 4}" height="${halfH * 2 + 2}" fill="transparent"/>`;
   s += `</g>`;
-  // НО снизу (×) — чёрный крестик с собственным тултипом
-  s += `<g class="vis-hover" data-tip="${supportTip || ''}">`;
-  s += `<line x1="${x - crossSize}" y1="${cyBot - crossSize}" x2="${x + crossSize}" y2="${cyBot + crossSize}" stroke="#000" stroke-width="1.5"/>`;
-  s += `<line x1="${x + crossSize}" y1="${cyBot - crossSize}" x2="${x - crossSize}" y2="${cyBot + crossSize}" stroke="#000" stroke-width="1.5"/>`;
+  // НО снизу (×) — адаптивный цвет (CSS: светлая/тёмная тема)
+  s += `<g class="vis-hover vis-support-cross" data-tip="${supportTip || ''}">`;
+  s += `<line x1="${x - crossSize}" y1="${cyBot - crossSize}" x2="${x + crossSize}" y2="${cyBot + crossSize}" stroke-width="1.5"/>`;
+  s += `<line x1="${x + crossSize}" y1="${cyBot - crossSize}" x2="${x - crossSize}" y2="${cyBot + crossSize}" stroke-width="1.5"/>`;
   s += `<rect x="${x - crossSize - 2}" y="${cyBot - crossSize - 2}" width="${crossSize * 2 + 4}" height="${crossSize * 2 + 4}" fill="transparent"/>`;
   s += `</g>`;
   return s;

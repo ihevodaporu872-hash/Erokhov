@@ -3193,6 +3193,17 @@ body.dark-theme .vis-legend-text {
   stroke-width: 2.5;
 }
 
+/* Неподвижные опоры: чёрные в светлой теме, белые в тёмной */
+.vis-support-cross line {
+  stroke: #000;
+}
+body.dark-theme .vis-support-cross line {
+  stroke: #fff;
+}
+.vis-support-cross:hover line {
+  stroke-width: 2.5;
+}
+
 /* Концевые узлы: яркость + тень */
 .vis-endnode-hover:hover {
   filter: brightness(1.3) drop-shadow(0 0 3px currentColor);
