@@ -581,9 +581,9 @@ function renderSectionSVG(sec, si, h1, hn) {
       // --- Индивидуальные подписи диаметров у каждой трубы ---
       const midFloor = Math.round((zr.from + zr.to) / 2);
       const yDia = floorY(midFloor) + floorH * 0.3;
-      svg += `<text x="${bundle.xV1 + 5}" y="${yDia}" text-anchor="start" class="vis-dia-label" fill="${COLOR_V1}">Ø${d.V1}</text>`;
-      svg += `<text x="${bundle.xT3 + 5}" y="${yDia}" text-anchor="start" class="vis-dia-label" fill="${COLOR_T3}">Ø${d.T3}</text>`;
-      svg += `<text x="${bundle.xT4 + 5}" y="${yDia}" text-anchor="start" class="vis-dia-label" fill="${COLOR_T4}">Ø${d.T4}</text>`;
+      svg += `<text x="${bundle.xV1 - 5}" y="${yDia}" text-anchor="end" class="vis-dia-label" fill="${COLOR_V1}">Ø${d.V1}</text>`;
+      svg += `<text x="${bundle.xT3 - 5}" y="${yDia}" text-anchor="end" class="vis-dia-label" fill="${COLOR_T3}">Ø${d.T3}</text>`;
+      svg += `<text x="${bundle.xT4 - 5}" y="${yDia}" text-anchor="end" class="vis-dia-label" fill="${COLOR_T4}">Ø${d.T4}</text>`;
 
       // --- Концевые узлы ---
       const endTipBase = `Концевой узел\\nКран шаровой (1 шт)\\nВоздухоотводчик автомат. (1 шт)\\nВсего по корпусу: ${totalEndNodes} узлов`;
