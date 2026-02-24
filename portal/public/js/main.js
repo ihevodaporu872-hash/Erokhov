@@ -34,7 +34,8 @@ import {
   computeZonesData,
   computeRisersByDiameter,
   computeMopPexLengthsForSection,
-  sectionZoneForFloor
+  sectionZoneForFloor,
+  floorRangeHeightMeters
 } from './calculations.js';
 
 import { getSleeveDn } from './constants.js';
@@ -526,6 +527,7 @@ function renderSectionSVG(sec, si, h1, hn) {
     const yZoneBot = floorY(zr.from);
     const yFloor1 = floorY(1);
     const zoneName = zr.zone.name || 'Зона ' + (zi + 1);
+    const hZone = floorRangeHeightMeters(h1, hn, 1, zr.to);
 
     group.bundles.forEach((bundle) => {
       const riserNum = bundle.riserIdx + 1;
@@ -548,19 +550,19 @@ function renderSectionSVG(sec, si, h1, hn) {
       }
 
       // --- Активные стояки (рабочая зона) ---
-      const tipV1 = `В1 (ХВС), ${zoneName}${riserLabel}\\nСталь оцинкованная Ø${d.V1}\\nЭтажи ${zr.from}–${zr.to}`;
+      const tipV1 = `В1 (ХВС), ${zoneName}${riserLabel}\\nСталь оцинкованная Ø${d.V1}\\nЭтажи ${zr.from}–${zr.to}\\nДлина: ${hZone.toFixed(2)} м`;
       svg += `<g class="vis-hover vis-riser-hover" data-tip="${tipV1}">`;
       svg += `<line x1="${bundle.xV1}" y1="${yZoneTop}" x2="${bundle.xV1}" y2="${yZoneBot}" stroke="${COLOR_V1}" stroke-width="3" stroke-linecap="round"/>`;
       svg += `<rect x="${bundle.xV1 - 6}" y="${yZoneTop}" width="12" height="${yZoneBot - yZoneTop}" fill="transparent"/>`;
       svg += `</g>`;
 
-      const tipT3 = `Т3 (ГВС подача), ${zoneName}${riserLabel}\\nСталь оцинкованная Ø${d.T3}\\nЭтажи ${zr.from}–${zr.to}`;
+      const tipT3 = `Т3 (ГВС подача), ${zoneName}${riserLabel}\\nСталь оцинкованная Ø${d.T3}\\nЭтажи ${zr.from}–${zr.to}\\nДлина: ${hZone.toFixed(2)} м`;
       svg += `<g class="vis-hover vis-riser-hover" data-tip="${tipT3}">`;
       svg += `<line x1="${bundle.xT3}" y1="${yZoneTop}" x2="${bundle.xT3}" y2="${yZoneBot}" stroke="${COLOR_T3}" stroke-width="3" stroke-linecap="round"/>`;
       svg += `<rect x="${bundle.xT3 - 6}" y="${yZoneTop}" width="12" height="${yZoneBot - yZoneTop}" fill="transparent"/>`;
       svg += `</g>`;
 
-      const tipT4 = `Т4 (ГВС циркуляция), ${zoneName}${riserLabel}\\nСталь оцинкованная Ø${d.T4}\\nЭтажи ${zr.from}–${zr.to}`;
+      const tipT4 = `Т4 (ГВС циркуляция), ${zoneName}${riserLabel}\\nСталь оцинкованная Ø${d.T4}\\nЭтажи ${zr.from}–${zr.to}\\nДлина: ${hZone.toFixed(2)} м`;
       svg += `<g class="vis-hover vis-riser-hover" data-tip="${tipT4}">`;
       svg += `<line x1="${bundle.xT4}" y1="${yZoneTop}" x2="${bundle.xT4}" y2="${yZoneBot}" stroke="${COLOR_T4}" stroke-width="2" stroke-linecap="round"/>`;
       svg += `<rect x="${bundle.xT4 - 6}" y="${yZoneTop}" width="12" height="${yZoneBot - yZoneTop}" fill="transparent"/>`;
