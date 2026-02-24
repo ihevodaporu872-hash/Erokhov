@@ -236,7 +236,7 @@ function renderFloorsTableForSection(si) {
     const aptVal = isFirst ? 0 : (sec.apts[f] ?? 0);
     const aptCell = isFirst
       ? `<input type="number" value="0" disabled/>`
-      : `<input type="number" min="0" max="200" value="${aptVal}" oninput="window.app.setApt(${si}, ${f}, +this.value)">`;
+      : `<input type="number" min="0" max="200" value="${aptVal}" data-focus-id="apt-${si}-${f}" oninput="window.app.setApt(${si}, ${f}, +this.value)">`;
 
     const rentCells = isFirst
       ? `
@@ -249,6 +249,7 @@ function renderFloorsTableForSection(si) {
         <td>
           <input type="number" min="0" step="1" value="${sec.rent.qty}"
             ${sec.rent.enabled ? '' : 'disabled'}
+            data-focus-id="rent-${si}"
             oninput="window.app.setRentQty(${si}, +this.value)">
         </td>`
       : `<td></td><td></td>`;
@@ -292,6 +293,7 @@ function renderZonesTableForSection(si) {
     <tr>
       <td>
         <input type="text" value="${z.name}" ${dis}
+          data-focus-id="zone-${si}-${z.id}-name"
           oninput="window.app.updateZone(${si}, ${z.id}, 'name', this.value)"/>
         <div class="inline" style="margin-top:6px;">
           <label class="inline" style="gap:6px;">
@@ -302,8 +304,10 @@ function renderZonesTableForSection(si) {
       </td>
       <td style="text-align:center;">1</td>
       <td><input type="number" min="1" value="${z.to}" ${dis}
+             data-focus-id="zone-${si}-${z.id}-to"
              oninput="window.app.updateZone(${si}, ${z.id}, 'to', +this.value)"/></td>
       <td><input type="number" min="1" value="${z.risers}" ${dis}
+             data-focus-id="zone-${si}-${z.id}-risers"
              oninput="window.app.updateZone(${si}, ${z.id}, 'risers', +this.value)"/></td>
       <td>${renderDnSelect(d.V1 ?? 32, `window.app.updateZoneDia(${si}, ${z.id}, 'V1', +this.value)`, z.locked)}</td>
       <td>${renderDnSelect(d.T3 ?? 32, `window.app.updateZoneDia(${si}, ${z.id}, 'T3', +this.value)`, z.locked)}</td>
@@ -373,6 +377,7 @@ function renderMopBlockForSection(si) {
         <div class="input-group">
           <label>Длина МОП, L (м):</label>
           <input type="number" min="0" step="0.1" value="${mop.L}"
+                 data-focus-id="mop-${si}-L"
                  oninput="window.app.setMopLength(${si}, +this.value)">
         </div>
         <div class="input-group">
@@ -426,6 +431,17 @@ export function renderSectionsBlocks() {
     }
   });
 
+  // Сохраняем фокус и позицию курсора перед ререндером
+  let savedFocusId = null;
+  let savedSelStart = null;
+  let savedSelEnd = null;
+  const activeEl = document.activeElement;
+  if (activeEl && wrap.contains(activeEl) && activeEl.dataset.focusId) {
+    savedFocusId = activeEl.dataset.focusId;
+    savedSelStart = activeEl.selectionStart;
+    savedSelEnd = activeEl.selectionEnd;
+  }
+
   const blocks = sections.map((sec, si) => {
     const totalApts = getTotalAptsForSection(sec);
     const aptsLabel = totalApts > 0 ? ` (итого: ${totalApts} кв.)` : '';
@@ -441,6 +457,7 @@ export function renderSectionsBlocks() {
           <label>Количество этажей в корпусе:</label>
           <div class="inline">
             <input type="number" min="1" max="200" value="${sec.floors}" ${sec.floorsLocked ? 'disabled' : ''}
+                   data-focus-id="floors-${si}"
                    oninput="window.app.updateSectionFloors(${si}, +this.value)">
             <label class="inline" style="gap:6px;">
               <input type="checkbox" ${sec.floorsLocked ? 'checked' : ''}
@@ -482,6 +499,19 @@ export function renderSectionsBlocks() {
       det.open = true;
     }
   });
+
+  // Восстанавливаем фокус и позицию курсора
+  if (savedFocusId) {
+    const el = wrap.querySelector(`[data-focus-id="${savedFocusId}"]`);
+    if (el) {
+      el.focus();
+      try {
+        if (savedSelStart !== null && savedSelEnd !== null) {
+          el.setSelectionRange(savedSelStart, savedSelEnd);
+        }
+      } catch (e) { /* number-инпуты не поддерживают setSelectionRange */ }
+    }
+  }
 }
 
 // Рендер шапки таблицы результатов по этажам
