@@ -278,8 +278,8 @@ export function computeZonesData(sections, h1, hn, ivptEnabled) {
       const risersPerSection = Math.max(1, +z.risers || 1);
       const d = z.fixedD || { V1: 0, T3: 0, T4: 0 };
 
-      // Высота зоны — от zoneFrom до zoneTo
-      const hZone = floorRangeHeightMeters(h1, hn, zoneFrom, zoneTo);
+      // Высота стояка — всегда от 1-го этажа до верха зоны
+      const hZone = floorRangeHeightMeters(h1, hn, 1, zoneTo);
       const lenOneRiser = hZone;
       const lenAllRisers = lenOneRiser * risersPerSection;
 
@@ -377,7 +377,7 @@ export function computeRisersOverall(sections, h1, hn) {
 
       const risers = Math.max(1, +z.risers || 1);
       const d = z.fixedD || {};
-      const h = floorRangeHeightMeters(h1, hn, zoneFrom, zoneTo);
+      const h = floorRangeHeightMeters(h1, hn, 1, zoneTo);
       const lenAll = h * risers;
 
       ['V1', 'T3', 'T4'].forEach(sys => {
