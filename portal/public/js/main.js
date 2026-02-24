@@ -663,12 +663,14 @@ function renderSectionSVG(sec, si, h1, hn) {
 
 // Символ компенсатора (П-образный) с тултипом
 function renderCompensatorSymbol(x, y, color, tip) {
-  const w = 6;
-  const h = 8;
+  const w = 4;      // амплитуда зигзага (влево-вправо от оси стояка)
+  const halfH = 6;  // половина высоты символа
+  // Зигзаг-гармошка (типовое обозначение сильфонного компенсатора):
+  // 3 полных волны вдоль оси стояка, от (x, y+6) до (x, y-6)
   let s = `<g class="vis-hover vis-comp-hover" data-tip="${tip || ''}">`;
-  s += `<path d="M${x} ${y} L${x - w} ${y} L${x - w} ${y - h} L${x + w} ${y - h} L${x + w} ${y} L${x} ${y}" fill="none" stroke="${color}" stroke-width="1.5"/>`;
+  s += `<path d="M${x} ${y + halfH} L${x + w} ${y + 4} L${x - w} ${y + 2} L${x + w} ${y} L${x - w} ${y - 2} L${x + w} ${y - 4} L${x} ${y - halfH}" fill="none" stroke="${color}" stroke-width="1.5" stroke-linejoin="round"/>`;
   // Невидимая область для наведения
-  s += `<rect x="${x - w - 2}" y="${y - h - 2}" width="${w * 2 + 4}" height="${h + 4}" fill="transparent"/>`;
+  s += `<rect x="${x - w - 2}" y="${y - halfH - 2}" width="${w * 2 + 4}" height="${halfH * 2 + 4}" fill="transparent"/>`;
   s += `</g>`;
   return s;
 }
