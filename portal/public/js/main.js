@@ -494,11 +494,17 @@ function renderSectionSVG(sec, si, h1, hn) {
   // --- Подложки зон (отрисовываются первым слоем — под всей графикой) ---
   zoneGroups.forEach((group, zi) => {
     const zr = group.zr;
-    // Верх: 45px покрывает подписи стояков, концевые узлы, стрелки
-    // Низ: 4px — минимальный отступ, чтобы соседние зоны не накладывались
-    // (45 + 4 = 49 < floorH = 50 → 1px зазор между зонами)
-    const yTop = floorY(zr.to) - 45;
+    // Верх: 58px покрывает подписи систем (-40), номера стояков (-52),
+    // концевые узлы с воздухоотводчиками (-27) и стрелки
+    // Низ: 4px — минимальный отступ
+    // Для нижних зон верх ограничивается, чтобы не наложиться на соседнюю зону сверху
+    let yTop = floorY(zr.to) - 58;
     const yBot = floorY(zr.from) + 4;
+    // Защита от наложения: нижняя граница верхней зоны ограничивает yTop текущей
+    if (zi < zoneGroups.length - 1) {
+      const nextBot = floorY(zoneGroups[zi + 1].zr.from) + 4;
+      yTop = Math.max(yTop, nextBot + 2);
+    }
     const fillOpacity = zi % 2 === 0 ? 0.04 : 0.07;
     svg += `<rect x="${leftPad}" y="${yTop}" width="${rightColX - leftPad - 8}" height="${yBot - yTop}" fill="var(--vis-zone-bg, #007AFF)" fill-opacity="${fillOpacity}" rx="6"/>`;
     // Подпись зоны — вертикальный текст слева от номеров этажей
@@ -572,14 +578,14 @@ function renderSectionSVG(sec, si, h1, hn) {
       svg += `<rect x="${bundle.xT4 - 6}" y="${yZoneTop}" width="12" height="${yZoneBot - yZoneTop}" fill="transparent"/>`;
       svg += `</g>`;
 
-      // --- Подписи стояков над концевыми узлами ---
-      const yLabel = yZoneTop - 24;
+      // --- Подписи стояков над концевыми узлами (с запасом от воздухоотводчиков) ---
+      const yLabel = yZoneTop - 40;
       svg += `<text x="${bundle.xV1}" y="${yLabel}" text-anchor="middle" class="vis-riser-label" fill="${COLOR_V1}">В1</text>`;
       svg += `<text x="${bundle.xT3}" y="${yLabel}" text-anchor="middle" class="vis-riser-label" fill="${COLOR_T3}">Т3</text>`;
       svg += `<text x="${bundle.xT4}" y="${yLabel}" text-anchor="middle" class="vis-riser-label" fill="${COLOR_T4}">Т4</text>`;
       // Номер стояка (если несколько)
       if (group.risersCount > 1) {
-        svg += `<text x="${(bundle.xV1 + bundle.xT4) / 2}" y="${yLabel - 14}" text-anchor="middle" class="vis-riser-label" fill="var(--text-secondary, #86868b)">ст.${riserNum}</text>`;
+        svg += `<text x="${(bundle.xV1 + bundle.xT4) / 2}" y="${yLabel - 12}" text-anchor="middle" class="vis-riser-label" fill="var(--text-secondary, #86868b)">ст.${riserNum}</text>`;
       }
 
       // --- Индивидуальные подписи диаметров у каждой трубы ---
