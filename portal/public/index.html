@@ -327,11 +327,20 @@
             border-color: #0d6efd;
         }
 
+        .theme-toggle-wrapper {
+            display: flex !important;
+            align-items: center;
+            flex-shrink: 0;
+            z-index: 10;
+        }
+
         .theme-switch {
             position: relative;
-            display: inline-block;
+            display: inline-block !important;
             width: 52px;
             height: 28px;
+            flex-shrink: 0;
+            z-index: 10;
         }
 
         .theme-switch input {
@@ -340,7 +349,7 @@
             height: 0;
         }
 
-        .slider {
+        .theme-switch .slider {
             position: absolute;
             cursor: pointer;
             top: 0;
@@ -351,9 +360,11 @@
             transition: 0.3s ease;
             border-radius: 28px;
             box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1);
+            display: block !important;
+            z-index: 10;
         }
 
-        .slider:before {
+        .theme-switch .slider:before {
             position: absolute;
             content: "";
             height: 22px;
@@ -366,19 +377,19 @@
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
         }
 
-        input:checked + .slider {
+        .theme-switch input:checked + .slider {
             background-color: #3d8bfd;
         }
 
-        input:checked + .slider:before {
+        .theme-switch input:checked + .slider:before {
             transform: translateX(24px);
         }
 
-        body.dark-theme .slider {
+        body.dark-theme .theme-switch .slider {
             background-color: #3a3a3a;
         }
 
-        body.dark-theme input:checked + .slider {
+        body.dark-theme .theme-switch input:checked + .slider {
             background-color: #3b82f6;
         }
 
@@ -471,6 +482,9 @@
         }
 
         @media (max-width: 768px) {
+            .theme-toggle-wrapper {
+                display: flex !important;
+            }
             .sidebar {
                 width: 100%;
                 position: relative;
@@ -495,7 +509,7 @@
             <a class="navbar-brand" href="#">
                 <i class="bi bi-gear-fill"></i> Инженерный портал
             </a>
-            <div class="d-flex align-items-center">
+            <div class="d-flex align-items-center theme-toggle-wrapper">
                 <span class="me-2 text-secondary"><i class="bi bi-sun-fill"></i></span>
                 <label class="theme-switch">
                     <input type="checkbox" id="themeToggle">
