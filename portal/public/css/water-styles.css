@@ -2550,20 +2550,29 @@ button:active {
   width: 100%;
 }
 
+.estimate-table-financial td,
+.estimate-table-financial th {
+  text-align: left;
+  padding: 8px 6px;
+}
+
 .estimate-table-financial .col-type {
-  width: 80px;
+  width: 60px;
   white-space: nowrap;
+  padding-left: 8px;
 }
 
 .estimate-table-financial .col-name {
-  width: auto;
+  width: 100%;
+  text-align: left;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  padding-left: 4px;
 }
 
 .estimate-table-financial .col-unit {
-  width: 60px;
+  width: 55px;
   text-align: center;
   white-space: nowrap;
 }
@@ -2577,7 +2586,7 @@ button:active {
 }
 
 .estimate-table-financial .col-price {
-  width: 100px;
+  width: 105px;
   text-align: right;
   white-space: nowrap;
 }
@@ -2588,6 +2597,7 @@ button:active {
   font-weight: 600;
   color: var(--gray-900);
   white-space: nowrap;
+  padding-right: 8px;
 }
 
 /* Поле ввода цены */
