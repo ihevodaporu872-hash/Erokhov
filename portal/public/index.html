@@ -538,39 +538,6 @@
             color: #a0a0a0;
         }
 
-        /* Кнопка "Выйти из проекта" в sidebar */
-        .sidebar-exit-btn {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            width: 100%;
-            padding: 0.6rem 1rem;
-            margin-bottom: 0.5rem;
-            border-radius: 12px;
-            border: 1px dashed var(--border-color);
-            background: transparent;
-            color: var(--text-secondary);
-            font-size: 0.9rem;
-            font-weight: 500;
-            cursor: pointer;
-            transition: all 0.2s;
-            text-decoration: none;
-        }
-
-        .sidebar-exit-btn:hover {
-            background: rgba(239, 68, 68, 0.08);
-            border-color: #ef4444;
-            color: #ef4444;
-        }
-
-        body.dark-theme .sidebar-exit-btn:hover {
-            background: rgba(239, 68, 68, 0.12);
-        }
-
-        .sidebar-exit-btn.hidden {
-            display: none;
-        }
-
         /* Карточки проектов на Dashboard */
         .project-card-db {
             background-color: var(--bg-secondary);
@@ -704,12 +671,6 @@
                         <i class="bi bi-speedometer2"></i>
                         Панель управления
                     </a>
-                </li>
-                <li class="nav-item" id="exitProjectItem">
-                    <button class="sidebar-exit-btn hidden" id="btnExitProject">
-                        <i class="bi bi-box-arrow-left"></i>
-                        Выйти из проекта
-                    </button>
                 </li>
                 <li class="nav-item">
                     <a class="nav-link" href="#" data-section="water-supply">
@@ -948,8 +909,23 @@
 
         // ==================== Состояние ====================
         let portalProjects = [];
-        let currentProjectId = null;
+        let projectViewProjectId = null; // ID проекта на странице project-view
+        let activeSection = 'dashboard';
         let saveTimer = null;
+
+        // ==================== Per-system хранение проектов ====================
+        function getSystemProjectId(systemType) {
+            const val = localStorage.getItem(`portalProject_${systemType}`);
+            return val ? +val : null;
+        }
+
+        function setSystemProjectId(systemType, projectId) {
+            if (projectId) {
+                localStorage.setItem(`portalProject_${systemType}`, String(projectId));
+            } else {
+                localStorage.removeItem(`portalProject_${systemType}`);
+            }
+        }
 
         // ==================== Тема ====================
         const themeToggle = document.getElementById('themeToggle');
@@ -970,10 +946,9 @@
                     theme: currentTheme
                 }, '*');
 
-                // Если проект уже выбран — отправляем данные в iframe
-                if (currentProjectId) {
-                    sendProjectToIframe(currentProjectId);
-                }
+                // Если для water-supply уже выбран проект — отправляем данные
+                const wsProjectId = getSystemProjectId('water-supply');
+                if (wsProjectId) sendProjectToIframe(wsProjectId);
             });
         }
 
@@ -998,28 +973,87 @@
         });
 
         // ==================== Навигация ====================
+        function navigateToSection(sectionId) {
+            document.querySelectorAll('.sidebar .nav-link').forEach(l => l.classList.remove('active'));
+            const targetLink = document.querySelector(`.sidebar .nav-link[data-section="${sectionId}"]`);
+            if (targetLink) targetLink.classList.add('active');
+            document.querySelectorAll('.content-section').forEach(s => s.classList.remove('active'));
+            const section = document.getElementById(sectionId);
+            if (section) section.classList.add('active');
+
+            activeSection = sectionId;
+            updateNavbarForActiveSection();
+        }
+
         document.querySelectorAll('.sidebar .nav-link').forEach(link => {
             link.addEventListener('click', function(e) {
                 e.preventDefault();
-                document.querySelectorAll('.sidebar .nav-link').forEach(l => l.classList.remove('active'));
-                this.classList.add('active');
-                document.querySelectorAll('.content-section').forEach(section => section.classList.remove('active'));
                 const sectionId = this.getAttribute('data-section');
-                document.getElementById(sectionId).classList.add('active');
+                navigateToSection(sectionId);
             });
         });
 
+        // ==================== Бейдж навбара ====================
+        function updateNavbarProjectName(name) {
+            const badge = document.getElementById('navbarProjectBadge');
+            const nameEl = document.getElementById('navbarProjectName');
+            if (!badge || !nameEl) return;
+
+            if (name) {
+                nameEl.textContent = name;
+                badge.classList.remove('empty');
+            } else {
+                nameEl.textContent = 'Проект не выбран';
+                badge.classList.add('empty');
+            }
+        }
+
+        // Обновление бейджа в зависимости от активной секции
+        function updateNavbarForActiveSection() {
+            if (activeSection === 'project-view') {
+                const project = portalProjects.find(p => p.id === projectViewProjectId);
+                updateNavbarProjectName(project ? project.name : null);
+            } else if (activeSection === 'dashboard') {
+                updateNavbarProjectName(null);
+            } else {
+                // Системная страница — берём проект из её dropdown
+                const projectId = getSystemProjectId(activeSection);
+                if (projectId) {
+                    const project = portalProjects.find(p => p.id === projectId);
+                    updateNavbarProjectName(project ? project.name : null);
+                } else {
+                    updateNavbarProjectName(null);
+                }
+            }
+        }
+
         // ==================== Управление проектами ====================
 
-        // Загрузка проектов из БД
         async function loadProjectsList() {
             try {
                 portalProjects = await fetchProjects();
                 renderDashboardProjects();
-                updateAllDropdowns();
+                populateAllDropdowns();
             } catch (err) {
                 console.error('Ошибка загрузки проектов:', err);
             }
+        }
+
+        // Заполнение dropdown (каждый восстанавливает свой сохранённый проект)
+        function populateAllDropdowns() {
+            document.querySelectorAll('.project-selector').forEach(select => {
+                const systemType = select.dataset.system;
+                select.innerHTML = '<option value="">-- Выберите проект --</option>';
+                portalProjects.forEach(p => {
+                    const opt = document.createElement('option');
+                    opt.value = p.id;
+                    opt.textContent = p.name;
+                    select.appendChild(opt);
+                });
+                // Восстанавливаем проект именно для этой системы
+                const savedId = getSystemProjectId(systemType);
+                if (savedId) select.value = savedId;
+            });
         }
 
         // Рендер карточек проектов в Dashboard
@@ -1059,26 +1093,6 @@
             }).join('');
         }
 
-        // Обновить все dropdown-списки проектов
-        function updateAllDropdowns() {
-            document.querySelectorAll('.project-selector').forEach(select => {
-                const currentVal = select.value;
-                select.innerHTML = '<option value="">-- Выберите проект --</option>';
-                portalProjects.forEach(p => {
-                    const opt = document.createElement('option');
-                    opt.value = p.id;
-                    opt.textContent = p.name;
-                    select.appendChild(opt);
-                });
-                // Восстанавливаем выбранный проект
-                if (currentProjectId) {
-                    select.value = currentProjectId;
-                } else if (currentVal) {
-                    select.value = currentVal;
-                }
-            });
-        }
-
         // Создание проекта
         async function handleCreateProject() {
             const input = document.getElementById('newProjectNameInput');
@@ -1093,9 +1107,7 @@
                 input.value = '';
                 portalProjects.unshift(project);
                 renderDashboardProjects();
-                updateAllDropdowns();
-
-                // Автовыбор и вход в новый проект
+                populateAllDropdowns();
                 enterProject(project.id);
             } catch (err) {
                 console.error('Ошибка создания проекта:', err);
@@ -1116,12 +1128,14 @@
                 const idx = portalProjects.findIndex(p => p.id === id);
                 if (idx !== -1) portalProjects[idx] = updated;
                 renderDashboardProjects();
-                updateAllDropdowns();
-                if (currentProjectId === id) {
-                    updateNavbarProjectName(updated.name);
+                populateAllDropdowns();
+
+                // Обновляем project-view если смотрим этот проект
+                if (projectViewProjectId === id) {
                     const viewName = document.getElementById('projectViewName');
                     if (viewName) viewName.textContent = updated.name;
                 }
+                updateNavbarForActiveSection();
             } catch (err) {
                 console.error('Ошибка переименования:', err);
                 alert('Не удалось переименовать проект');
@@ -1140,73 +1154,32 @@
                 portalProjects = portalProjects.filter(p => p.id !== id);
                 renderDashboardProjects();
 
-                if (currentProjectId === id) {
-                    exitProject();
+                // Очищаем этот проект из всех систем где он был выбран
+                document.querySelectorAll('.project-selector').forEach(select => {
+                    const sys = select.dataset.system;
+                    if (getSystemProjectId(sys) === id) {
+                        setSystemProjectId(sys, null);
+                    }
+                });
+
+                // Если удалили проект, на который смотрим — возврат на dashboard
+                if (projectViewProjectId === id) {
+                    projectViewProjectId = null;
+                    navigateToSection('dashboard');
                 }
-                updateAllDropdowns();
+
+                populateAllDropdowns();
+                updateNavbarForActiveSection();
             } catch (err) {
                 console.error('Ошибка удаления:', err);
                 alert('Не удалось удалить проект');
             }
         }
 
-        // Навигация к секции (программный клик по sidebar)
-        function navigateToSection(sectionId) {
-            document.querySelectorAll('.sidebar .nav-link').forEach(l => l.classList.remove('active'));
-            const targetLink = document.querySelector(`.sidebar .nav-link[data-section="${sectionId}"]`);
-            if (targetLink) targetLink.classList.add('active');
-            document.querySelectorAll('.content-section').forEach(s => s.classList.remove('active'));
-            const section = document.getElementById(sectionId);
-            if (section) section.classList.add('active');
-        }
-
-        // Обновление названия проекта в навбаре
-        function updateNavbarProjectName(name) {
-            const badge = document.getElementById('navbarProjectBadge');
-            const nameEl = document.getElementById('navbarProjectName');
-            if (!badge || !nameEl) return;
-
-            if (name) {
-                nameEl.textContent = name;
-                badge.classList.remove('empty');
-            } else {
-                nameEl.textContent = 'Проект не выбран';
-                badge.classList.add('empty');
-            }
-        }
-
-        // Показать/скрыть кнопку "Выйти из проекта"
-        function toggleExitButton(show) {
-            const btn = document.getElementById('btnExitProject');
-            if (btn) {
-                btn.classList.toggle('hidden', !show);
-            }
-        }
-
-        // Выбор проекта (без навигации — для dropdown)
-        function selectProject(projectId) {
-            currentProjectId = projectId;
-            localStorage.setItem('portalActiveProjectId', projectId);
-
-            // Синхронизируем все dropdown
-            document.querySelectorAll('.project-selector').forEach(s => {
-                s.value = projectId;
-            });
-
-            // Обновляем навбар
-            const project = portalProjects.find(p => p.id === projectId);
-            updateNavbarProjectName(project ? project.name : null);
-            toggleExitButton(!!projectId);
-
-            // Загружаем данные для water-supply
-            sendProjectToIframe(projectId);
-        }
-
-        // Вход в проект (клик по карточке) — select + navigate to project-view
+        // Вход в проект (клик по карточке) — только project-view, без установки в dropdown
         function enterProject(projectId) {
-            selectProject(projectId);
+            projectViewProjectId = projectId;
 
-            // Обновляем заголовок на странице проекта
             const project = portalProjects.find(p => p.id === projectId);
             const viewName = document.getElementById('projectViewName');
             if (viewName && project) viewName.textContent = project.name;
@@ -1214,22 +1187,8 @@
             navigateToSection('project-view');
         }
 
-        // Выход из проекта — сброс + возврат на dashboard
-        function exitProject() {
-            currentProjectId = null;
-            localStorage.removeItem('portalActiveProjectId');
+        // ==================== Iframe: загрузка и автосохранение ====================
 
-            // Сбрасываем dropdown
-            document.querySelectorAll('.project-selector').forEach(s => {
-                s.value = '';
-            });
-
-            updateNavbarProjectName(null);
-            toggleExitButton(false);
-            navigateToSection('dashboard');
-        }
-
-        // Отправка данных проекта в iframe калькулятора
         async function sendProjectToIframe(projectId) {
             if (!projectId) return;
             try {
@@ -1249,14 +1208,14 @@
             }
         }
 
-        // Автосохранение данных из iframe в БД (с debounce)
         function handleAutoSave(state) {
-            if (!currentProjectId) return;
+            const wsProjectId = getSystemProjectId('water-supply');
+            if (!wsProjectId) return;
 
             clearTimeout(saveTimer);
             saveTimer = setTimeout(async () => {
                 try {
-                    await saveCalculation(currentProjectId, 'water-supply', state);
+                    await saveCalculation(wsProjectId, 'water-supply', state);
                     showAutosaveToast();
                 } catch (err) {
                     console.error('Ошибка автосохранения:', err);
@@ -1264,7 +1223,6 @@
             }, 800);
         }
 
-        // Показать уведомление "Сохранено"
         function showAutosaveToast() {
             const toast = document.getElementById('autosaveToast');
             if (!toast) return;
@@ -1272,25 +1230,23 @@
             setTimeout(() => toast.classList.remove('show'), 1500);
         }
 
-        // Слушаем сообщения от iframe (автосохранение)
         window.addEventListener('message', (event) => {
             if (event.data && event.data.type === 'auto-save') {
                 handleAutoSave(event.data.state);
             }
             if (event.data && event.data.type === 'iframe-ready') {
-                // iframe загрузился — отправляем текущую тему и проект
                 const iframe = document.getElementById('waterCalcFrame');
                 if (iframe && iframe.contentWindow) {
                     const currentTheme = body.classList.contains('dark-theme') ? 'dark' : 'light';
                     iframe.contentWindow.postMessage({ type: 'theme-change', theme: currentTheme }, '*');
                 }
-                if (currentProjectId) {
-                    sendProjectToIframe(currentProjectId);
-                }
+                const wsProjectId = getSystemProjectId('water-supply');
+                if (wsProjectId) sendProjectToIframe(wsProjectId);
             }
         });
 
-        // Экранирование HTML
+        // ==================== Утилиты ====================
+
         function escapeHtml(text) {
             const div = document.createElement('div');
             div.textContent = text;
@@ -1299,26 +1255,28 @@
 
         // ==================== Обработчики ====================
 
-        // Кнопка "Создать"
         document.getElementById('btnCreateProjectDB')?.addEventListener('click', handleCreateProject);
 
-        // Enter в поле ввода
         document.getElementById('newProjectNameInput')?.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') handleCreateProject();
         });
 
-        // Dropdown проектов — синхронный выбор
+        // Dropdown — каждый сохраняет проект только для своей системы
         document.querySelectorAll('.project-selector').forEach(select => {
             select.addEventListener('change', (e) => {
                 const projectId = e.target.value;
-                if (projectId) {
-                    selectProject(+projectId);
+                const systemType = e.target.dataset.system;
+                if (!systemType) return;
+
+                setSystemProjectId(systemType, projectId ? +projectId : null);
+                updateNavbarForActiveSection();
+
+                // Для water-supply — отправляем данные в iframe
+                if (systemType === 'water-supply' && projectId) {
+                    sendProjectToIframe(+projectId);
                 }
             });
         });
-
-        // Кнопка "Выйти из проекта" в sidebar
-        document.getElementById('btnExitProject')?.addEventListener('click', exitProject);
 
         // ==================== Глобальный API (для onclick в HTML) ====================
         window.portalApp = {
@@ -1331,14 +1289,12 @@
         (async function init() {
             await loadProjectsList();
 
-            // Восстанавливаем последний выбранный проект (без навигации)
-            const savedProjectId = localStorage.getItem('portalActiveProjectId');
-            if (savedProjectId && portalProjects.find(p => p.id === +savedProjectId)) {
-                selectProject(+savedProjectId);
-            } else {
-                updateNavbarProjectName(null);
-                toggleExitButton(false);
-            }
+            // Отправляем в iframe проект water-supply если был сохранён
+            const wsProjectId = getSystemProjectId('water-supply');
+            if (wsProjectId) sendProjectToIframe(wsProjectId);
+
+            // Бейдж стартует пустым (на dashboard)
+            updateNavbarProjectName(null);
         })();
     </script>
 </body>
