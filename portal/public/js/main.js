@@ -2104,6 +2104,10 @@ window.addEventListener('message', (event) => {
       if (typeof calculateUndergroundCost === 'function') {
         calculateUndergroundCost();
       }
+      // Обновляем смету с новой площадью подземной части
+      if (getActiveTabId() === 'estimate') {
+        renderEstimate();
+      }
     }
   }
 });

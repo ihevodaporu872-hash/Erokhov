@@ -1332,13 +1332,13 @@ export function aggregateEstimateData({ zonesData, risersByDiameter, sections, h
 /**
  * Рассчитывает сводку по всему зданию
  */
-export function calculateBuildingSummary(estimateData) {
+export function calculateBuildingSummary(estimateData, undergroundArea = 0) {
   const summary = {
     cold: { items: [] },
     hot: { items: [] },
   };
 
-  // Собираем все items по системам
+  // Собираем все items по системам (из корпусов)
   const itemsMap = {
     cold: new Map(),
     hot: new Map(),
@@ -1358,6 +1358,22 @@ export function calculateBuildingSummary(estimateData) {
       });
     });
   });
+
+  // Добавляем позиции из подземной части
+  if (undergroundArea > 0) {
+    ['cold', 'hot'].forEach(systemKey => {
+      UNDERGROUND_ITEMS[systemKey].forEach(item => {
+        const key = `${item.type}-${item.name}`;
+        const map = itemsMap[systemKey];
+
+        if (map.has(key)) {
+          map.get(key).quantity += undergroundArea;
+        } else {
+          map.set(key, { ...item, quantity: undergroundArea });
+        }
+      });
+    });
+  }
 
   // Конвертируем в массивы и сортируем по фиксированному порядку работ
   ['cold', 'hot'].forEach(systemKey => {
@@ -1488,8 +1504,8 @@ export function renderEstimateBlock(estimateData, sectionsCount, prices = {}, un
   html += renderUndergroundBlock(undergroundArea, prices);
 
   // === Сводка по зданию ===
-  if (sectionsCount > 1) {
-    const summary = calculateBuildingSummary(estimateData);
+  if (sectionsCount > 1 || undergroundArea > 0) {
+    const summary = calculateBuildingSummary(estimateData, undergroundArea);
 
     html += `
       <details class="estimate-section-details estimate-summary-details">
@@ -1705,8 +1721,8 @@ export function exportEstimateToExcel(estimateData, sectionsCount, prices = {}, 
   }
 
   // Лист сводки
-  if (sectionsCount > 1) {
-    const summary = calculateBuildingSummary(estimateData);
+  if (sectionsCount > 1 || undergroundArea > 0) {
+    const summary = calculateBuildingSummary(estimateData, undergroundArea);
     const rows = [['СВОДКА ПО ЗДАНИЮ', '', '', '', '', ''], ['', '', '', '', '', '']];
 
     ['cold', 'hot'].forEach(key => {
