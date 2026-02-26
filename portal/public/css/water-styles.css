@@ -2562,7 +2562,7 @@ button:active {
 }
 
 .estimate-table-financial .col-name {
-  width: 99%;
+  width: 60%;
   white-space: nowrap;
 }
 
@@ -2572,7 +2572,8 @@ button:active {
 
 .estimate-table-financial td.col-name {
   text-align: left !important;
-  padding-left: 10px !important;
+  padding-left: 15px !important;
+  width: 60% !important;
 }
 
 .estimate-table-financial .col-unit {
@@ -3377,4 +3378,5 @@ body.dark-theme .vis-schema {
 .estimate-table-unified td.col-name {
   text-align: left !important;
   padding-left: 15px !important;
+  width: 60% !important;
 }

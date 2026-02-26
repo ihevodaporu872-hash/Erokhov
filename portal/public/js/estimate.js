@@ -1598,7 +1598,7 @@ function renderSystemBlock(systemKey, data, isSummary = false, sectionIndex = 0,
     html += `
       <tr class="${typeClass}">
         <td class="col-type">${item.type}</td>
-        <td class="col-name" style="text-align:left!important;padding-left:15px!important">${item.name}</td>
+        <td class="col-name" style="text-align:left !important; padding-left:15px !important; width:60% !important;">${item.name}</td>
         <td class="col-unit">${item.unit}</td>
         <td class="col-qty">${qty}</td>
         ${priceCells}
