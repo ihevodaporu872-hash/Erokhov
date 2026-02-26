@@ -93,7 +93,8 @@ import {
   aggregateEstimateData,
   renderEstimateBlock,
   exportEstimateToExcel,
-  initEstimatePriceHandlers
+  initEstimatePriceHandlers,
+  showPriceManagementModal
 } from './estimate.js';
 
 console.log('=== main.js ЗАГРУЖЕН (после импортов) ===');
@@ -2210,6 +2211,29 @@ window.onload = () => {
     const undergroundArea = parseFloat(document.getElementById('undergroundArea')?.value) || 0;
     exportEstimateToExcel(estimateData, sections.length, estimatePrices, undergroundArea);
   });
+
+  // Обработчики кнопок управления расценками
+  function openPriceModal(type) {
+    const { zonesData, risersByDiameter, h1, hn, ivptEnabled } = lastCalculationCache;
+    if (!zonesData || !risersByDiameter) {
+      alert('Сначала произведите расчёт на вкладке «Жилая часть»');
+      return;
+    }
+    const collectorSelect = document.querySelector('select.manufacturer-select[data-section="collectors"]');
+    const collectorVendor = collectorSelect ?
+      (collectorSelect.options[collectorSelect.selectedIndex]?.text || 'РФ') : 'РФ';
+    const estimateData = aggregateEstimateData({
+      zonesData, risersByDiameter, sections, h1, hn, ivptEnabled, collectorVendor,
+    });
+    showPriceManagementModal(type, estimateData, { ...estimatePrices }, (updatedPrices) => {
+      setEstimatePrices(updatedPrices);
+      onStateChange();
+      renderEstimate();
+    });
+  }
+
+  document.getElementById('btnEditWorkPrices')?.addEventListener('click', () => openPriceModal('works'));
+  document.getElementById('btnEditMaterialPrices')?.addEventListener('click', () => openPriceModal('materials'));
 
   // Обработчик создания проекта
   document.getElementById('btnCreateProject')?.addEventListener('click', () => {

@@ -93,17 +93,78 @@ function escapeHtml(str) {
 }
 
 // ============================================================================
+// ГЛОБАЛЬНЫЙ СПРАВОЧНИК ЦЕН (localStorage)
+// ============================================================================
+
+const MASTER_PRICES_WORKS_KEY = 'masterPrices_works';
+const MASTER_PRICES_MATERIALS_KEY = 'masterPrices_materials';
+
+/**
+ * Загружает глобальный справочник цен из localStorage.
+ * @param {'works'|'materials'} type
+ * @returns {Object} - { "itemName": "priceString", ... }
+ */
+function loadMasterPrices(type) {
+  const key = type === 'works' ? MASTER_PRICES_WORKS_KEY : MASTER_PRICES_MATERIALS_KEY;
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : {};
+  } catch (e) {
+    console.warn('[MasterPrices] Error loading', key, e);
+    return {};
+  }
+}
+
+/**
+ * Сохраняет глобальный справочник цен в localStorage.
+ * @param {'works'|'materials'} type
+ * @param {Object} prices - { "itemName": "priceString", ... }
+ */
+function saveMasterPrices(type, prices) {
+  const key = type === 'works' ? MASTER_PRICES_WORKS_KEY : MASTER_PRICES_MATERIALS_KEY;
+  try {
+    localStorage.setItem(key, JSON.stringify(prices));
+  } catch (e) {
+    console.warn('[MasterPrices] Error saving', key, e);
+  }
+}
+
+/**
+ * Возвращает мастер-цену для материала из глобального справочника.
+ * @param {string} name - наименование материала
+ * @returns {number|null}
+ */
+function getDefaultMaterialPrice(name) {
+  if (!name) return null;
+  const masterPrices = loadMasterPrices('materials');
+  if (masterPrices[name] !== undefined) {
+    const val = parseFloat(masterPrices[name]);
+    return isNaN(val) ? null : val;
+  }
+  return null;
+}
+
+// ============================================================================
 // СПРАВОЧНИК ЦЕН ПО УМОЛЧАНИЮ (для работ)
 // ============================================================================
 
 /**
  * Возвращает цену по умолчанию для работы по её наименованию.
- * Сопоставление по подстроке — порядок проверок от более конкретных к общим.
+ * Приоритет: глобальный справочник (localStorage) → хардкод (fallback).
  * @param {string} name - наименование работы
  * @returns {number|null} - цена по умолчанию или null
  */
 function getDefaultWorkPrice(name) {
   if (!name) return null;
+
+  // 1. Проверяем глобальный справочник (localStorage)
+  const masterPrices = loadMasterPrices('works');
+  if (masterPrices[name] !== undefined) {
+    const val = parseFloat(masterPrices[name]);
+    if (!isNaN(val)) return val;
+  }
+
+  // 2. Хардкод-fallback
   const n = name.toLowerCase();
 
   // Монтаж стальных оцинкованных труб (по диаметрам)
@@ -1577,6 +1638,9 @@ function renderSystemBlock(systemKey, data, isSummary = false, sectionIndex = 0,
         } else if (item.type === 'работа') {
           const defPrice = getDefaultWorkPrice(item.name);
           if (defPrice !== null) savedPrice = String(defPrice);
+        } else if (item.type === 'материал') {
+          const defPrice = getDefaultMaterialPrice(item.name);
+          if (defPrice !== null) savedPrice = String(defPrice);
         }
       }
       const numPrice = parseFloat(savedPrice) || 0;
@@ -1665,6 +1729,9 @@ export function exportEstimateToExcel(estimateData, sectionsCount, prices = {}, 
             priceVal = String(item.defaultPrice);
           } else if (item.type === 'работа') {
             const def = getDefaultWorkPrice(item.name);
+            if (def !== null) priceVal = String(def);
+          } else if (item.type === 'материал') {
+            const def = getDefaultMaterialPrice(item.name);
             if (def !== null) priceVal = String(def);
           }
         }
@@ -1811,4 +1878,254 @@ function recalcEstimateSectionTotal(tbody) {
   if (totalEl) {
     totalEl.textContent = sum > 0 ? formatEstimateMoney(sum) : '—';
   }
+}
+
+// ============================================================================
+// УПРАВЛЕНИЕ РАСЦЕНКАМИ — группировка, сбор позиций, модальное окно
+// ============================================================================
+
+/**
+ * Определяет группу номенклатуры для модального окна.
+ */
+function getItemGroup(name) {
+  if (!name) return 'Прочее';
+  const n = name.toLowerCase();
+  if (n.includes('труб') || n.includes('трубопровод')) return 'Трубопроводы';
+  if (n.includes('кран') || n.includes('задвижк') || n.includes('клапан') || n.includes('армат')) return 'Арматура';
+  return 'Прочее';
+}
+
+/**
+ * Собирает уникальные наименования позиций из данных сметы + подземки.
+ * @param {Object} estimateData - данные от aggregateEstimateData()
+ * @param {'работа'|'материал'} itemType - тип позиций
+ * @returns {Array<{name, unit, group, currentPrice}>}
+ */
+function collectUniqueItems(estimateData, itemType) {
+  const uniqueMap = new Map();
+
+  // 1. Сканируем estimateData (все корпуса, все системы)
+  if (estimateData) {
+    Object.values(estimateData).forEach(sectionData => {
+      ['cold', 'hot'].forEach(systemKey => {
+        if (!sectionData[systemKey]) return;
+        sectionData[systemKey].items.forEach(item => {
+          if (item.type === itemType && !uniqueMap.has(item.name)) {
+            uniqueMap.set(item.name, {
+              name: item.name,
+              unit: item.unit,
+              group: getItemGroup(item.name),
+              fallbackPrice: null,
+            });
+          }
+        });
+      });
+    });
+  }
+
+  // 2. Сканируем UNDERGROUND_ITEMS
+  ['cold', 'hot'].forEach(systemKey => {
+    UNDERGROUND_ITEMS[systemKey].forEach(item => {
+      if (item.type === itemType && !uniqueMap.has(item.name)) {
+        uniqueMap.set(item.name, {
+          name: item.name,
+          unit: item.unit,
+          group: getItemGroup(item.name),
+          fallbackPrice: item.defaultPrice ? String(item.defaultPrice) : null,
+        });
+      }
+    });
+  });
+
+  // 3. Подставляем текущие мастер-цены и fallback из справочника
+  const masterType = itemType === 'работа' ? 'works' : 'materials';
+  const masterPrices = loadMasterPrices(masterType);
+
+  const items = Array.from(uniqueMap.values()).map(item => {
+    let currentPrice = masterPrices[item.name] || '';
+    if (!currentPrice && item.fallbackPrice) {
+      currentPrice = item.fallbackPrice;
+    }
+    if (!currentPrice && itemType === 'работа') {
+      // Fallback из хардкод-словаря (но не через localStorage, а прямо из логики)
+      const n = item.name.toLowerCase();
+      let hardcoded = null;
+      if (n.includes('стальн') && n.includes('оцинк')) {
+        if (n.includes('32') || n.includes('ду 32')) hardcoded = 1562;
+        else if (n.includes('40') || n.includes('ду 40')) hardcoded = 1659.57;
+        else if (n.includes('50') || n.includes('ду 50')) hardcoded = 3034.42;
+      }
+      else if (n.includes('сшит') && n.includes('полиэтилен')) hardcoded = 648.46;
+      else if (n.includes('теплоизоляц')) hardcoded = 332.59;
+      else if (n.includes('гильз')) hardcoded = 211.50;
+      else if (n.includes('узл') && n.includes('концев')) hardcoded = 1096;
+      else if (n.includes('счётчик') || n.includes('счетчик')) hardcoded = 712;
+      else if (n.includes('коллектор') || n.includes('гребенк')) hardcoded = 14592;
+      else if (n.includes('водомерн') && n.includes('узл')) hardcoded = 6655.43;
+      else if (n.includes('компенсатор')) hardcoded = 4473;
+      else if (n.includes('опор')) hardcoded = 4082;
+      else if (n.includes('пожаротушен')) hardcoded = 917;
+      else if (n.includes('пусконаладоч')) hardcoded = 37;
+      if (hardcoded !== null) currentPrice = String(hardcoded);
+    }
+    return { name: item.name, unit: item.unit, group: item.group, currentPrice };
+  });
+
+  // 4. Сортировка: группа → алфавит
+  const groupOrder = { 'Трубопроводы': 0, 'Арматура': 1, 'Прочее': 2 };
+  items.sort((a, b) => {
+    const gA = groupOrder[a.group] ?? 99;
+    const gB = groupOrder[b.group] ?? 99;
+    if (gA !== gB) return gA - gB;
+    return a.name.localeCompare(b.name, 'ru');
+  });
+
+  return items;
+}
+
+/**
+ * Открывает модальное окно управления ценами.
+ * @param {'works'|'materials'} type
+ * @param {Object} estimateData
+ * @param {Object} currentPrices - текущие estimatePrices из state
+ * @param {Function} onApplyToProject - callback(updatedPrices)
+ */
+export function showPriceManagementModal(type, estimateData, currentPrices, onApplyToProject) {
+  const itemType = type === 'works' ? 'работа' : 'материал';
+  const title = type === 'works' ? 'Стоимость работ' : 'Стоимость материалов';
+  const items = collectUniqueItems(estimateData, itemType);
+
+  if (items.length === 0) {
+    alert('Нет данных. Выполните расчёт для формирования сметы.');
+    return;
+  }
+
+  // Генерируем строки таблицы с группировкой
+  let tableRows = '';
+  let currentGroup = '';
+
+  items.forEach((item, idx) => {
+    if (item.group !== currentGroup) {
+      currentGroup = item.group;
+      tableRows += `
+        <tr class="price-modal-group-row">
+          <td colspan="3">${escapeHtml(currentGroup)}</td>
+        </tr>`;
+    }
+    tableRows += `
+      <tr>
+        <td class="price-modal-name" style="text-align:left !important; padding-left:12px;">${escapeHtml(item.name)}</td>
+        <td class="price-modal-unit">${escapeHtml(item.unit)}</td>
+        <td class="price-modal-price">
+          <input type="text" inputmode="decimal" class="estimate-price-input price-modal-input"
+            data-item-name="${escapeHtml(item.name)}" data-idx="${idx}"
+            value="${escapeHtml(item.currentPrice)}" placeholder="—">
+        </td>
+      </tr>`;
+  });
+
+  // Создаём overlay
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay price-modal-overlay';
+
+  overlay.innerHTML = `
+    <div class="modal price-management-modal">
+      <h3>${title}</h3>
+      <p class="price-modal-subtitle">Изменения сохраняются в глобальный справочник и применяются к новым проектам.</p>
+      <div class="price-modal-table-wrap">
+        <table class="price-modal-table">
+          <thead>
+            <tr>
+              <th class="price-modal-th-name">Наименование</th>
+              <th class="price-modal-th-unit">Ед.</th>
+              <th class="price-modal-th-price">Цена за ед. (руб.)</th>
+            </tr>
+          </thead>
+          <tbody>${tableRows}</tbody>
+        </table>
+      </div>
+      <label class="price-modal-checkbox-label">
+        <input type="checkbox" id="priceModalApplyAll">
+        Обновить во всём текущем проекте
+      </label>
+      <div class="modal-buttons">
+        <button class="btn-secondary price-modal-btn" id="priceModalCancel">Отмена</button>
+        <button class="btn-primary price-modal-btn" id="priceModalSave">Сохранить</button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(overlay);
+
+  // Закрытие
+  const close = () => overlay.remove();
+
+  overlay.querySelector('#priceModalCancel').addEventListener('click', close);
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) close();
+  });
+
+  // Санитизация price inputs
+  overlay.querySelectorAll('.price-modal-input').forEach(inp => {
+    inp.addEventListener('input', () => sanitizeEstimatePriceInput(inp));
+  });
+
+  // Сохранение
+  overlay.querySelector('#priceModalSave').addEventListener('click', () => {
+    const masterPrices = loadMasterPrices(type);
+    const applyAll = overlay.querySelector('#priceModalApplyAll').checked;
+    const updatedNames = {};
+
+    // Собираем новые цены из инпутов модала
+    overlay.querySelectorAll('.price-modal-input').forEach(inp => {
+      const name = inp.dataset.itemName;
+      const val = inp.value.trim();
+      if (val && parseFloat(val) > 0) {
+        masterPrices[name] = val;
+        updatedNames[name] = val;
+      } else {
+        delete masterPrices[name];
+      }
+    });
+
+    // Всегда сохраняем в localStorage (глобальный справочник)
+    saveMasterPrices(type, masterPrices);
+    console.log(`[MasterPrices] Saved ${type}:`, masterPrices);
+
+    // Если чекбокс "Обновить во всём проекте" — обновляем estimatePrices
+    if (applyAll && onApplyToProject) {
+      const updatedPrices = { ...currentPrices };
+
+      Object.keys(updatedNames).forEach(name => {
+        // Обновляем во всех корпусах
+        if (estimateData) {
+          Object.entries(estimateData).forEach(([sectionIndex, sectionData]) => {
+            ['cold', 'hot'].forEach(systemKey => {
+              if (!sectionData[systemKey]) return;
+              sectionData[systemKey].items.forEach(item => {
+                if (item.name === name && item.type === itemType) {
+                  const priceKey = `${sectionIndex}:${systemKey}:${name}`;
+                  updatedPrices[priceKey] = updatedNames[name];
+                }
+              });
+            });
+          });
+        }
+
+        // Обновляем в подземке
+        ['cold', 'hot'].forEach(systemKey => {
+          UNDERGROUND_ITEMS[systemKey].forEach(ugItem => {
+            if (ugItem.name === name && ugItem.type === itemType) {
+              const priceKey = `underground:${systemKey}:${name}`;
+              updatedPrices[priceKey] = updatedNames[name];
+            }
+          });
+        });
+      });
+
+      onApplyToProject(updatedPrices);
+    }
+
+    close();
+  });
 }
