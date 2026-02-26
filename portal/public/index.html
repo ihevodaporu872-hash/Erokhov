@@ -1401,6 +1401,13 @@
                     // Обновляем локальный список
                     const idx = portalProjects.findIndex(p => p.id === projectViewProjectId);
                     if (idx !== -1) Object.assign(portalProjects[idx], updated);
+
+                    // Синхронизируем underground_area с iframe водоснабжения
+                    const wsProjectId = getSystemProjectId('water-supply');
+                    if (wsProjectId === projectViewProjectId) {
+                        sendUndergroundAreaToIframe(under);
+                    }
+
                     if (status) {
                         status.innerHTML = '<i class="bi bi-check-circle me-1" style="color: #22c55e;"></i>Сохранено';
                         setTimeout(() => { if (status) status.textContent = ''; }, 2000);
@@ -1497,6 +1504,18 @@
             });
         });
 
+        // ==================== Синхронизация площадей с iframe ====================
+
+        function sendUndergroundAreaToIframe(value) {
+            const iframe = document.getElementById('waterCalcFrame');
+            if (iframe && iframe.contentWindow) {
+                iframe.contentWindow.postMessage({
+                    type: 'sync-underground-area',
+                    value: parseFloat(value) || 0
+                }, '*');
+            }
+        }
+
         // ==================== Iframe: загрузка и автосохранение ====================
 
         async function sendProjectToIframe(projectId) {
@@ -1512,6 +1531,13 @@
                         projectId: projectId,
                         data: data
                     }, '*');
+                }
+
+                // Синхронизируем площадь подземной части
+                const project = portalProjects.find(p => p.id === projectId);
+                if (project) {
+                    // Небольшая задержка чтобы iframe успел обработать load-project-data
+                    setTimeout(() => sendUndergroundAreaToIframe(project.underground_area), 300);
                 }
             } catch (err) {
                 console.error('Ошибка загрузки данных проекта:', err);

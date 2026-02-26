@@ -2089,6 +2089,19 @@ window.addEventListener('message', (event) => {
       calculateWaterSupply();
     }
   }
+
+  // Синхронизация площади подземной части из паспорта проекта
+  if (event.data && event.data.type === 'sync-underground-area') {
+    const area = parseFloat(event.data.value) || 0;
+    const input = document.getElementById('undergroundArea');
+    if (input) {
+      input.value = area || '';
+      // Вызываем расчёт стоимости если функция доступна
+      if (typeof calculateUndergroundCost === 'function') {
+        calculateUndergroundCost();
+      }
+    }
+  }
 });
 
 // ===== Инициализация =====
