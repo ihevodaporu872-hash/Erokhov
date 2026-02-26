@@ -2545,36 +2545,45 @@ button:active {
 }
 
 /* Финансовая таблица с 6 колонками: + Цена | Итого */
+.estimate-table-financial {
+  table-layout: auto;
+}
+
 .estimate-table-financial .col-type {
-  width: 80px;
+  width: 70px;
+  white-space: nowrap;
 }
 
 .estimate-table-financial .col-name {
   width: auto;
+  min-width: 40%;
 }
 
 .estimate-table-financial .col-unit {
-  width: 70px;
+  width: 60px;
   text-align: center;
+  white-space: nowrap;
 }
 
 .estimate-table-financial .col-qty {
-  width: 90px;
+  width: 80px;
   text-align: right;
   font-weight: 600;
   color: var(--gray-900);
+  white-space: nowrap;
 }
 
 .estimate-table-financial .col-price {
-  width: 140px;
+  width: 120px;
   text-align: right;
 }
 
 .estimate-table-financial .col-total {
-  width: 130px;
+  width: 110px;
   text-align: right;
   font-weight: 600;
   color: var(--gray-900);
+  white-space: nowrap;
 }
 
 /* Поле ввода цены */
