@@ -1,5 +1,7 @@
+require('dotenv').config();
 const express = require('express');
 const path = require('path');
+const nodemailer = require('nodemailer');
 const db = require('./db');
 
 const app = express();
@@ -8,6 +10,21 @@ const PORT = process.env.PORT || 3000;
 // Middleware
 app.use(express.json({ limit: '10mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
+
+// ==================== Конфигурация SMTP ====================
+// ВАЖНО: Замените заглушки на реальные данные вашей почты
+const SMTP_CONFIG = {
+  host: process.env.SMTP_HOST || 'smtp.yandex.ru',
+  port: parseInt(process.env.SMTP_PORT) || 465,
+  secure: true, // true для 465, false для 587
+  auth: {
+    user: process.env.SMTP_USER || '',
+    pass: process.env.SMTP_PASS || '',
+  },
+};
+
+// Адрес отправителя (From)
+const SMTP_FROM = process.env.SMTP_FROM || SMTP_CONFIG.auth.user;
 
 // ==================== API: Проекты ====================
 
@@ -117,6 +134,74 @@ app.put('/api/calculations/:projectId/:systemType', (req, res) => {
   res.json({ success: true });
 });
 
+// ==================== API: Отправка почты ====================
+
+app.post('/send-mail', async (req, res) => {
+  const { subject, text, recipients, copyTo } = req.body;
+
+  console.log('[send-mail] Получен запрос на отправку');
+  console.log('[send-mail] Тема:', subject);
+  console.log('[send-mail] Получатели:', recipients);
+  console.log('[send-mail] Копия:', copyTo || '(нет)');
+
+  // Валидация
+  if (!subject || !text) {
+    console.error('[send-mail] Ошибка: отсутствует subject или text');
+    return res.status(400).json({ ok: false, error: 'Не указаны тема или текст письма' });
+  }
+
+  if (!recipients || !Array.isArray(recipients) || recipients.length === 0) {
+    console.error('[send-mail] Ошибка: нет получателей');
+    return res.status(400).json({ ok: false, error: 'Не указаны получатели' });
+  }
+
+  // Проверяем SMTP-конфигурацию
+  if (!SMTP_CONFIG.auth.user || !SMTP_CONFIG.auth.pass) {
+    console.error('[send-mail] SMTP не настроен! Укажите SMTP_USER и SMTP_PASS в переменных окружения или в server.js');
+    return res.status(500).json({
+      ok: false,
+      error: 'SMTP не настроен. Обратитесь к администратору.'
+    });
+  }
+
+  try {
+    // Создаём транспорт
+    const transporter = nodemailer.createTransport(SMTP_CONFIG);
+
+    // Проверяем соединение
+    console.log('[send-mail] Проверяем SMTP-соединение...');
+    await transporter.verify();
+    console.log('[send-mail] SMTP-соединение OK');
+
+    // Формируем список получателей
+    const toList = recipients.join(', ');
+    const ccList = copyTo ? copyTo : '';
+
+    const mailOptions = {
+      from: `"Инженерный портал" <${SMTP_FROM}>`,
+      to: toList,
+      cc: ccList || undefined,
+      subject: subject,
+      text: text,
+    };
+
+    console.log('[send-mail] Отправляем письмо:', { to: toList, cc: ccList, subject });
+
+    const info = await transporter.sendMail(mailOptions);
+    console.log('[send-mail] Письмо отправлено! MessageId:', info.messageId);
+    console.log('[send-mail] Ответ SMTP:', info.response);
+
+    res.json({ ok: true, messageId: info.messageId });
+  } catch (error) {
+    console.error('[send-mail] ОШИБКА отправки:', error.message);
+    console.error('[send-mail] Полная ошибка:', error);
+    res.status(500).json({
+      ok: false,
+      error: `Ошибка отправки: ${error.message}`
+    });
+  }
+});
+
 // ==================== Основной маршрут ====================
 
 app.get('/', (req, res) => {
@@ -127,5 +212,10 @@ app.get('/', (req, res) => {
 app.listen(PORT, () => {
   console.log(`\u{1F680} Инженерный портал запущен на http://localhost:${PORT}`);
   console.log(`\u{1F4C2} Статические файлы обслуживаются из папки: ${path.join(__dirname, 'public')}`);
+  if (SMTP_CONFIG.auth.user) {
+    console.log(`\u{1F4E7} SMTP настроен: ${SMTP_CONFIG.host}:${SMTP_CONFIG.port}, user: ${SMTP_CONFIG.auth.user}`);
+  } else {
+    console.log(`\u26A0\uFE0F  SMTP НЕ настроен! Создайте файл .env (см. .env.example)`);
+  }
   console.log(`\u23F9\uFE0F  Для остановки сервера нажмите Ctrl+C`);
 });

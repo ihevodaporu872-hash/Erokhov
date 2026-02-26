@@ -3,3 +3,5 @@ portal/node_modules/
 portal/data/*.db
 portal/data/*.db-wal
 portal/data/*.db-shm
+.env
+portal/.env

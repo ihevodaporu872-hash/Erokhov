@@ -1463,13 +1463,13 @@ function formatQuoteRequestText(projectName, summary) {
  * @param {string} text - текст письма
  * @returns {Promise<{ok: boolean, error?: string}>}
  */
-async function sendQuoteToServer(subject, text) {
-  const response = await fetch('http://localhost:3001/send-mail', {
+async function sendQuoteToServer(subject, text, recipients, copyTo) {
+  const response = await fetch('/send-mail', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json'
     },
-    body: JSON.stringify({ subject, text })
+    body: JSON.stringify({ subject, text, recipients, copyTo })
   });
 
   const data = await response.json();
@@ -1819,7 +1819,26 @@ async function sendQuoteWithSections() {
   const subject = `Запрос коммерческого предложения по объекту: ${projectName}`;
   const text = formatQuoteRequestTextWithSections(projectName, summary, selectedSections, specData);
 
+  // Собираем уникальные email-адреса получателей
+  const recipientEmails = [...new Set(
+    selectedSections
+      .map(s => s.supplierEmail)
+      .filter(e => e && e.includes('@'))
+  )];
+
+  if (recipientEmails.length === 0) {
+    alert('У выбранных разделов не указаны email-адреса поставщиков.');
+    return;
+  }
+
+  // Копия себе
+  const sendCopy = document.getElementById('sendCopyToSelf')?.checked;
+  const selfEmail = document.getElementById('selfEmailCopy')?.value?.trim() || '';
+  const copyTo = (sendCopy && selfEmail && selfEmail.includes('@')) ? selfEmail : '';
+
   console.log('sendQuoteWithSections: subject =', subject);
+  console.log('sendQuoteWithSections: recipients =', recipientEmails);
+  console.log('sendQuoteWithSections: copyTo =', copyTo);
   console.log('sendQuoteWithSections: text =', text);
 
   // Блокируем кнопку отправки
@@ -1831,7 +1850,7 @@ async function sendQuoteWithSections() {
   }
 
   try {
-    const data = await sendQuoteToServer(subject, text);
+    const data = await sendQuoteToServer(subject, text, recipientEmails, copyTo);
 
     if (data.ok === true) {
       closeQuoteDialog();
