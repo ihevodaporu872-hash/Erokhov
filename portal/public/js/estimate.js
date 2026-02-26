@@ -1888,11 +1888,10 @@ function recalcEstimateSectionTotal(tbody) {
  * Определяет группу номенклатуры для модального окна.
  */
 function getItemGroup(name) {
-  if (!name) return 'Прочее';
+  if (!name) return 'Арматура';
   const n = name.toLowerCase();
   if (n.includes('труб') || n.includes('трубопровод') || n.includes('гильз') || n.includes('пусконаладоч')) return 'Трубопроводы';
-  if (n.includes('кран') || n.includes('задвижк') || n.includes('клапан') || n.includes('армат')) return 'Арматура';
-  return 'Прочее';
+  return 'Арматура';
 }
 
 /**
@@ -1972,7 +1971,7 @@ function collectUniqueItems(estimateData, itemType) {
   });
 
   // 4. Сортировка: группа → алфавит
-  const groupOrder = { 'Трубопроводы': 0, 'Арматура': 1, 'Прочее': 2 };
+  const groupOrder = { 'Трубопроводы': 0, 'Арматура': 1 };
   items.sort((a, b) => {
     const gA = groupOrder[a.group] ?? 99;
     const gB = groupOrder[b.group] ?? 99;
@@ -2008,7 +2007,7 @@ export function showPriceManagementModal(type, estimateData, currentPrices, onAp
   });
 
   // Порядок групп
-  const groupOrder = ['Трубопроводы', 'Арматура', 'Прочее'];
+  const groupOrder = ['Трубопроводы', 'Арматура'];
   // Группы, которые свёрнуты по умолчанию
   const collapsedGroups = new Set(['Трубопроводы', 'Арматура']);
 
