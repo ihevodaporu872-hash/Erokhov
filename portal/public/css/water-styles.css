@@ -2561,18 +2561,18 @@ button:active {
   white-space: nowrap;
 }
 
+.estimate-table-financial .col-name {
+  width: 99%;
+  white-space: nowrap;
+}
+
 .estimate-table-financial th.col-name {
-  text-align: center;
+  text-align: center !important;
 }
 
 .estimate-table-financial td.col-name {
   text-align: left !important;
-  padding-left: 10px;
-}
-
-.estimate-table-financial .col-name {
-  width: 99%;
-  white-space: nowrap;
+  padding-left: 10px !important;
 }
 
 .estimate-table-financial .col-unit {
