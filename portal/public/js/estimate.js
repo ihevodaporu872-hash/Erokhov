@@ -1886,10 +1886,22 @@ function recalcEstimateSectionTotal(tbody) {
 
 /**
  * Определяет группу номенклатуры для модального окна.
+ * @param {string} name - наименование позиции
+ * @param {'работа'|'материал'} itemType - тип позиции
  */
-function getItemGroup(name) {
+function getItemGroup(name, itemType) {
   if (!name) return 'Арматура';
   const n = name.toLowerCase();
+
+  if (itemType === 'материал') {
+    // Трубопроводы: трубы + теплоизоляция (цилиндр из вспененного полиэтилена)
+    if (n.includes('труб') || n.includes('трубопровод') || n.includes('цилиндр') || n.includes('вспенен')) return 'Трубопроводы';
+    // Прочее: хомуты, гильзы, крюки, переходники, соединения угловые, тройники, фиксаторы загиба
+    if (n.includes('хомут') || n.includes('гильз') || n.includes('крюк') || n.includes('переходник') || n.includes('соединени') || n.includes('тройник') || n.includes('фиксатор')) return 'Прочее';
+    return 'Арматура';
+  }
+
+  // Работы: 2 группы
   if (n.includes('труб') || n.includes('трубопровод') || n.includes('гильз') || n.includes('пусконаладоч')) return 'Трубопроводы';
   return 'Арматура';
 }
@@ -1913,7 +1925,7 @@ function collectUniqueItems(estimateData, itemType) {
             uniqueMap.set(item.name, {
               name: item.name,
               unit: item.unit,
-              group: getItemGroup(item.name),
+              group: getItemGroup(item.name, itemType),
               fallbackPrice: null,
             });
           }
@@ -1929,7 +1941,7 @@ function collectUniqueItems(estimateData, itemType) {
         uniqueMap.set(item.name, {
           name: item.name,
           unit: item.unit,
-          group: getItemGroup(item.name),
+          group: getItemGroup(item.name, itemType),
           fallbackPrice: item.defaultPrice ? String(item.defaultPrice) : null,
         });
       }
@@ -1971,7 +1983,7 @@ function collectUniqueItems(estimateData, itemType) {
   });
 
   // 4. Сортировка: группа → алфавит
-  const groupOrder = { 'Трубопроводы': 0, 'Арматура': 1 };
+  const groupOrder = { 'Трубопроводы': 0, 'Арматура': 1, 'Прочее': 2 };
   items.sort((a, b) => {
     const gA = groupOrder[a.group] ?? 99;
     const gB = groupOrder[b.group] ?? 99;
@@ -2006,10 +2018,12 @@ export function showPriceManagementModal(type, estimateData, currentPrices, onAp
     groups[item.group].push(item);
   });
 
-  // Порядок групп
-  const groupOrder = ['Трубопроводы', 'Арматура'];
-  // Группы, которые свёрнуты по умолчанию
-  const collapsedGroups = new Set(['Трубопроводы', 'Арматура']);
+  // Порядок групп (материалы — 3 группы, работы — 2)
+  const groupOrder = type === 'materials'
+    ? ['Трубопроводы', 'Арматура', 'Прочее']
+    : ['Трубопроводы', 'Арматура'];
+  // Все группы свёрнуты по умолчанию
+  const collapsedGroups = new Set(groupOrder);
 
   // Генерируем строки таблицы с аккордеонами
   let tableRows = '';
