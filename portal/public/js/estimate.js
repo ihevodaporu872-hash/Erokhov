@@ -1894,10 +1894,10 @@ function getItemGroup(name, itemType) {
   const n = name.toLowerCase();
 
   if (itemType === 'материал') {
+    // Прочее (проверяем ПЕРВЫМ — крепёж может содержать слово «труб» в названии)
+    if (n.includes('хомут') || n.includes('гильз') || n.includes('крюк') || n.includes('переходник') || n.includes('соединени') || n.includes('тройник') || n.includes('фиксатор')) return 'Прочее';
     // Трубопроводы: трубы + теплоизоляция (цилиндр из вспененного полиэтилена)
     if (n.includes('труб') || n.includes('трубопровод') || n.includes('цилиндр') || n.includes('вспенен')) return 'Трубопроводы';
-    // Прочее: хомуты, гильзы, крюки, переходники, соединения угловые, тройники, фиксаторы загиба
-    if (n.includes('хомут') || n.includes('гильз') || n.includes('крюк') || n.includes('переходник') || n.includes('соединени') || n.includes('тройник') || n.includes('фиксатор')) return 'Прочее';
     return 'Арматура';
   }
 
