@@ -3370,3 +3370,11 @@ body.dark-theme .vis-schema {
   --vis-branch-color: #78909C;
   --vis-zone-bg: #4a9eff;
 }
+
+/* === ПРИНУДИТЕЛЬНОЕ выравнивание наименований в смете === */
+.estimate-table td.col-name,
+.estimate-table-financial td.col-name,
+.estimate-table-unified td.col-name {
+  text-align: left !important;
+  padding-left: 15px !important;
+}
