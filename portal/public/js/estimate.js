@@ -92,6 +92,53 @@ function escapeHtml(str) {
     .replace(/>/g, '&gt;');
 }
 
+// ============================================================================
+// СПРАВОЧНИК ЦЕН ПО УМОЛЧАНИЮ (для работ)
+// ============================================================================
+
+/**
+ * Возвращает цену по умолчанию для работы по её наименованию.
+ * Сопоставление по подстроке — порядок проверок от более конкретных к общим.
+ * @param {string} name - наименование работы
+ * @returns {number|null} - цена по умолчанию или null
+ */
+function getDefaultWorkPrice(name) {
+  if (!name) return null;
+  const n = name.toLowerCase();
+
+  // Монтаж стальных оцинкованных труб Ду 40
+  if (n.includes('стальн') && n.includes('оцинк')) return 381;
+
+  // Монтаж трубопроводов из сшитого полиэтилена
+  if (n.includes('сшит') && n.includes('полиэтилен')) return 648.46;
+
+  // Теплоизоляция трубопровода
+  if (n.includes('теплоизоляц')) return 332.59;
+
+  // Монтаж гильз
+  if (n.includes('гильз')) return 211.50;
+
+  // Монтаж узла концевого
+  if (n.includes('узл') && n.includes('концев')) return 1096;
+
+  // Установка счётчиков воды
+  if (n.includes('счётчик') || n.includes('счетчик')) return 712;
+
+  // Монтаж коллектора (распределительной гребенки)
+  if (n.includes('коллектор') || n.includes('гребенк')) return 14592;
+
+  // Монтаж водомерного узла (Аренда)
+  if (n.includes('водомерн') && n.includes('узл')) return 6655.43;
+
+  // Установка устройств внутриквартирного пожаротушения
+  if (n.includes('пожаротушен')) return 917;
+
+  // Пусконаладочные работы
+  if (n.includes('пусконаладоч')) return 37;
+
+  return null;
+}
+
 /**
  * Санитизация ввода цены: запятая → точка, только цифры и точка
  */
@@ -1435,7 +1482,12 @@ function renderSystemBlock(systemKey, data, isSummary = false, sectionIndex = 0,
     let priceCells = '';
     if (showPrices) {
       const priceKey = `${sectionIndex}:${systemKey}:${item.name}`;
-      const savedPrice = prices[priceKey] || '';
+      let savedPrice = prices[priceKey] || '';
+      // Для работ без сохранённой цены подставляем значение из справочника
+      if (!savedPrice && item.type === 'работа') {
+        const defaultPrice = getDefaultWorkPrice(item.name);
+        if (defaultPrice !== null) savedPrice = String(defaultPrice);
+      }
       const numPrice = parseFloat(savedPrice) || 0;
       const rowTotal = numPrice * item.quantity;
       if (rowTotal > 0) sectionTotal += rowTotal;
@@ -1516,7 +1568,12 @@ export function exportEstimateToExcel(estimateData, sectionsCount, prices = {}) 
       let sectionTotal = 0;
       items.forEach(item => {
         const priceKey = `${sectionIndex}:${systemKey}:${item.name}`;
-        const price = parseFloat(prices[priceKey]) || 0;
+        let priceVal = prices[priceKey] || '';
+        if (!priceVal && item.type === 'работа') {
+          const def = getDefaultWorkPrice(item.name);
+          if (def !== null) priceVal = String(def);
+        }
+        const price = parseFloat(priceVal) || 0;
         const total = price * item.quantity;
         sectionTotal += total;
         rows.push([item.type, item.name, item.unit, item.quantity, price || '', total || '']);
