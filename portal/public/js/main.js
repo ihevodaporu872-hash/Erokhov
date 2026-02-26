@@ -1817,10 +1817,8 @@ async function sendQuoteWithSections() {
   // Собираем данные спецификации для каждого раздела
   const specData = collectSpecificationData(summary.zonesData);
 
-  // Формируем subject: если название начинается с цифры — ставим его первым
-  const subject = /^\d/.test(projectName)
-    ? `${projectName}: Запрос КП`
-    : `Запрос КП по объекту: ${projectName}`;
+  // Формируем тему письма
+  const subject = `Запрос КП: ${projectName}`;
   const text = formatQuoteRequestTextWithSections(projectName, summary, selectedSections, specData);
 
   // Собираем уникальные email-адреса получателей
