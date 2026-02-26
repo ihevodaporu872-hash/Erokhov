@@ -24,7 +24,9 @@ import {
   setSectionsFromImport,
   setMopLength as stateSetMopLength,
   setMopPosition as stateSetMopPosition,
-  setMopDiameter as stateSetMopDiameter
+  setMopDiameter as stateSetMopDiameter,
+  estimatePrices,
+  setEstimatePrices
 } from './state.js';
 
 import { parseExcelFile, convertToSections } from './import.js';
@@ -90,7 +92,8 @@ import {
 import {
   aggregateEstimateData,
   renderEstimateBlock,
-  exportEstimateToExcel
+  exportEstimateToExcel,
+  initEstimatePriceHandlers
 } from './estimate.js';
 
 console.log('=== main.js ЗАГРУЖЕН (после импортов) ===');
@@ -349,7 +352,7 @@ function renderEstimate() {
     });
 
   // Рендерим смету
-  renderEstimateBlock(estimateData, sections.length);
+  renderEstimateBlock(estimateData, sections.length, estimatePrices);
 }
 
 // Рендеринг вкладки "Визуализация расчёта"
@@ -2120,6 +2123,12 @@ window.onload = () => {
   // Устанавливаем renderer для вкладки "Смета"
   setEstimateRenderer(renderEstimate);
 
+  // Инициализируем обработчики цен сметы (debounced auto-save)
+  initEstimatePriceHandlers((allPrices) => {
+    setEstimatePrices(allPrices);
+    onStateChange();
+  });
+
   // Устанавливаем renderer для вкладки "Визуализация"
   setVisualizationRenderer(renderVisualization);
 
@@ -2193,7 +2202,7 @@ window.onload = () => {
       collectorVendor,
     });
 
-    exportEstimateToExcel(estimateData, sections.length);
+    exportEstimateToExcel(estimateData, sections.length, estimatePrices);
   });
 
   // Обработчик создания проекта

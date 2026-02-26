@@ -72,6 +72,37 @@ function formatQuantity(qty) {
   return qty % 1 === 0 ? qty : qty.toFixed(1);
 }
 
+/**
+ * Форматирует денежное значение (ru-RU)
+ */
+function formatEstimateMoney(value) {
+  if (!value && value !== 0) return '';
+  return Number(value).toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+/**
+ * Экранирует строку для вставки в HTML-атрибут
+ */
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+/**
+ * Санитизация ввода цены: запятая → точка, только цифры и точка
+ */
+function sanitizeEstimatePriceInput(el) {
+  let val = el.value.replace(/,/g, '.');
+  val = val.replace(/[^\d.]/g, '');
+  const parts = val.split('.');
+  if (parts.length > 2) val = parts[0] + '.' + parts.slice(1).join('');
+  el.value = val;
+}
+
 // ============================================================================
 // СОРТИРОВКА СМЕТЫ
 // ============================================================================
@@ -1282,7 +1313,7 @@ export function calculateBuildingSummary(estimateData) {
 /**
  * Рендерит блок сметы в HTML
  */
-export function renderEstimateBlock(estimateData, sectionsCount) {
+export function renderEstimateBlock(estimateData, sectionsCount, prices = {}) {
   console.log('[Смета] renderEstimateBlock вызван, sectionsCount:', sectionsCount);
   console.log('[Смета] estimateData:', estimateData);
 
@@ -1324,12 +1355,12 @@ export function renderEstimateBlock(estimateData, sectionsCount) {
 
     // Холодное водоснабжение
     if (sectionData.cold.items.length > 0) {
-      html += renderSystemBlock('cold', sectionData.cold);
+      html += renderSystemBlock('cold', sectionData.cold, false, sectionIndex, prices);
     }
 
     // Горячее водоснабжение
     if (sectionData.hot.items.length > 0) {
-      html += renderSystemBlock('hot', sectionData.hot);
+      html += renderSystemBlock('hot', sectionData.hot, false, sectionIndex, prices);
     }
 
     html += `
@@ -1371,9 +1402,11 @@ export function renderEstimateBlock(estimateData, sectionsCount) {
 /**
  * Рендерит блок системы (ХВС или ГВС) - единая таблица с колонкой "Тип"
  */
-function renderSystemBlock(systemKey, data, isSummary = false) {
+function renderSystemBlock(systemKey, data, isSummary = false, sectionIndex = 0, prices = {}) {
   const systemName = ESTIMATE_SYSTEM_NAMES[systemKey];
   const titlePrefix = isSummary ? 'Итого: ' : '';
+  const showPrices = !isSummary;
+  let sectionTotal = 0;
 
   let html = `
     <details class="estimate-details">
@@ -1382,13 +1415,14 @@ function renderSystemBlock(systemKey, data, isSummary = false) {
         ${titlePrefix}${systemName}
       </summary>
       <div class="estimate-details-content">
-        <table class="estimate-table estimate-table-unified">
+        <table class="estimate-table ${showPrices ? 'estimate-table-financial' : 'estimate-table-unified'}">
           <thead>
             <tr>
               <th class="col-type">Тип</th>
               <th class="col-name">Наименование</th>
               <th class="col-unit">Ед. изм.</th>
               <th class="col-qty">Количество</th>
+              ${showPrices ? '<th class="col-price">Цена за ед. (руб.)</th><th class="col-total">Итого (руб.)</th>' : ''}
             </tr>
           </thead>
           <tbody>
@@ -1398,15 +1432,49 @@ function renderSystemBlock(systemKey, data, isSummary = false) {
     const qty = formatQuantity(item.quantity);
     const typeClass = item.type === 'работа' ? 'type-work' : 'type-material';
 
+    let priceCells = '';
+    if (showPrices) {
+      const priceKey = `${sectionIndex}:${systemKey}:${item.name}`;
+      const savedPrice = prices[priceKey] || '';
+      const numPrice = parseFloat(savedPrice) || 0;
+      const rowTotal = numPrice * item.quantity;
+      if (rowTotal > 0) sectionTotal += rowTotal;
+
+      priceCells = `
+        <td class="col-price">
+          <input type="text" inputmode="decimal" class="estimate-price-input"
+            data-price-key="${escapeHtml(priceKey)}" data-qty="${item.quantity}"
+            value="${savedPrice}" placeholder="—">
+        </td>
+        <td class="col-total">
+          <span class="estimate-total-value">${rowTotal > 0 ? formatEstimateMoney(rowTotal) : ''}</span>
+        </td>
+      `;
+    }
+
     html += `
       <tr class="${typeClass}">
         <td class="col-type">${item.type}</td>
         <td class="col-name">${item.name}</td>
         <td class="col-unit">${item.unit}</td>
         <td class="col-qty">${qty}</td>
+        ${priceCells}
       </tr>
     `;
   });
+
+  // Строка "Всего по разделу"
+  if (showPrices) {
+    html += `
+      <tr class="estimate-section-total-row">
+        <td colspan="4"></td>
+        <td class="estimate-section-total-label">Всего по разделу:</td>
+        <td class="col-total">
+          <span class="estimate-section-total-value">${sectionTotal > 0 ? formatEstimateMoney(sectionTotal) : '—'}</span>
+        </td>
+      </tr>
+    `;
+  }
 
   html += `
           </tbody>
@@ -1421,13 +1489,14 @@ function renderSystemBlock(systemKey, data, isSummary = false) {
 /**
  * Экспортирует смету в Excel
  */
-export function exportEstimateToExcel(estimateData, sectionsCount) {
+export function exportEstimateToExcel(estimateData, sectionsCount, prices = {}) {
   if (typeof XLSX === 'undefined') {
     alert('Библиотека XLSX не загружена');
     return;
   }
 
   const wb = XLSX.utils.book_new();
+  const headers = ['Тип', 'Наименование', 'Ед. изм.', 'Количество', 'Цена за ед. (руб.)', 'Итого (руб.)'];
 
   // Создаём листы для каждого корпуса
   for (let sectionIndex = 0; sectionIndex < sectionsCount; sectionIndex++) {
@@ -1436,36 +1505,35 @@ export function exportEstimateToExcel(estimateData, sectionsCount) {
 
     const rows = [];
 
-    // ХВС
-    if (sectionData.cold.items.length > 0) {
-      rows.push(['СИСТЕМА ХОЛОДНОГО ВОДОСНАБЖЕНИЯ В1', '', '', '']);
-      rows.push(['Тип', 'Наименование', 'Ед. изм.', 'Количество']);
+    ['cold', 'hot'].forEach(systemKey => {
+      const items = sectionData[systemKey].items;
+      if (items.length === 0) return;
 
-      sectionData.cold.items.forEach(item => {
-        rows.push([item.type, item.name, item.unit, item.quantity]);
+      const sysName = systemKey === 'cold' ? 'СИСТЕМА ХОЛОДНОГО ВОДОСНАБЖЕНИЯ В1' : 'СИСТЕМА ГОРЯЧЕГО ВОДОСНАБЖЕНИЯ Т3, Т4';
+      rows.push([sysName, '', '', '', '', '']);
+      rows.push(headers);
+
+      let sectionTotal = 0;
+      items.forEach(item => {
+        const priceKey = `${sectionIndex}:${systemKey}:${item.name}`;
+        const price = parseFloat(prices[priceKey]) || 0;
+        const total = price * item.quantity;
+        sectionTotal += total;
+        rows.push([item.type, item.name, item.unit, item.quantity, price || '', total || '']);
       });
 
-      rows.push(['', '', '', '']);
-    }
-
-    // ГВС
-    if (sectionData.hot.items.length > 0) {
-      rows.push(['СИСТЕМА ГОРЯЧЕГО ВОДОСНАБЖЕНИЯ Т3, Т4', '', '', '']);
-      rows.push(['Тип', 'Наименование', 'Ед. изм.', 'Количество']);
-
-      sectionData.hot.items.forEach(item => {
-        rows.push([item.type, item.name, item.unit, item.quantity]);
-      });
-    }
+      rows.push(['', '', '', '', 'Всего по разделу:', sectionTotal || '']);
+      rows.push(['', '', '', '', '', '']);
+    });
 
     const ws = XLSX.utils.aoa_to_sheet(rows);
-
-    // Устанавливаем ширину колонок
     ws['!cols'] = [
       { wch: 12 },
       { wch: 75 },
       { wch: 10 },
       { wch: 15 },
+      { wch: 18 },
+      { wch: 18 },
     ];
 
     XLSX.utils.book_append_sheet(wb, ws, `Корпус ${sectionIndex + 1}`);
@@ -1474,23 +1542,92 @@ export function exportEstimateToExcel(estimateData, sectionsCount) {
   // Лист сводки
   if (sectionsCount > 1) {
     const summary = calculateBuildingSummary(estimateData);
-    const rows = [['СВОДКА ПО ЗДАНИЮ', '', '', ''], ['', '', '', '']];
+    const rows = [['СВОДКА ПО ЗДАНИЮ', '', '', '', '', ''], ['', '', '', '', '', '']];
 
     ['cold', 'hot'].forEach(key => {
       const name = key === 'cold' ? 'СИСТЕМА ХОЛОДНОГО ВОДОСНАБЖЕНИЯ В1' : 'СИСТЕМА ГОРЯЧЕГО ВОДОСНАБЖЕНИЯ Т3, Т4';
-      rows.push([name, '', '', '']);
-      rows.push(['Тип', 'Наименование', 'Ед. изм.', 'Количество']);
+      rows.push([name, '', '', '', '', '']);
+      rows.push(headers);
 
       summary[key].items.forEach(item => {
-        rows.push([item.type, item.name, item.unit, item.quantity]);
+        rows.push([item.type, item.name, item.unit, item.quantity, '', '']);
       });
-      rows.push(['', '', '', '']);
+      rows.push(['', '', '', '', '', '']);
     });
 
     const ws = XLSX.utils.aoa_to_sheet(rows);
-    ws['!cols'] = [{ wch: 12 }, { wch: 75 }, { wch: 10 }, { wch: 15 }];
+    ws['!cols'] = [{ wch: 12 }, { wch: 75 }, { wch: 10 }, { wch: 15 }, { wch: 18 }, { wch: 18 }];
     XLSX.utils.book_append_sheet(wb, ws, 'Сводка');
   }
 
   XLSX.writeFile(wb, 'Смета_водоснабжение.xlsx');
+}
+
+// ============================================================================
+// ОБРАБОТЧИКИ ЦЕН СМЕТЫ (event delegation + debounce)
+// ============================================================================
+
+let estimatePriceListenerAttached = false;
+let priceDebounceTimer = null;
+
+/**
+ * Инициализирует обработчики ввода цен (вызвать один раз при загрузке).
+ * @param {Function} onPriceChangeBatch - callback(allPrices) вызывается после debounce
+ */
+export function initEstimatePriceHandlers(onPriceChangeBatch) {
+  if (estimatePriceListenerAttached) return;
+  const container = document.getElementById('estimateContent');
+  if (!container) return;
+  estimatePriceListenerAttached = true;
+
+  container.addEventListener('input', (e) => {
+    if (!e.target.classList.contains('estimate-price-input')) return;
+
+    // Санитизация: запятая → точка
+    sanitizeEstimatePriceInput(e.target);
+
+    const input = e.target;
+    const qty = parseFloat(input.dataset.qty) || 0;
+    const price = parseFloat(input.value) || 0;
+    const total = price * qty;
+
+    // Обновляем "Итого" в той же строке
+    const row = input.closest('tr');
+    const totalSpan = row ? row.querySelector('.estimate-total-value') : null;
+    if (totalSpan) {
+      totalSpan.textContent = total > 0 ? formatEstimateMoney(total) : '';
+    }
+
+    // Пересчитываем "Всего по разделу"
+    const tbody = input.closest('tbody');
+    if (tbody) recalcEstimateSectionTotal(tbody);
+
+    // Debounce сохранение
+    clearTimeout(priceDebounceTimer);
+    priceDebounceTimer = setTimeout(() => {
+      const allPrices = {};
+      container.querySelectorAll('.estimate-price-input').forEach(inp => {
+        const key = inp.dataset.priceKey;
+        const val = inp.value.trim();
+        if (val && parseFloat(val) > 0) allPrices[key] = val;
+      });
+      onPriceChangeBatch(allPrices);
+    }, 800);
+  });
+}
+
+/**
+ * Пересчитывает "Всего по разделу" для таблицы
+ */
+function recalcEstimateSectionTotal(tbody) {
+  let sum = 0;
+  tbody.querySelectorAll('.estimate-price-input').forEach(inp => {
+    const price = parseFloat(inp.value) || 0;
+    const qty = parseFloat(inp.dataset.qty) || 0;
+    sum += price * qty;
+  });
+  const totalEl = tbody.querySelector('.estimate-section-total-value');
+  if (totalEl) {
+    totalEl.textContent = sum > 0 ? formatEstimateMoney(sum) : '—';
+  }
 }

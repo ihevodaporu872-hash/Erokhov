@@ -12,11 +12,19 @@ export let calculatorParams = {
   numSections: 2
 };
 
+// Цены для сметы (ключ: "секция:система:имя", значение: цена за единицу)
+export let estimatePrices = {};
+
 // Callback для автосохранения (устанавливается из main.js)
 let onStateChangeCallback = null;
 
 export function setOnStateChange(callback) {
   onStateChangeCallback = callback;
+}
+
+// Установка цен сметы (batch-обновление)
+export function setEstimatePrices(prices) {
+  estimatePrices = prices && typeof prices === 'object' ? { ...prices } : {};
 }
 
 // Уведомление об изменении состояния
@@ -63,7 +71,8 @@ export function getDefaultCalculatorState() {
 export function serializeCalculatorState() {
   return {
     sections: JSON.parse(JSON.stringify(sections)),
-    params: { ...calculatorParams }
+    params: { ...calculatorParams },
+    estimatePrices: { ...estimatePrices }
   };
 }
 
@@ -106,6 +115,13 @@ export function loadCalculatorState(data) {
       ivptEnabled: false,
       numSections: sections.length
     };
+  }
+
+  // Загрузка цен сметы
+  if (data.estimatePrices && typeof data.estimatePrices === 'object') {
+    estimatePrices = { ...data.estimatePrices };
+  } else {
+    estimatePrices = {};
   }
 }
 
