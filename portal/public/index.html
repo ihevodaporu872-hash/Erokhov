@@ -858,15 +858,15 @@
                             <div class="row g-3">
                                 <div class="col-md-4">
                                     <label class="form-label" for="inputTotalArea">Общая площадь (м²)</label>
-                                    <input type="number" class="form-control" id="inputTotalArea" min="0" step="0.01" placeholder="0" oninput="this.value = this.value.replace(',', '.')">
+                                    <input type="text" inputmode="decimal" class="form-control" id="inputTotalArea" placeholder="0">
                                 </div>
                                 <div class="col-md-4">
                                     <label class="form-label" for="inputAboveGroundArea">Наземная площадь (м²)</label>
-                                    <input type="number" class="form-control" id="inputAboveGroundArea" min="0" step="0.01" placeholder="0" oninput="this.value = this.value.replace(',', '.')">
+                                    <input type="text" inputmode="decimal" class="form-control" id="inputAboveGroundArea" placeholder="0">
                                 </div>
                                 <div class="col-md-4">
                                     <label class="form-label" for="inputUndergroundArea">Подземная площадь (м²)</label>
-                                    <input type="number" class="form-control" id="inputUndergroundArea" min="0" step="0.01" placeholder="0" oninput="this.value = this.value.replace(',', '.')">
+                                    <input type="text" inputmode="decimal" class="form-control" id="inputUndergroundArea" placeholder="0">
                                 </div>
                             </div>
                         </div>
@@ -1412,9 +1412,24 @@
             }, 800);
         }
 
+        // Санитизация ввода площадей: запятая -> точка, только цифры и одна точка
+        function sanitizeAreaInput(el) {
+            let val = el.value.replace(/,/g, '.');
+            val = val.replace(/[^\d.]/g, '');
+            // Оставляем только первую точку
+            const parts = val.split('.');
+            if (parts.length > 2) {
+                val = parts[0] + '.' + parts.slice(1).join('');
+            }
+            el.value = val;
+        }
+
         // Вешаем обработчики на инпуты площадей
         ['inputTotalArea', 'inputAboveGroundArea', 'inputUndergroundArea'].forEach(id => {
-            document.getElementById(id)?.addEventListener('input', scheduleAreasSave);
+            document.getElementById(id)?.addEventListener('input', function() {
+                sanitizeAreaInput(this);
+                scheduleAreasSave();
+            });
         });
 
         // ==================== Технические заметки — таблица (Project View) ====================
