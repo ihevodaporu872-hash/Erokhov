@@ -1390,24 +1390,35 @@ const UNDERGROUND_ITEMS = {
  * Рендерит аккордеон "Подземная часть"
  */
 function renderUndergroundBlock(undergroundArea, prices) {
-  if (!undergroundArea || undergroundArea <= 0) return '';
+  console.log('[Смета] renderUndergroundBlock, undergroundArea:', undergroundArea);
+
+  const area = parseFloat(undergroundArea) || 0;
+  const hasArea = area > 0;
 
   let html = `
     <details class="estimate-section-details">
       <summary class="estimate-section-header">
         <span class="estimate-section-icon"></span>
-        Подземная часть
+        Подземная часть${!hasArea ? ' (площадь не задана)' : ''}
       </summary>
       <div class="estimate-section-content">
   `;
 
-  ['cold', 'hot'].forEach(systemKey => {
-    const items = UNDERGROUND_ITEMS[systemKey];
-    const data = {
-      items: items.map(it => ({ ...it, quantity: undergroundArea }))
-    };
-    html += renderSystemBlock(systemKey, data, false, 'underground', prices);
-  });
+  if (!hasArea) {
+    html += `
+      <div style="padding: 16px 20px; color: var(--gray-500); font-style: italic;">
+        Заполните поле «Площадь подземной части» в паспорте объекта для расчёта.
+      </div>
+    `;
+  } else {
+    ['cold', 'hot'].forEach(systemKey => {
+      const items = UNDERGROUND_ITEMS[systemKey];
+      const data = {
+        items: items.map(it => ({ ...it, quantity: area }))
+      };
+      html += renderSystemBlock(systemKey, data, false, 'underground', prices);
+    });
+  }
 
   html += `
       </div>
@@ -1418,7 +1429,7 @@ function renderUndergroundBlock(undergroundArea, prices) {
 }
 
 export function renderEstimateBlock(estimateData, sectionsCount, prices = {}, undergroundArea = 0) {
-  console.log('[Смета] renderEstimateBlock вызван, sectionsCount:', sectionsCount);
+  console.log('[Смета] renderEstimateBlock вызван, sectionsCount:', sectionsCount, 'undergroundArea:', undergroundArea);
   console.log('[Смета] estimateData:', estimateData);
 
   const container = document.getElementById('estimateContent');
