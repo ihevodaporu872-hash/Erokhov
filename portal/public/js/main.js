@@ -351,8 +351,9 @@ function renderEstimate() {
       collectorVendor,
     });
 
-  // Рендерим смету
-  renderEstimateBlock(estimateData, sections.length, estimatePrices);
+  // Рендерим смету (с учётом подземной части)
+  const undergroundArea = parseFloat(document.getElementById('undergroundArea')?.value) || 0;
+  renderEstimateBlock(estimateData, sections.length, estimatePrices, undergroundArea);
 }
 
 // Рендеринг вкладки "Визуализация расчёта"
@@ -2202,7 +2203,8 @@ window.onload = () => {
       collectorVendor,
     });
 
-    exportEstimateToExcel(estimateData, sections.length, estimatePrices);
+    const undergroundArea = parseFloat(document.getElementById('undergroundArea')?.value) || 0;
+    exportEstimateToExcel(estimateData, sections.length, estimatePrices, undergroundArea);
   });
 
   // Обработчик создания проекта

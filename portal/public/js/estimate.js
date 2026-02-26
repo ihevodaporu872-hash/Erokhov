@@ -1371,7 +1371,53 @@ export function calculateBuildingSummary(estimateData) {
 /**
  * Рендерит блок сметы в HTML
  */
-export function renderEstimateBlock(estimateData, sectionsCount, prices = {}) {
+// ============================================================================
+// ДАННЫЕ ПОДЗЕМНОЙ ЧАСТИ (фиксированные позиции + цены)
+// ============================================================================
+
+const UNDERGROUND_ITEMS = {
+  cold: [
+    { type: 'работа',   name: 'Монтаж трубопроводов Ду20-200, с запорной арматурой', unit: 'компл.', defaultPrice: 303.23 },
+    { type: 'материал', name: 'Трубы Ду20-200, с запорной арматурой',                unit: 'компл.', defaultPrice: 214.47 },
+  ],
+  hot: [
+    { type: 'работа',   name: 'Монтаж трубопроводов Ду20-200, с запорной арматурой', unit: 'компл.', defaultPrice: 202.21 },
+    { type: 'материал', name: 'Трубы Ду20-200, с запорной арматурой',                unit: 'компл.', defaultPrice: 142.98 },
+  ],
+};
+
+/**
+ * Рендерит аккордеон "Подземная часть"
+ */
+function renderUndergroundBlock(undergroundArea, prices) {
+  if (!undergroundArea || undergroundArea <= 0) return '';
+
+  let html = `
+    <details class="estimate-section-details">
+      <summary class="estimate-section-header">
+        <span class="estimate-section-icon"></span>
+        Подземная часть
+      </summary>
+      <div class="estimate-section-content">
+  `;
+
+  ['cold', 'hot'].forEach(systemKey => {
+    const items = UNDERGROUND_ITEMS[systemKey];
+    const data = {
+      items: items.map(it => ({ ...it, quantity: undergroundArea }))
+    };
+    html += renderSystemBlock(systemKey, data, false, 'underground', prices);
+  });
+
+  html += `
+      </div>
+    </details>
+  `;
+
+  return html;
+}
+
+export function renderEstimateBlock(estimateData, sectionsCount, prices = {}, undergroundArea = 0) {
   console.log('[Смета] renderEstimateBlock вызван, sectionsCount:', sectionsCount);
   console.log('[Смета] estimateData:', estimateData);
 
@@ -1426,6 +1472,9 @@ export function renderEstimateBlock(estimateData, sectionsCount, prices = {}) {
       </details>
     `;
   }
+
+  // === Подземная часть ===
+  html += renderUndergroundBlock(undergroundArea, prices);
 
   // === Сводка по зданию ===
   if (sectionsCount > 1) {
@@ -1494,10 +1543,14 @@ function renderSystemBlock(systemKey, data, isSummary = false, sectionIndex = 0,
     if (showPrices) {
       const priceKey = `${sectionIndex}:${systemKey}:${item.name}`;
       let savedPrice = prices[priceKey] || '';
-      // Для работ без сохранённой цены подставляем значение из справочника
-      if (!savedPrice && item.type === 'работа') {
-        const defaultPrice = getDefaultWorkPrice(item.name);
-        if (defaultPrice !== null) savedPrice = String(defaultPrice);
+      // Для позиций без сохранённой цены подставляем значение из справочника или из item.defaultPrice
+      if (!savedPrice) {
+        if (item.defaultPrice != null) {
+          savedPrice = String(item.defaultPrice);
+        } else if (item.type === 'работа') {
+          const defPrice = getDefaultWorkPrice(item.name);
+          if (defPrice !== null) savedPrice = String(defPrice);
+        }
       }
       const numPrice = parseFloat(savedPrice) || 0;
       const rowTotal = numPrice * item.quantity;
@@ -1552,7 +1605,7 @@ function renderSystemBlock(systemKey, data, isSummary = false, sectionIndex = 0,
 /**
  * Экспортирует смету в Excel
  */
-export function exportEstimateToExcel(estimateData, sectionsCount, prices = {}) {
+export function exportEstimateToExcel(estimateData, sectionsCount, prices = {}, undergroundArea = 0) {
   if (typeof XLSX === 'undefined') {
     alert('Библиотека XLSX не загружена');
     return;
@@ -1580,9 +1633,13 @@ export function exportEstimateToExcel(estimateData, sectionsCount, prices = {}) 
       items.forEach(item => {
         const priceKey = `${sectionIndex}:${systemKey}:${item.name}`;
         let priceVal = prices[priceKey] || '';
-        if (!priceVal && item.type === 'работа') {
-          const def = getDefaultWorkPrice(item.name);
-          if (def !== null) priceVal = String(def);
+        if (!priceVal) {
+          if (item.defaultPrice != null) {
+            priceVal = String(item.defaultPrice);
+          } else if (item.type === 'работа') {
+            const def = getDefaultWorkPrice(item.name);
+            if (def !== null) priceVal = String(def);
+          }
         }
         const price = parseFloat(priceVal) || 0;
         const total = price * item.quantity;
@@ -1605,6 +1662,35 @@ export function exportEstimateToExcel(estimateData, sectionsCount, prices = {}) 
     ];
 
     XLSX.utils.book_append_sheet(wb, ws, `Корпус ${sectionIndex + 1}`);
+  }
+
+  // Лист "Подземная часть"
+  if (undergroundArea > 0) {
+    const rows = [['ПОДЗЕМНАЯ ЧАСТЬ', '', '', '', '', ''], ['', '', '', '', '', '']];
+
+    ['cold', 'hot'].forEach(systemKey => {
+      const sysName = systemKey === 'cold' ? 'СИСТЕМА ХОЛОДНОГО ВОДОСНАБЖЕНИЯ В1' : 'СИСТЕМА ГОРЯЧЕГО ВОДОСНАБЖЕНИЯ Т3, Т4';
+      rows.push([sysName, '', '', '', '', '']);
+      rows.push(headers);
+
+      let sectionTotal = 0;
+      UNDERGROUND_ITEMS[systemKey].forEach(item => {
+        const priceKey = `underground:${systemKey}:${item.name}`;
+        let priceVal = prices[priceKey] || '';
+        if (!priceVal && item.defaultPrice != null) priceVal = String(item.defaultPrice);
+        const price = parseFloat(priceVal) || 0;
+        const total = price * undergroundArea;
+        sectionTotal += total;
+        rows.push([item.type, item.name, item.unit, undergroundArea, price || '', total || '']);
+      });
+
+      rows.push(['', '', '', '', 'Всего по разделу:', sectionTotal || '']);
+      rows.push(['', '', '', '', '', '']);
+    });
+
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    ws['!cols'] = [{ wch: 12 }, { wch: 75 }, { wch: 10 }, { wch: 15 }, { wch: 18 }, { wch: 18 }];
+    XLSX.utils.book_append_sheet(wb, ws, 'Подземная часть');
   }
 
   // Лист сводки
