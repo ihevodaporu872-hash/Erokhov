@@ -662,13 +662,67 @@
             font-size: 1rem;
         }
 
-        .engineering-notes-textarea {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-            font-size: 0.92rem;
-            line-height: 1.6;
+        /* Таблица технических нюансов */
+        .notes-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+        }
+
+        .notes-table th {
+            font-weight: 600;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+            padding: 0.5rem 0.75rem;
+            border-bottom: 2px solid var(--border-color);
+            white-space: nowrap;
+        }
+
+        .notes-table td {
+            padding: 0.4rem 0.75rem;
+            border-bottom: 1px solid var(--border-color);
+            vertical-align: top;
+        }
+
+        .notes-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .notes-table .system-name {
+            font-weight: 500;
+            font-size: 0.9rem;
+            color: var(--text-primary);
+            white-space: nowrap;
+            padding-top: 0.65rem;
+            width: 240px;
+            min-width: 200px;
+        }
+
+        .notes-table .note-input {
+            width: 100%;
+            border: 1px solid var(--border-color);
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            border-radius: 0.4rem;
+            padding: 0.45rem 0.65rem;
+            font-size: 0.9rem;
+            line-height: 1.5;
             resize: vertical;
-            min-height: 200px;
-            max-height: 500px;
+            min-height: 36px;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        }
+
+        .notes-table .note-input:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
+        }
+
+        .notes-table .note-input::placeholder {
+            color: var(--text-secondary);
+            opacity: 0.6;
         }
     </style>
 </head>
@@ -826,8 +880,48 @@
                                 </h6>
                                 <div id="projectNotesSaveStatus" style="font-size: 0.82rem; color: var(--text-secondary); min-height: 1.2em;"></div>
                             </div>
-                            <textarea class="form-control engineering-notes-textarea" id="inputEngineeringNotes" rows="12"
-                                placeholder="Например: Вентиляция — приточка в квартиры, Водоснабжение — наружные сети от существующей камеры..."></textarea>
+                            <table class="notes-table" id="notesTable">
+                                <thead>
+                                    <tr>
+                                        <th>Система</th>
+                                        <th>Нюансы / особенности</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td class="system-name"><i class="bi bi-droplet-fill me-2"></i>Водоснабжение</td>
+                                        <td><textarea class="note-input" data-system-note="water-supply" rows="1" placeholder="Нюансы по водоснабжению..."></textarea></td>
+                                    </tr>
+                                    <tr>
+                                        <td class="system-name"><i class="bi bi-arrow-down-circle me-2"></i>Водоотведение</td>
+                                        <td><textarea class="note-input" data-system-note="sewage" rows="1" placeholder="Нюансы по водоотведению..."></textarea></td>
+                                    </tr>
+                                    <tr>
+                                        <td class="system-name"><i class="bi bi-fire me-2"></i>Пожаротушение</td>
+                                        <td><textarea class="note-input" data-system-note="fire-safety" rows="1" placeholder="Нюансы по пожаротушению..."></textarea></td>
+                                    </tr>
+                                    <tr>
+                                        <td class="system-name"><i class="bi bi-thermometer-half me-2"></i>Отопление</td>
+                                        <td><textarea class="note-input" data-system-note="heating" rows="1" placeholder="Нюансы по отоплению..."></textarea></td>
+                                    </tr>
+                                    <tr>
+                                        <td class="system-name"><i class="bi bi-wind me-2"></i>Вентиляция</td>
+                                        <td><textarea class="note-input" data-system-note="ventilation" rows="1" placeholder="Нюансы по вентиляции..."></textarea></td>
+                                    </tr>
+                                    <tr>
+                                        <td class="system-name"><i class="bi bi-snow me-2"></i>Кондиционирование</td>
+                                        <td><textarea class="note-input" data-system-note="conditioning" rows="1" placeholder="Нюансы по кондиционированию..."></textarea></td>
+                                    </tr>
+                                    <tr>
+                                        <td class="system-name"><i class="bi bi-gear me-2"></i>ИТП</td>
+                                        <td><textarea class="note-input" data-system-note="itp" rows="1" placeholder="Нюансы по ИТП..."></textarea></td>
+                                    </tr>
+                                    <tr>
+                                        <td class="system-name"><i class="bi bi-diagram-3 me-2"></i>Наружные сети</td>
+                                        <td><textarea class="note-input" data-system-note="external-networks" rows="1" placeholder="Нюансы по наружным сетям..."></textarea></td>
+                                    </tr>
+                                </tbody>
+                            </table>
                         </div>
                     </div>
                 </div>
@@ -1266,7 +1360,6 @@
             const inputTotal = document.getElementById('inputTotalArea');
             const inputAbove = document.getElementById('inputAboveGroundArea');
             const inputUnder = document.getElementById('inputUndergroundArea');
-            const inputNotes = document.getElementById('inputEngineeringNotes');
             const status = document.getElementById('projectAreasSaveStatus');
             const notesStatus = document.getElementById('projectNotesSaveStatus');
             if (!inputTotal || !inputAbove || !inputUnder) return;
@@ -1276,7 +1369,7 @@
                 inputTotal.value = project.total_area || '';
                 inputAbove.value = project.above_ground_area || '';
                 inputUnder.value = project.underground_area || '';
-                if (inputNotes) inputNotes.value = project.engineering_notes || '';
+                populateNotesTable(project.engineering_notes);
                 if (status) status.textContent = '';
                 if (notesStatus) notesStatus.textContent = '';
             } catch (err) {
@@ -1284,7 +1377,7 @@
                 inputTotal.value = '';
                 inputAbove.value = '';
                 inputUnder.value = '';
-                if (inputNotes) inputNotes.value = '';
+                populateNotesTable(null);
             }
         }
 
@@ -1324,8 +1417,39 @@
             document.getElementById(id)?.addEventListener('input', scheduleAreasSave);
         });
 
-        // ==================== Технические заметки (Project View) ====================
+        // ==================== Технические заметки — таблица (Project View) ====================
         let notesSaveTimer = null;
+
+        function collectNotesFromTable() {
+            const notes = {};
+            document.querySelectorAll('.note-input[data-system-note]').forEach(textarea => {
+                const key = textarea.dataset.systemNote;
+                const val = textarea.value.trim();
+                if (val) notes[key] = val;
+            });
+            return JSON.stringify(notes);
+        }
+
+        function populateNotesTable(rawNotes) {
+            let notesObj = {};
+            if (rawNotes) {
+                try {
+                    const parsed = JSON.parse(rawNotes);
+                    if (typeof parsed === 'object' && parsed !== null) notesObj = parsed;
+                } catch (e) {
+                    // Старый формат (plain text) — игнорируем
+                }
+            }
+            document.querySelectorAll('.note-input[data-system-note]').forEach(textarea => {
+                textarea.value = notesObj[textarea.dataset.systemNote] || '';
+                autoResizeTextarea(textarea);
+            });
+        }
+
+        function autoResizeTextarea(el) {
+            el.style.height = 'auto';
+            el.style.height = el.scrollHeight + 'px';
+        }
 
         function scheduleNotesSave() {
             if (!projectViewProjectId) return;
@@ -1334,10 +1458,10 @@
 
             clearTimeout(notesSaveTimer);
             notesSaveTimer = setTimeout(async () => {
-                const notes = document.getElementById('inputEngineeringNotes')?.value || '';
+                const notesJson = collectNotesFromTable();
 
                 try {
-                    const updated = await updateProjectNotes(projectViewProjectId, notes);
+                    const updated = await updateProjectNotes(projectViewProjectId, notesJson);
                     const idx = portalProjects.findIndex(p => p.id === projectViewProjectId);
                     if (idx !== -1) Object.assign(portalProjects[idx], updated);
                     if (status) {
@@ -1351,7 +1475,12 @@
             }, 800);
         }
 
-        document.getElementById('inputEngineeringNotes')?.addEventListener('input', scheduleNotesSave);
+        document.querySelectorAll('.note-input[data-system-note]').forEach(textarea => {
+            textarea.addEventListener('input', function() {
+                autoResizeTextarea(this);
+                scheduleNotesSave();
+            });
+        });
 
         // ==================== Iframe: загрузка и автосохранение ====================
 
