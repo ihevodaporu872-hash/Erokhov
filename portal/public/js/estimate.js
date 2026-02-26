@@ -106,8 +106,13 @@ function getDefaultWorkPrice(name) {
   if (!name) return null;
   const n = name.toLowerCase();
 
-  // Монтаж стальных оцинкованных труб Ду 40
-  if (n.includes('стальн') && n.includes('оцинк')) return 381;
+  // Монтаж стальных оцинкованных труб (по диаметрам)
+  if (n.includes('стальн') && n.includes('оцинк')) {
+    if (n.includes('32') || n.includes('ду 32')) return 1562;
+    if (n.includes('40') || n.includes('ду 40')) return 1659.57;
+    if (n.includes('50') || n.includes('ду 50')) return 3034.42;
+    return null; // неизвестный диаметр — пустое поле
+  }
 
   // Монтаж трубопроводов из сшитого полиэтилена
   if (n.includes('сшит') && n.includes('полиэтилен')) return 648.46;
