@@ -3517,6 +3517,27 @@ body.dark-theme .vis-schema {
   border-bottom: 2px solid var(--gray-200);
 }
 
+.price-modal-accordion-toggle {
+  cursor: pointer;
+  user-select: none;
+}
+
+.price-modal-accordion-toggle:hover td {
+  background: var(--gray-100);
+}
+
+.price-accordion-chevron {
+  display: inline-block;
+  font-size: 10px;
+  margin-right: 6px;
+  transition: transform 0.2s ease;
+  transform: rotate(0deg);
+}
+
+.price-accordion-chevron.open {
+  transform: rotate(90deg);
+}
+
 .price-modal-checkbox-label {
   display: flex;
   align-items: center;

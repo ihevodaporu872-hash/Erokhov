@@ -1890,7 +1890,7 @@ function recalcEstimateSectionTotal(tbody) {
 function getItemGroup(name) {
   if (!name) return 'Прочее';
   const n = name.toLowerCase();
-  if (n.includes('труб') || n.includes('трубопровод')) return 'Трубопроводы';
+  if (n.includes('труб') || n.includes('трубопровод') || n.includes('гильз') || n.includes('пусконаладоч')) return 'Трубопроводы';
   if (n.includes('кран') || n.includes('задвижк') || n.includes('клапан') || n.includes('армат')) return 'Арматура';
   return 'Прочее';
 }
@@ -2000,28 +2000,49 @@ export function showPriceManagementModal(type, estimateData, currentPrices, onAp
     return;
   }
 
-  // Генерируем строки таблицы с группировкой
-  let tableRows = '';
-  let currentGroup = '';
+  // Группируем позиции
+  const groups = {};
+  items.forEach(item => {
+    if (!groups[item.group]) groups[item.group] = [];
+    groups[item.group].push(item);
+  });
 
-  items.forEach((item, idx) => {
-    if (item.group !== currentGroup) {
-      currentGroup = item.group;
-      tableRows += `
-        <tr class="price-modal-group-row">
-          <td colspan="3">${escapeHtml(currentGroup)}</td>
-        </tr>`;
-    }
+  // Порядок групп
+  const groupOrder = ['Трубопроводы', 'Арматура', 'Прочее'];
+  // Группы, которые свёрнуты по умолчанию
+  const collapsedGroups = new Set(['Трубопроводы', 'Арматура']);
+
+  // Генерируем строки таблицы с аккордеонами
+  let tableRows = '';
+  let globalIdx = 0;
+
+  groupOrder.forEach(groupName => {
+    const groupItems = groups[groupName];
+    if (!groupItems || groupItems.length === 0) return;
+    const isCollapsed = collapsedGroups.has(groupName);
+    const groupId = groupName.replace(/\s+/g, '-');
+
     tableRows += `
-      <tr>
+        <tr class="price-modal-group-row price-modal-accordion-toggle" data-group-id="${groupId}">
+          <td colspan="3">
+            <span class="price-accordion-chevron${isCollapsed ? '' : ' open'}">&#9654;</span>
+            ${escapeHtml(groupName)} (${groupItems.length})
+          </td>
+        </tr>`;
+
+    groupItems.forEach(item => {
+      tableRows += `
+      <tr class="price-modal-group-item" data-group="${groupId}"${isCollapsed ? ' style="display:none;"' : ''}>
         <td class="price-modal-name" style="text-align:left !important; padding-left:12px;">${escapeHtml(item.name)}</td>
         <td class="price-modal-unit">${escapeHtml(item.unit)}</td>
         <td class="price-modal-price">
           <input type="text" inputmode="decimal" class="estimate-price-input price-modal-input"
-            data-item-name="${escapeHtml(item.name)}" data-idx="${idx}"
+            data-item-name="${escapeHtml(item.name)}" data-idx="${globalIdx}"
             value="${escapeHtml(item.currentPrice)}" placeholder="—">
         </td>
       </tr>`;
+      globalIdx++;
+    });
   });
 
   // Создаём overlay
@@ -2063,6 +2084,23 @@ export function showPriceManagementModal(type, estimateData, currentPrices, onAp
   overlay.querySelector('#priceModalCancel').addEventListener('click', close);
   overlay.addEventListener('click', (e) => {
     if (e.target === overlay) close();
+  });
+
+  // Аккордеоны групп
+  overlay.querySelectorAll('.price-modal-accordion-toggle').forEach(row => {
+    row.addEventListener('click', () => {
+      const groupId = row.dataset.groupId;
+      const chevron = row.querySelector('.price-accordion-chevron');
+      const rows = overlay.querySelectorAll(`.price-modal-group-item[data-group="${groupId}"]`);
+      const isOpen = chevron.classList.contains('open');
+      if (isOpen) {
+        chevron.classList.remove('open');
+        rows.forEach(r => r.style.display = 'none');
+      } else {
+        chevron.classList.add('open');
+        rows.forEach(r => r.style.display = '');
+      }
+    });
   });
 
   // Санитизация price inputs
