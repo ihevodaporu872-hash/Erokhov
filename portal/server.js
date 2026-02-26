@@ -76,6 +76,20 @@ app.patch('/api/projects/:id/areas', (req, res) => {
   res.json(project);
 });
 
+// Обновить технические заметки проекта
+app.patch('/api/projects/:id/notes', (req, res) => {
+  const { id } = req.params;
+  const { engineering_notes } = req.body;
+
+  const result = db.prepare(
+    'UPDATE projects SET engineering_notes = ? WHERE id = ?'
+  ).run(engineering_notes ?? '', id);
+
+  if (result.changes === 0) return res.status(404).json({ error: 'Проект не найден' });
+  const project = db.prepare('SELECT * FROM projects WHERE id = ?').get(id);
+  res.json(project);
+});
+
 // ==================== API: Расчёты ====================
 
 // Получить расчёт для проекта + системы

@@ -661,6 +661,15 @@
             padding: 0.6rem 0.85rem;
             font-size: 1rem;
         }
+
+        .engineering-notes-textarea {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            font-size: 0.92rem;
+            line-height: 1.6;
+            resize: vertical;
+            min-height: 200px;
+            max-height: 500px;
+        }
     </style>
 </head>
 <body>
@@ -808,6 +817,19 @@
                             </div>
                         </div>
                     </div>
+
+                    <div class="card project-characteristics-card mt-3">
+                        <div class="card-body px-4 py-3">
+                            <div class="d-flex align-items-center justify-content-between mb-3">
+                                <h6 class="mb-0" style="font-weight: 600;">
+                                    <i class="bi bi-journal-text me-2"></i>Технические нюансы и особенности объекта
+                                </h6>
+                                <div id="projectNotesSaveStatus" style="font-size: 0.82rem; color: var(--text-secondary); min-height: 1.2em;"></div>
+                            </div>
+                            <textarea class="form-control engineering-notes-textarea" id="inputEngineeringNotes" rows="12"
+                                placeholder="Например: Вентиляция — приточка в квартиры, Водоснабжение — наружные сети от существующей камеры..."></textarea>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -951,6 +973,7 @@
             deleteProjectAPI,
             fetchProject,
             updateProjectAreas,
+            updateProjectNotes,
             fetchCalculation,
             saveCalculation
         } from './js/api.js';
@@ -1243,7 +1266,9 @@
             const inputTotal = document.getElementById('inputTotalArea');
             const inputAbove = document.getElementById('inputAboveGroundArea');
             const inputUnder = document.getElementById('inputUndergroundArea');
+            const inputNotes = document.getElementById('inputEngineeringNotes');
             const status = document.getElementById('projectAreasSaveStatus');
+            const notesStatus = document.getElementById('projectNotesSaveStatus');
             if (!inputTotal || !inputAbove || !inputUnder) return;
 
             try {
@@ -1251,12 +1276,15 @@
                 inputTotal.value = project.total_area || '';
                 inputAbove.value = project.above_ground_area || '';
                 inputUnder.value = project.underground_area || '';
+                if (inputNotes) inputNotes.value = project.engineering_notes || '';
                 if (status) status.textContent = '';
+                if (notesStatus) notesStatus.textContent = '';
             } catch (err) {
                 console.error('Ошибка загрузки характеристик:', err);
                 inputTotal.value = '';
                 inputAbove.value = '';
                 inputUnder.value = '';
+                if (inputNotes) inputNotes.value = '';
             }
         }
 
@@ -1295,6 +1323,35 @@
         ['inputTotalArea', 'inputAboveGroundArea', 'inputUndergroundArea'].forEach(id => {
             document.getElementById(id)?.addEventListener('input', scheduleAreasSave);
         });
+
+        // ==================== Технические заметки (Project View) ====================
+        let notesSaveTimer = null;
+
+        function scheduleNotesSave() {
+            if (!projectViewProjectId) return;
+            const status = document.getElementById('projectNotesSaveStatus');
+            if (status) status.textContent = 'Сохранение...';
+
+            clearTimeout(notesSaveTimer);
+            notesSaveTimer = setTimeout(async () => {
+                const notes = document.getElementById('inputEngineeringNotes')?.value || '';
+
+                try {
+                    const updated = await updateProjectNotes(projectViewProjectId, notes);
+                    const idx = portalProjects.findIndex(p => p.id === projectViewProjectId);
+                    if (idx !== -1) Object.assign(portalProjects[idx], updated);
+                    if (status) {
+                        status.innerHTML = '<i class="bi bi-check-circle me-1" style="color: #22c55e;"></i>Сохранено';
+                        setTimeout(() => { if (status) status.textContent = ''; }, 2000);
+                    }
+                } catch (err) {
+                    console.error('Ошибка сохранения заметок:', err);
+                    if (status) status.innerHTML = '<i class="bi bi-exclamation-circle me-1" style="color: #ef4444;"></i>Ошибка сохранения';
+                }
+            }, 800);
+        }
+
+        document.getElementById('inputEngineeringNotes')?.addEventListener('input', scheduleNotesSave);
 
         // ==================== Iframe: загрузка и автосохранение ====================
 

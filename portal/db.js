@@ -23,6 +23,7 @@ db.exec(`
     total_area REAL DEFAULT 0,
     above_ground_area REAL DEFAULT 0,
     underground_area REAL DEFAULT 0,
+    engineering_notes TEXT DEFAULT '',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 
@@ -47,6 +48,9 @@ if (!columns.includes('above_ground_area')) {
 }
 if (!columns.includes('underground_area')) {
   db.exec("ALTER TABLE projects ADD COLUMN underground_area REAL DEFAULT 0");
+}
+if (!columns.includes('engineering_notes')) {
+  db.exec("ALTER TABLE projects ADD COLUMN engineering_notes TEXT DEFAULT ''");
 }
 
 module.exports = db;

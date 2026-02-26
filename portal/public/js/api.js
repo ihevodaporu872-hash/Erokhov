@@ -53,6 +53,16 @@ export async function updateProjectAreas(id, areas) {
   return res.json();
 }
 
+export async function updateProjectNotes(id, engineering_notes) {
+  const res = await fetch(`${API_BASE}/projects/${id}/notes`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ engineering_notes })
+  });
+  if (!res.ok) throw new Error('Ошибка сохранения заметок');
+  return res.json();
+}
+
 // ==================== Расчёты ====================
 
 export async function fetchCalculation(projectId, systemType) {
