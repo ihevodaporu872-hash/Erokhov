@@ -2546,17 +2546,20 @@ button:active {
 
 /* Финансовая таблица с 6 колонками: + Цена | Итого */
 .estimate-table-financial {
-  table-layout: auto;
+  table-layout: fixed;
+  width: 100%;
 }
 
 .estimate-table-financial .col-type {
-  width: 70px;
+  width: 80px;
   white-space: nowrap;
 }
 
 .estimate-table-financial .col-name {
   width: auto;
-  min-width: 40%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .estimate-table-financial .col-unit {
@@ -2574,8 +2577,9 @@ button:active {
 }
 
 .estimate-table-financial .col-price {
-  width: 120px;
+  width: 100px;
   text-align: right;
+  white-space: nowrap;
 }
 
 .estimate-table-financial .col-total {
