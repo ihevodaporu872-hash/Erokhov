@@ -178,7 +178,7 @@ app.post('/send-mail', async (req, res) => {
     const ccList = copyTo ? copyTo : '';
 
     const mailOptions = {
-      from: `"Инженерный портал" <${SMTP_FROM}>`,
+      from: `"Строительное управление - 10" <${SMTP_FROM}>`,
       to: toList,
       cc: ccList || undefined,
       subject: subject,
