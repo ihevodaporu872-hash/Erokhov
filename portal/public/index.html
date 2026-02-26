@@ -477,6 +477,76 @@
             color: #e4e4e4;
         }
 
+        /* Карточки характеристик и нюансов — тёмная тема */
+        body.dark-theme .project-characteristics-card {
+            background-color: var(--bg-secondary);
+            border-color: #444;
+        }
+
+        body.dark-theme .project-characteristics-card h6 {
+            color: #e4e4e4;
+        }
+
+        body.dark-theme .project-characteristics-card .form-control {
+            background-color: #333;
+            border-color: #444;
+            color: #e4e4e4;
+        }
+
+        body.dark-theme .project-characteristics-card .form-control::placeholder {
+            color: #888;
+        }
+
+        body.dark-theme .notes-table th {
+            color: #a0a0a0;
+            border-bottom-color: #444;
+        }
+
+        body.dark-theme .notes-table td {
+            border-bottom-color: #444;
+        }
+
+        body.dark-theme .notes-table .system-name {
+            color: #e4e4e4;
+        }
+
+        body.dark-theme .notes-table .note-input {
+            background-color: #333;
+            border-color: #444;
+            color: #e4e4e4;
+        }
+
+        body.dark-theme .notes-table .note-input::placeholder {
+            color: #888;
+        }
+
+        /* Аккордеон "Технические нюансы" — сворачиваемый */
+        .notes-collapse-toggle {
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .notes-collapse-toggle i.bi-chevron-down {
+            transition: transform 0.25s ease;
+            font-size: 0.85rem;
+        }
+
+        .notes-collapse-toggle.collapsed i.bi-chevron-down {
+            transform: rotate(-90deg);
+        }
+
+        .notes-collapse-body {
+            overflow: hidden;
+            transition: max-height 0.3s ease, opacity 0.25s ease;
+            max-height: 800px;
+            opacity: 1;
+        }
+
+        .notes-collapse-body.collapsed {
+            max-height: 0;
+            opacity: 0;
+        }
+
         body.dark-theme .navbar-brand {
             color: #e4e4e4;
         }
@@ -874,12 +944,14 @@
 
                     <div class="card project-characteristics-card mt-3">
                         <div class="card-body px-4 py-3">
-                            <div class="d-flex align-items-center justify-content-between mb-3">
+                            <div class="d-flex align-items-center justify-content-between mb-3 notes-collapse-toggle collapsed" id="notesToggle">
                                 <h6 class="mb-0" style="font-weight: 600;">
                                     <i class="bi bi-journal-text me-2"></i>Технические нюансы и особенности объекта
+                                    <i class="bi bi-chevron-down ms-2"></i>
                                 </h6>
                                 <div id="projectNotesSaveStatus" style="font-size: 0.82rem; color: var(--text-secondary); min-height: 1.2em;"></div>
                             </div>
+                            <div class="notes-collapse-body collapsed" id="notesBody">
                             <table class="notes-table" id="notesTable">
                                 <thead>
                                     <tr>
@@ -922,6 +994,7 @@
                                     </tr>
                                 </tbody>
                             </table>
+                            </div><!-- /.notes-collapse-body -->
                         </div>
                     </div>
                 </div>
@@ -1136,6 +1209,16 @@
                 }, '*');
             }
         });
+
+        // ==================== Аккордеон "Технические нюансы" ====================
+        const notesToggle = document.getElementById('notesToggle');
+        const notesBody = document.getElementById('notesBody');
+        if (notesToggle && notesBody) {
+            notesToggle.addEventListener('click', () => {
+                notesToggle.classList.toggle('collapsed');
+                notesBody.classList.toggle('collapsed');
+            });
+        }
 
         // ==================== Навигация ====================
         function navigateToSection(sectionId) {
