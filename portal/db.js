@@ -20,6 +20,9 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS projects (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
+    total_area REAL DEFAULT 0,
+    above_ground_area REAL DEFAULT 0,
+    underground_area REAL DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 
@@ -33,5 +36,17 @@ db.exec(`
     UNIQUE(project_id, system_type)
   );
 `);
+
+// Миграция: добавляем колонки площадей если их нет (для существующих БД)
+const columns = db.prepare("PRAGMA table_info(projects)").all().map(c => c.name);
+if (!columns.includes('total_area')) {
+  db.exec("ALTER TABLE projects ADD COLUMN total_area REAL DEFAULT 0");
+}
+if (!columns.includes('above_ground_area')) {
+  db.exec("ALTER TABLE projects ADD COLUMN above_ground_area REAL DEFAULT 0");
+}
+if (!columns.includes('underground_area')) {
+  db.exec("ALTER TABLE projects ADD COLUMN underground_area REAL DEFAULT 0");
+}
 
 module.exports = db;

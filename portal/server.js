@@ -49,6 +49,33 @@ app.delete('/api/projects/:id', (req, res) => {
   res.json({ success: true });
 });
 
+// Получить один проект
+app.get('/api/projects/:id', (req, res) => {
+  const { id } = req.params;
+  const project = db.prepare('SELECT * FROM projects WHERE id = ?').get(id);
+  if (!project) return res.status(404).json({ error: 'Проект не найден' });
+  res.json(project);
+});
+
+// Обновить площади проекта
+app.patch('/api/projects/:id/areas', (req, res) => {
+  const { id } = req.params;
+  const { total_area, above_ground_area, underground_area } = req.body;
+
+  const result = db.prepare(
+    'UPDATE projects SET total_area = ?, above_ground_area = ?, underground_area = ? WHERE id = ?'
+  ).run(
+    total_area ?? 0,
+    above_ground_area ?? 0,
+    underground_area ?? 0,
+    id
+  );
+
+  if (result.changes === 0) return res.status(404).json({ error: 'Проект не найден' });
+  const project = db.prepare('SELECT * FROM projects WHERE id = ?').get(id);
+  res.json(project);
+});
+
 // ==================== API: Расчёты ====================
 
 // Получить расчёт для проекта + системы

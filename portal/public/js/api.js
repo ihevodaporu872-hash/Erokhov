@@ -37,6 +37,22 @@ export async function deleteProjectAPI(id) {
   return res.json();
 }
 
+export async function fetchProject(id) {
+  const res = await fetch(`${API_BASE}/projects/${id}`);
+  if (!res.ok) throw new Error('Ошибка загрузки проекта');
+  return res.json();
+}
+
+export async function updateProjectAreas(id, areas) {
+  const res = await fetch(`${API_BASE}/projects/${id}/areas`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(areas)
+  });
+  if (!res.ok) throw new Error('Ошибка сохранения площадей');
+  return res.json();
+}
+
 // ==================== Расчёты ====================
 
 export async function fetchCalculation(projectId, systemType) {
