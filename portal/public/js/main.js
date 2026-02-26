@@ -132,6 +132,17 @@ function saveCurrentProject() {
 // Автосохранение при изменении состояния
 function onStateChange() {
   saveCurrentProject();
+
+  // Отправляем состояние в родительское окно для сохранения в БД
+  if (window.parent !== window) {
+    readParamsFromDOM();
+    const state = serializeCalculatorState();
+    state.activeTabId = getActiveTabId();
+    window.parent.postMessage({
+      type: 'auto-save',
+      state: state
+    }, '*');
+  }
 }
 
 // Переключение на проект
@@ -2059,6 +2070,26 @@ function calculateUndergroundCost() {
   // Показываем блок результатов
   resultsBlock.style.display = 'block';
 }
+
+// ===== Обработка сообщений от родительского окна (портал) =====
+window.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'load-project-data') {
+    const data = event.data.data;
+    if (data && (data.sections || data.params)) {
+      // Загружаем состояние из данных проекта
+      loadCalculatorState(data);
+      applyStateToDOM();
+
+      // Инициализация вкладок
+      const savedTabId = data.activeTabId || 'residential';
+      initTabs(savedTabId);
+
+      // Ререндер
+      renderSectionsBlocks();
+      calculateWaterSupply();
+    }
+  }
+});
 
 // ===== Инициализация =====
 window.onload = () => {
