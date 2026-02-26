@@ -102,6 +102,7 @@ console.log('=== main.js ЗАГРУЖЕН (после импортов) ===');
 // ===== Состояние приложения =====
 let projects = [];
 let activeProjectId = null;
+let portalProjectName = ''; // Имя проекта из родительского портала
 
 // Кэш последнего расчёта для сметы
 let lastCalculationCache = {
@@ -1805,9 +1806,10 @@ async function sendQuoteWithSections() {
 
   console.log('sendQuoteWithSections: выбрано разделов:', selectedSections.length);
 
-  // Получаем название проекта
-  const project = findProjectById(projects, activeProjectId);
-  const projectName = project?.name || 'Проект';
+  // Получаем название проекта (приоритет: имя из портала → локальное имя)
+  const localProject = findProjectById(projects, activeProjectId);
+  const projectName = portalProjectName || localProject?.name || 'Проект';
+  console.log('sendQuoteWithSections: projectName =', projectName);
 
   // Собираем данные расчёта
   const summary = collectCalculationSummary();
@@ -2100,6 +2102,11 @@ function calculateUndergroundCost() {
 // ===== Обработка сообщений от родительского окна (портал) =====
 window.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'load-project-data') {
+    // Сохраняем имя проекта из портала
+    if (event.data.projectName) {
+      portalProjectName = event.data.projectName;
+      console.log('[load-project-data] Имя проекта из портала:', portalProjectName);
+    }
     const data = event.data.data;
     if (data && (data.sections || data.params)) {
       // Загружаем состояние из данных проекта

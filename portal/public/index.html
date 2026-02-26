@@ -1524,17 +1524,18 @@
                 const calc = await fetchCalculation(projectId, 'water-supply');
                 const data = calc.data_json ? JSON.parse(calc.data_json) : {};
 
+                const project = portalProjects.find(p => p.id === projectId);
                 const iframe = document.getElementById('waterCalcFrame');
                 if (iframe && iframe.contentWindow) {
                     iframe.contentWindow.postMessage({
                         type: 'load-project-data',
                         projectId: projectId,
+                        projectName: project ? project.name : '',
                         data: data
                     }, '*');
                 }
 
                 // Синхронизируем площадь подземной части
-                const project = portalProjects.find(p => p.id === projectId);
                 if (project) {
                     // Небольшая задержка чтобы iframe успел обработать load-project-data
                     setTimeout(() => sendUndergroundAreaToIframe(project.underground_area), 300);
