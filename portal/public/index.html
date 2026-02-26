@@ -501,6 +501,76 @@
             }
         }
 
+        /* Название проекта в навбаре */
+        .navbar-project-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: rgba(59, 130, 246, 0.1);
+            border: 1px solid rgba(59, 130, 246, 0.25);
+            color: #3b82f6;
+            padding: 0.3rem 0.75rem;
+            border-radius: 2rem;
+            font-size: 0.85rem;
+            font-weight: 500;
+            max-width: 280px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            transition: all 0.2s;
+        }
+
+        .navbar-project-badge.empty {
+            background: rgba(108, 117, 125, 0.1);
+            border-color: rgba(108, 117, 125, 0.25);
+            color: var(--text-secondary);
+        }
+
+        body.dark-theme .navbar-project-badge {
+            background: rgba(59, 130, 246, 0.15);
+            border-color: rgba(59, 130, 246, 0.3);
+            color: #60a5fa;
+        }
+
+        body.dark-theme .navbar-project-badge.empty {
+            background: rgba(160, 160, 160, 0.1);
+            border-color: rgba(160, 160, 160, 0.2);
+            color: #a0a0a0;
+        }
+
+        /* Кнопка "Выйти из проекта" в sidebar */
+        .sidebar-exit-btn {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            width: 100%;
+            padding: 0.6rem 1rem;
+            margin-bottom: 0.5rem;
+            border-radius: 12px;
+            border: 1px dashed var(--border-color);
+            background: transparent;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-decoration: none;
+        }
+
+        .sidebar-exit-btn:hover {
+            background: rgba(239, 68, 68, 0.08);
+            border-color: #ef4444;
+            color: #ef4444;
+        }
+
+        body.dark-theme .sidebar-exit-btn:hover {
+            background: rgba(239, 68, 68, 0.12);
+        }
+
+        .sidebar-exit-btn.hidden {
+            display: none;
+        }
+
         /* Карточки проектов на Dashboard */
         .project-card-db {
             background-color: var(--bg-secondary);
@@ -508,7 +578,7 @@
             border-radius: 0.75rem;
             padding: 1.25rem;
             transition: all 0.2s ease;
-            cursor: default;
+            cursor: pointer;
         }
 
         .project-card-db:hover {
@@ -606,6 +676,10 @@
             <a class="navbar-brand" href="#">
                 <i class="bi bi-gear-fill"></i> Инженерный портал
             </a>
+            <span id="navbarProjectBadge" class="navbar-project-badge empty">
+                <i class="bi bi-folder2"></i>
+                <span id="navbarProjectName">Проект не выбран</span>
+            </span>
             <div class="d-flex align-items-center theme-toggle-wrapper">
                 <span class="me-2 text-secondary"><i class="bi bi-sun-fill"></i></span>
                 <label class="theme-switch">
@@ -630,6 +704,12 @@
                         <i class="bi bi-speedometer2"></i>
                         Панель управления
                     </a>
+                </li>
+                <li class="nav-item" id="exitProjectItem">
+                    <button class="sidebar-exit-btn hidden" id="btnExitProject">
+                        <i class="bi bi-box-arrow-left"></i>
+                        Выйти из проекта
+                    </button>
                 </li>
                 <li class="nav-item">
                     <a class="nav-link" href="#" data-section="water-supply">
@@ -947,14 +1027,14 @@
                 });
                 return `
                     <div class="col-lg-4 col-md-6">
-                        <div class="project-card-db">
-                            <div class="project-name-db">${escapeHtml(p.name)}</div>
+                        <div class="project-card-db" data-project-id="${p.id}" onclick="portalApp.enterProject(${p.id})">
+                            <div class="project-name-db"><i class="bi bi-folder2 me-2"></i>${escapeHtml(p.name)}</div>
                             <div class="project-date-db"><i class="bi bi-calendar3 me-1"></i>${date}</div>
                             <div class="project-actions-db">
-                                <button onclick="portalApp.renameProject(${p.id})" title="Переименовать">
+                                <button onclick="event.stopPropagation(); portalApp.renameProject(${p.id})" title="Переименовать">
                                     <i class="bi bi-pencil"></i> Переименовать
                                 </button>
-                                <button class="btn-danger-db" onclick="portalApp.deleteProject(${p.id})" title="Удалить">
+                                <button class="btn-danger-db" onclick="event.stopPropagation(); portalApp.deleteProject(${p.id})" title="Удалить">
                                     <i class="bi bi-trash"></i> Удалить
                                 </button>
                             </div>
@@ -999,8 +1079,8 @@
                 renderDashboardProjects();
                 updateAllDropdowns();
 
-                // Автовыбор нового проекта
-                selectProject(project.id);
+                // Автовыбор и вход в новый проект
+                enterProject(project.id);
             } catch (err) {
                 console.error('Ошибка создания проекта:', err);
                 alert('Не удалось создать проект');
@@ -1021,6 +1101,9 @@
                 if (idx !== -1) portalProjects[idx] = updated;
                 renderDashboardProjects();
                 updateAllDropdowns();
+                if (currentProjectId === id) {
+                    updateNavbarProjectName(updated.name);
+                }
             } catch (err) {
                 console.error('Ошибка переименования:', err);
                 alert('Не удалось переименовать проект');
@@ -1040,8 +1123,7 @@
                 renderDashboardProjects();
 
                 if (currentProjectId === id) {
-                    currentProjectId = null;
-                    localStorage.removeItem('portalActiveProjectId');
+                    exitProject();
                 }
                 updateAllDropdowns();
             } catch (err) {
@@ -1050,7 +1132,40 @@
             }
         }
 
-        // Выбор проекта (из dropdown)
+        // Навигация к секции (программный клик по sidebar)
+        function navigateToSection(sectionId) {
+            document.querySelectorAll('.sidebar .nav-link').forEach(l => l.classList.remove('active'));
+            const targetLink = document.querySelector(`.sidebar .nav-link[data-section="${sectionId}"]`);
+            if (targetLink) targetLink.classList.add('active');
+            document.querySelectorAll('.content-section').forEach(s => s.classList.remove('active'));
+            const section = document.getElementById(sectionId);
+            if (section) section.classList.add('active');
+        }
+
+        // Обновление названия проекта в навбаре
+        function updateNavbarProjectName(name) {
+            const badge = document.getElementById('navbarProjectBadge');
+            const nameEl = document.getElementById('navbarProjectName');
+            if (!badge || !nameEl) return;
+
+            if (name) {
+                nameEl.textContent = name;
+                badge.classList.remove('empty');
+            } else {
+                nameEl.textContent = 'Проект не выбран';
+                badge.classList.add('empty');
+            }
+        }
+
+        // Показать/скрыть кнопку "Выйти из проекта"
+        function toggleExitButton(show) {
+            const btn = document.getElementById('btnExitProject');
+            if (btn) {
+                btn.classList.toggle('hidden', !show);
+            }
+        }
+
+        // Выбор проекта (без навигации — для dropdown)
         function selectProject(projectId) {
             currentProjectId = projectId;
             localStorage.setItem('portalActiveProjectId', projectId);
@@ -1060,8 +1175,34 @@
                 s.value = projectId;
             });
 
+            // Обновляем навбар
+            const project = portalProjects.find(p => p.id === projectId);
+            updateNavbarProjectName(project ? project.name : null);
+            toggleExitButton(!!projectId);
+
             // Загружаем данные для water-supply
             sendProjectToIframe(projectId);
+        }
+
+        // Вход в проект (клик по карточке) — select + navigate
+        function enterProject(projectId) {
+            selectProject(projectId);
+            navigateToSection('water-supply');
+        }
+
+        // Выход из проекта — сброс + возврат на dashboard
+        function exitProject() {
+            currentProjectId = null;
+            localStorage.removeItem('portalActiveProjectId');
+
+            // Сбрасываем dropdown
+            document.querySelectorAll('.project-selector').forEach(s => {
+                s.value = '';
+            });
+
+            updateNavbarProjectName(null);
+            toggleExitButton(false);
+            navigateToSection('dashboard');
         }
 
         // Отправка данных проекта в iframe калькулятора
@@ -1152,8 +1293,12 @@
             });
         });
 
+        // Кнопка "Выйти из проекта" в sidebar
+        document.getElementById('btnExitProject')?.addEventListener('click', exitProject);
+
         // ==================== Глобальный API (для onclick в HTML) ====================
         window.portalApp = {
+            enterProject: enterProject,
             renameProject: handleRenameProject,
             deleteProject: handleDeleteProject
         };
@@ -1162,10 +1307,13 @@
         (async function init() {
             await loadProjectsList();
 
-            // Восстанавливаем последний выбранный проект
+            // Восстанавливаем последний выбранный проект (без навигации)
             const savedProjectId = localStorage.getItem('portalActiveProjectId');
             if (savedProjectId && portalProjects.find(p => p.id === +savedProjectId)) {
                 selectProject(+savedProjectId);
+            } else {
+                updateNavbarProjectName(null);
+                toggleExitButton(false);
             }
         })();
     </script>
