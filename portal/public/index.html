@@ -788,6 +788,22 @@
                 </div>
             </div>
 
+            <!-- Страница проекта (Project View) -->
+            <div id="project-view" class="content-section">
+                <div class="page-header">
+                    <h1><i class="bi bi-folder2-open"></i> <span id="projectViewName">Проект</span></h1>
+                    <p class="lead mb-0">Рабочая область проекта</p>
+                </div>
+
+                <div class="container-fluid p-4">
+                    <div class="text-center py-5">
+                        <i class="bi bi-kanban" style="font-size: 4rem; opacity: 0.5; color: var(--text-secondary);"></i>
+                        <h4 class="mt-3 mb-2">Контент проекта находится в разработке</h4>
+                        <p class="text-muted mb-0">Выберите систему в боковом меню для начала расчётов.</p>
+                    </div>
+                </div>
+            </div>
+
             <!-- Водоснабжение -->
             <div id="water-supply" class="content-section">
                 <div class="page-header">
@@ -1103,6 +1119,8 @@
                 updateAllDropdowns();
                 if (currentProjectId === id) {
                     updateNavbarProjectName(updated.name);
+                    const viewName = document.getElementById('projectViewName');
+                    if (viewName) viewName.textContent = updated.name;
                 }
             } catch (err) {
                 console.error('Ошибка переименования:', err);
@@ -1184,10 +1202,16 @@
             sendProjectToIframe(projectId);
         }
 
-        // Вход в проект (клик по карточке) — select + navigate
+        // Вход в проект (клик по карточке) — select + navigate to project-view
         function enterProject(projectId) {
             selectProject(projectId);
-            navigateToSection('water-supply');
+
+            // Обновляем заголовок на странице проекта
+            const project = portalProjects.find(p => p.id === projectId);
+            const viewName = document.getElementById('projectViewName');
+            if (viewName && project) viewName.textContent = project.name;
+
+            navigateToSection('project-view');
         }
 
         // Выход из проекта — сброс + возврат на dashboard
