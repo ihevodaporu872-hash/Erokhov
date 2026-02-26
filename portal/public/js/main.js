@@ -1464,13 +1464,13 @@ function formatQuoteRequestText(projectName, summary) {
  * @param {string} text - текст письма
  * @returns {Promise<{ok: boolean, error?: string}>}
  */
-async function sendQuoteToServer(subject, text, recipients, copyTo) {
+async function sendQuoteToServer(payload) {
   const response = await fetch('/send-mail', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json'
     },
-    body: JSON.stringify({ subject, text, recipients, copyTo })
+    body: JSON.stringify(payload)
   });
 
   const data = await response.json();
@@ -1480,6 +1480,51 @@ async function sendQuoteToServer(subject, text, recipients, copyTo) {
   }
 
   return data;
+}
+
+/**
+ * Нормализует items раздела в единый формат { name, unit, quantity }
+ */
+function normalizeSectionItems(secData, sectionId) {
+  if (!secData || !secData.items || secData.items.length === 0) return [];
+
+  const items = secData.items;
+  const unit = secData.unit || 'шт';
+
+  switch (sectionId) {
+    case 'steel-galvanized':
+    case 'steel-sleeves':
+    case 'ppr-pipes':
+    case 'insulation':
+      return items
+        .filter(item => item.dia && item.len)
+        .map(item => ({
+          name: `Ду ${item.dia}`,
+          unit: 'м',
+          quantity: parseFloat(item.len.toFixed(1))
+        }));
+
+    case 'compensators':
+      return items
+        .filter(item => item.name && item.qty)
+        .map(item => ({
+          name: item.dia ? `${item.name} Ду ${item.dia}` : item.name,
+          unit: 'шт',
+          quantity: item.qty
+        }));
+
+    case 'water-meters':
+    case 'collectors':
+    case 'shutoff-valves':
+    default:
+      return items
+        .filter(item => item.name && item.qty)
+        .map(item => ({
+          name: item.name,
+          unit: unit,
+          quantity: item.qty
+        }));
+  }
 }
 
 /**
@@ -1819,7 +1864,25 @@ async function sendQuoteWithSections() {
 
   // Формируем тему письма
   const subject = `Запрос КП: ${projectName}`;
-  const text = formatQuoteRequestTextWithSections(projectName, summary, selectedSections, specData);
+
+  // Собираем структурированные разделы с нормализованными items
+  const sectionsForEmail = [];
+  selectedSections.forEach(sec => {
+    const secData = specData[sec.sectionId];
+    if (!secData || !secData.items || secData.items.length === 0) return;
+    const items = normalizeSectionItems(secData, sec.sectionId);
+    if (items.length === 0) return;
+    sectionsForEmail.push({
+      title: sec.title,
+      supplierName: sec.supplierName,
+      items: items
+    });
+  });
+
+  if (sectionsForEmail.length === 0) {
+    alert('Нет данных спецификации для отправки. Выполните расчёт.');
+    return;
+  }
 
   // Собираем уникальные email-адреса получателей
   const recipientEmails = [...new Set(
@@ -1838,10 +1901,15 @@ async function sendQuoteWithSections() {
   const selfEmail = document.getElementById('selfEmailCopy')?.value?.trim() || '';
   const copyTo = (sendCopy && selfEmail && selfEmail.includes('@')) ? selfEmail : '';
 
-  console.log('sendQuoteWithSections: subject =', subject);
-  console.log('sendQuoteWithSections: recipients =', recipientEmails);
-  console.log('sendQuoteWithSections: copyTo =', copyTo);
-  console.log('sendQuoteWithSections: text =', text);
+  const payload = {
+    subject,
+    projectName,
+    sections: sectionsForEmail,
+    recipients: recipientEmails,
+    copyTo
+  };
+
+  console.log('sendQuoteWithSections: payload =', payload);
 
   // Блокируем кнопку отправки
   const btnSend = document.getElementById('btnQuoteSend');
@@ -1852,7 +1920,7 @@ async function sendQuoteWithSections() {
   }
 
   try {
-    const data = await sendQuoteToServer(subject, text, recipientEmails, copyTo);
+    const data = await sendQuoteToServer(payload);
 
     if (data.ok === true) {
       closeQuoteDialog();
