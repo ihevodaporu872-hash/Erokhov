@@ -657,7 +657,8 @@ function renderSectionSVG(sec, si, h1, hn) {
 
         // Горизонтальные линии — труба PP-R (vis-ppr-hover)
         const pprFloorLen = ((mopResult.mPerApt || 0) * aptsPerRiser * 2).toFixed(1);
-        const pprTip = `Труба PP-R, этаж ${f}, материал: полипропилен, длина: ${pprFloorLen} м`;
+        const pprDn = sec.mop?.dn || 20;
+        const pprTip = `Труба PP-R Ø${pprDn}, этаж ${f}, материал: полипропилен, длина: ${pprFloorLen} м`;
         svg += `<g class="vis-hover vis-ppr-hover" data-tip="${pprTip}">`;
         svg += `<line x1="${bundle.xT4 + 4}" y1="${y - pprYOffset}" x2="${collEndX}" y2="${y - pprYOffset}" stroke="${COLOR_V1}" stroke-width="1" opacity="0.6"/>`;
         svg += `<line x1="${bundle.xT4 + 4}" y1="${y}" x2="${collEndX}" y2="${y}" stroke="${COLOR_T3}" stroke-width="1" opacity="0.6"/>`;
