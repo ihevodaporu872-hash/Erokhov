@@ -411,6 +411,9 @@ function renderSectionSVG(sec, si, h1, hn) {
   const COLOR_T4 = '#FB8C00';
   const COLOR_PPR = '#43A047';
 
+  // Длины труб PP-R для тултипов
+  const mopResult = computeMopPexLengthsForSection(sec);
+
   // --- Определяем зоны и их границы ---
   let currentFloor = 1;
   const zoneRanges = [];
@@ -653,7 +656,8 @@ function renderSectionSVG(sec, si, h1, hn) {
         const collEndX = bundle.collectorStartX + aptsPerRiser * aptSpacing;
 
         // Горизонтальные линии — труба PP-R (vis-ppr-hover)
-        const pprTip = `Труба PP-R, этаж ${f}, материал: полипропилен`;
+        const pprFloorLen = ((mopResult.mPerApt || 0) * aptsPerRiser * 2).toFixed(1);
+        const pprTip = `Труба PP-R, этаж ${f}, материал: полипропилен, длина: ${pprFloorLen} м`;
         svg += `<g class="vis-hover vis-ppr-hover" data-tip="${pprTip}">`;
         svg += `<line x1="${bundle.xT4 + 4}" y1="${y - pprYOffset}" x2="${collEndX}" y2="${y - pprYOffset}" stroke="${COLOR_V1}" stroke-width="1" opacity="0.6"/>`;
         svg += `<line x1="${bundle.xT4 + 4}" y1="${y}" x2="${collEndX}" y2="${y}" stroke="${COLOR_T3}" stroke-width="1" opacity="0.6"/>`;
