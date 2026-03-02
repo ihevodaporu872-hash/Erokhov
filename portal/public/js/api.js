@@ -63,6 +63,16 @@ export async function updateProjectNotes(id, engineering_notes) {
   return res.json();
 }
 
+export async function updateProjectBuildingStats(id, building_stats) {
+  const res = await fetch(`${API_BASE}/projects/${id}/building-stats`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ building_stats })
+  });
+  if (!res.ok) throw new Error('Ошибка сохранения данных по корпусам');
+  return res.json();
+}
+
 // ==================== Расчёты ====================
 
 export async function fetchCalculation(projectId, systemType) {

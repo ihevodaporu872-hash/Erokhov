@@ -1289,6 +1289,7 @@
             fetchProject,
             updateProjectAreas,
             updateProjectNotes,
+            updateProjectBuildingStats,
             fetchCalculation,
             saveCalculation
         } from './js/api.js';
@@ -1604,6 +1605,7 @@
             const inputUnder = document.getElementById('inputUndergroundArea');
             const status = document.getElementById('projectAreasSaveStatus');
             const notesStatus = document.getElementById('projectNotesSaveStatus');
+            const excelContainer = document.getElementById('excelResultsContainer');
             if (!inputTotal || !inputAbove || !inputUnder) return;
 
             try {
@@ -1614,12 +1616,20 @@
                 populateNotesTable(project.engineering_notes);
                 if (status) status.textContent = '';
                 if (notesStatus) notesStatus.textContent = '';
+
+                // Восстанавливаем данные по корпусам из Supabase
+                if (project.building_stats && Array.isArray(project.building_stats) && project.building_stats.length > 0) {
+                    renderBuildingAccordions(project.building_stats, excelContainer);
+                } else {
+                    if (excelContainer) { excelContainer.innerHTML = ''; excelContainer.style.display = 'none'; }
+                }
             } catch (err) {
                 console.error('Ошибка загрузки характеристик:', err);
                 inputTotal.value = '';
                 inputAbove.value = '';
                 inputUnder.value = '';
                 populateNotesTable(null);
+                if (excelContainer) { excelContainer.innerHTML = ''; excelContainer.style.display = 'none'; }
             }
         }
 
@@ -1772,77 +1782,18 @@
                     return;
                 }
 
-                // Рендерим сводную таблицу
-                let html = '<table class="notes-table"><thead><tr>' +
-                    '<th>Корпус</th><th style="text-align:right;">Высота, м</th><th style="text-align:right;">Квартир</th>' +
-                    '<th style="text-align:right;">С/У</th><th style="text-align:right;">Кухонь</th></tr></thead><tbody>';
+                // Рендерим аккордеоны корпусов
+                renderBuildingAccordions(result, container);
 
-                let totalApts = 0, totalBath = 0, totalKitchens = 0;
-                result.forEach(b => {
-                    totalApts += b.totalApts;
-                    totalBath += b.totalBath;
-                    totalKitchens += b.totalKitchens;
-                    const heightStr = b.height != null ? b.height.toFixed(3) : '—';
-                    html += `<tr>
-                        <td class="system-name">${escapeHtml(b.name)}</td>
-                        <td style="text-align:right; font-weight:600;">${heightStr}</td>
-                        <td style="text-align:right; font-weight:600;">${b.totalApts}</td>
-                        <td style="text-align:right; font-weight:600;">${b.totalBath}</td>
-                        <td style="text-align:right; font-weight:600;">${b.totalKitchens}</td>
-                    </tr>`;
-                });
-
-                if (result.length > 1) {
-                    html += `<tr style="border-top: 2px solid var(--border-color);">
-                        <td class="system-name"><b>Итого</b></td>
-                        <td style="text-align:right;"></td>
-                        <td style="text-align:right; font-weight:700;">${totalApts}</td>
-                        <td style="text-align:right; font-weight:700;">${totalBath}</td>
-                        <td style="text-align:right; font-weight:700;">${totalKitchens}</td>
-                    </tr>`;
+                // Сохраняем в Supabase
+                if (projectViewProjectId) {
+                    try {
+                        await updateProjectBuildingStats(projectViewProjectId, result);
+                    } catch (err) {
+                        console.error('Ошибка сохранения данных по корпусам:', err);
+                    }
                 }
 
-                html += '</tbody></table>';
-
-                // Шахматка — поэтажные данные для каждого корпуса
-                result.forEach(b => {
-                    if (!b.floors || !b.floors.length) return;
-                    const heightLabel = b.height != null ? ` — высота ${b.height.toFixed(3)} м` : '';
-                    html += `<div style="margin-top: 1rem;">
-                        <h6 style="font-weight: 600; font-size: 0.9rem; margin-bottom: 0.5rem;">
-                            <i class="bi bi-grid-3x3 me-1"></i>${escapeHtml(b.name)}${heightLabel}
-                        </h6>
-                        <div style="max-height: 400px; overflow-y: auto;">
-                        <table class="notes-table excel-chess-grid">
-                            <thead><tr>
-                                <th style="text-align:center;">Этаж</th>
-                                <th style="text-align:center;">Кол-во кв</th>
-                                <th style="text-align:center;">С/У</th>
-                                <th style="text-align:center;">Кухонь</th>
-                            </tr></thead><tbody>`;
-
-                    // Сортируем этажи по убыванию (сверху — верхний этаж)
-                    const sortedFloors = [...b.floors].sort((a, c) => c.floor - a.floor);
-                    sortedFloors.forEach(f => {
-                        html += `<tr>
-                            <td style="text-align:center; font-weight:600;">${f.floor}</td>
-                            <td style="text-align:center;">${f.apts}</td>
-                            <td style="text-align:center;">${f.bath}</td>
-                            <td style="text-align:center;">${f.kitchens}</td>
-                        </tr>`;
-                    });
-
-                    // Итого по корпусу
-                    html += `<tr style="border-top: 2px solid var(--border-color); background: var(--hover-bg);">
-                        <td style="text-align:center; font-weight:700;">Итого</td>
-                        <td style="text-align:center; font-weight:700;">${b.totalApts}</td>
-                        <td style="text-align:center; font-weight:700;">${b.totalBath}</td>
-                        <td style="text-align:center; font-weight:700;">${b.totalKitchens}</td>
-                    </tr>`;
-
-                    html += '</tbody></table></div></div>';
-                });
-                if (container) { container.innerHTML = html; container.style.display = 'block'; }
                 if (statusEl) statusEl.innerHTML = '<i class="bi bi-check-circle me-1" style="color: #22c55e;"></i>Загружено';
                 setTimeout(() => { if (statusEl) statusEl.textContent = ''; }, 3000);
             } catch (err) {
@@ -1853,6 +1804,75 @@
             // Сбрасываем input, чтобы можно было загрузить тот же файл повторно
             this.value = '';
         });
+
+        /**
+         * Рендер аккордеонов корпусов (каждый свёрнут по умолчанию)
+         * @param {Array} buildings - массив корпусов с floors
+         * @param {HTMLElement} container - контейнер для вывода
+         */
+        function renderBuildingAccordions(buildings, container) {
+            if (!container) return;
+            let html = '';
+
+            buildings.forEach((b, idx) => {
+                const heightLabel = b.height != null ? `, высота ${b.height.toFixed(3)} м` : '';
+                const summary = `${b.totalApts} кв, ${b.totalBath} с/у, ${b.totalKitchens} кухонь`;
+                const toggleId = `buildingToggle_${idx}`;
+                const bodyId = `buildingBody_${idx}`;
+
+                html += `<div style="margin-bottom: 0.5rem;">
+                    <div class="d-flex align-items-center notes-collapse-toggle collapsed building-accordion-toggle" id="${toggleId}" style="padding: 0.6rem 0; border-bottom: 1px solid var(--border-color);">
+                        <h6 class="mb-0" style="font-weight: 600; font-size: 0.9rem;">
+                            <i class="bi bi-building me-1"></i>${escapeHtml(b.name)}${heightLabel} — <span style="font-weight: 400; color: var(--text-secondary);">${summary}</span>
+                            <i class="bi bi-chevron-down ms-2"></i>
+                        </h6>
+                    </div>
+                    <div class="notes-collapse-body collapsed" id="${bodyId}">
+                        <div style="max-height: 400px; overflow-y: auto; margin-top: 0.5rem;">
+                        <table class="notes-table excel-chess-grid">
+                            <thead><tr>
+                                <th style="text-align:center;">Этаж</th>
+                                <th style="text-align:center;">Кол-во кв</th>
+                                <th style="text-align:center;">С/У</th>
+                                <th style="text-align:center;">Кухонь</th>
+                            </tr></thead><tbody>`;
+
+                // Сортируем этажи по убыванию (сверху — верхний этаж)
+                const sortedFloors = (b.floors || []).slice().sort((a, c) => c.floor - a.floor);
+                sortedFloors.forEach(f => {
+                    html += `<tr>
+                        <td style="text-align:center; font-weight:600;">${f.floor}</td>
+                        <td style="text-align:center;">${f.apts}</td>
+                        <td style="text-align:center;">${f.bath}</td>
+                        <td style="text-align:center;">${f.kitchens}</td>
+                    </tr>`;
+                });
+
+                html += `<tr style="border-top: 2px solid var(--border-color); background: var(--bg-primary);">
+                    <td style="text-align:center; font-weight:700;">Итого</td>
+                    <td style="text-align:center; font-weight:700;">${b.totalApts}</td>
+                    <td style="text-align:center; font-weight:700;">${b.totalBath}</td>
+                    <td style="text-align:center; font-weight:700;">${b.totalKitchens}</td>
+                </tr>`;
+
+                html += '</tbody></table></div></div></div>';
+            });
+
+            container.innerHTML = html;
+            container.style.display = 'block';
+
+            // Вешаем обработчики кликов на аккордеоны корпусов
+            buildings.forEach((b, idx) => {
+                const toggle = document.getElementById(`buildingToggle_${idx}`);
+                const body = document.getElementById(`buildingBody_${idx}`);
+                if (toggle && body) {
+                    toggle.addEventListener('click', () => {
+                        toggle.classList.toggle('collapsed');
+                        body.classList.toggle('collapsed');
+                    });
+                }
+            });
+        }
 
         /**
          * Парсинг Excel: поиск корпусов, подсчёт квартир / С/У / кухонь

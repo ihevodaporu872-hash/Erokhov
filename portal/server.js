@@ -44,6 +44,7 @@ function toApiProject(row) {
     above_ground_area: pd.above_ground_area || 0,
     underground_area: pd.underground_area || 0,
     engineering_notes: pd.engineering_notes || '',
+    building_stats: pd.building_stats || null,
     created_at: row.created_at || new Date().toISOString()
   };
 }
@@ -157,6 +158,31 @@ app.patch('/api/projects/:id/notes', async (req, res) => {
 
   const pd = current.project_data || {};
   pd.engineering_notes = engineering_notes ?? '';
+
+  const { data, error } = await supabase
+    .from('projects')
+    .update({ project_data: pd })
+    .eq('id', id)
+    .select()
+    .single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(toApiProject(data));
+});
+
+// Обновить данные по корпусам (building_stats) из Excel
+app.patch('/api/projects/:id/building-stats', async (req, res) => {
+  const { id } = req.params;
+  const { building_stats } = req.body;
+
+  const { data: current, error: readErr } = await supabase
+    .from('projects')
+    .select('project_data')
+    .eq('id', id)
+    .single();
+  if (readErr) return res.status(404).json({ error: 'Проект не найден' });
+
+  const pd = current.project_data || {};
+  pd.building_stats = building_stats || null;
 
   const { data, error } = await supabase
     .from('projects')
