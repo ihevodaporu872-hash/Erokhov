@@ -706,6 +706,60 @@
             color: var(--text-primary);
         }
 
+        /* Кнопка «Сохранить в облако» */
+        .btn-save-cloud {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 0.4rem 1rem;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #fff;
+            background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+            border: none;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: transform 0.15s, box-shadow 0.15s, opacity 0.15s;
+            box-shadow: 0 2px 8px rgba(34,197,94,0.3);
+        }
+        .btn-save-cloud:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 14px rgba(34,197,94,0.45);
+        }
+        .btn-save-cloud:active {
+            transform: translateY(0);
+            opacity: 0.85;
+        }
+        .btn-save-cloud:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* Тост облачного сохранения */
+        .cloud-toast {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%) translateY(80px);
+            padding: 12px 24px;
+            border-radius: 10px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: #fff;
+            z-index: 9999;
+            opacity: 0;
+            transition: transform 0.35s ease, opacity 0.35s ease;
+            pointer-events: none;
+        }
+        .cloud-toast.success { background: rgba(34,197,94,0.92); }
+        .cloud-toast.error   { background: rgba(239,68,68,0.92); }
+        .cloud-toast.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+
         /* Уведомление об автосохранении */
         .autosave-toast {
             position: fixed;
@@ -1026,9 +1080,14 @@
                 <div class="page-header">
                     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
                         <h1 class="mb-0"><i class="bi bi-droplet-fill"></i> Водоснабжение</h1>
-                        <select class="form-select project-selector" data-system="water-supply" style="max-width: 300px; color: #212529;">
-                            <option value="">-- Выберите проект --</option>
-                        </select>
+                        <div class="d-flex gap-2 align-items-center">
+                            <select class="form-select project-selector" data-system="water-supply" style="max-width: 300px; color: #212529;">
+                                <option value="">-- Выберите проект --</option>
+                            </select>
+                            <button class="btn-save-cloud" data-system="water-supply" title="Сохранить расчёт в облако">
+                                <i class="bi bi-cloud-upload"></i> Сохранить
+                            </button>
+                        </div>
                     </div>
                 </div>
 
@@ -1050,9 +1109,14 @@
                             <h1 class="mb-0"><i class="bi bi-arrow-down-circle"></i> Водоотведение</h1>
                             <p class="lead mb-0">Управление системами канализации</p>
                         </div>
-                        <select class="form-select project-selector" data-system="sewage" style="max-width: 300px; color: #212529;">
-                            <option value="">-- Выберите проект --</option>
-                        </select>
+                        <div class="d-flex gap-2 align-items-center">
+                            <select class="form-select project-selector" data-system="sewage" style="max-width: 300px; color: #212529;">
+                                <option value="">-- Выберите проект --</option>
+                            </select>
+                            <button class="btn-save-cloud" data-system="sewage" title="Сохранить расчёт в облако">
+                                <i class="bi bi-cloud-upload"></i> Сохранить
+                            </button>
+                        </div>
                     </div>
                 </div>
 
@@ -1071,9 +1135,14 @@
                             <h1 class="mb-0"><i class="bi bi-wind"></i> Вентиляция</h1>
                             <p class="lead mb-0">Управление системами вентиляции</p>
                         </div>
-                        <select class="form-select project-selector" data-system="ventilation" style="max-width: 300px; color: #212529;">
-                            <option value="">-- Выберите проект --</option>
-                        </select>
+                        <div class="d-flex gap-2 align-items-center">
+                            <select class="form-select project-selector" data-system="ventilation" style="max-width: 300px; color: #212529;">
+                                <option value="">-- Выберите проект --</option>
+                            </select>
+                            <button class="btn-save-cloud" data-system="ventilation" title="Сохранить расчёт в облако">
+                                <i class="bi bi-cloud-upload"></i> Сохранить
+                            </button>
+                        </div>
                     </div>
                 </div>
 
@@ -1092,9 +1161,14 @@
                             <h1 class="mb-0"><i class="bi bi-thermometer-half"></i> Отопление</h1>
                             <p class="lead mb-0">Управление системами отопления и теплоснабжения</p>
                         </div>
-                        <select class="form-select project-selector" data-system="heating" style="max-width: 300px; color: #212529;">
-                            <option value="">-- Выберите проект --</option>
-                        </select>
+                        <div class="d-flex gap-2 align-items-center">
+                            <select class="form-select project-selector" data-system="heating" style="max-width: 300px; color: #212529;">
+                                <option value="">-- Выберите проект --</option>
+                            </select>
+                            <button class="btn-save-cloud" data-system="heating" title="Сохранить расчёт в облако">
+                                <i class="bi bi-cloud-upload"></i> Сохранить
+                            </button>
+                        </div>
                     </div>
                 </div>
 
@@ -1113,9 +1187,14 @@
                             <h1 class="mb-0"><i class="bi bi-fire"></i> Пожаротушение</h1>
                             <p class="lead mb-0">Управление системами пожарной безопасности</p>
                         </div>
-                        <select class="form-select project-selector" data-system="fire-safety" style="max-width: 300px; color: #212529;">
-                            <option value="">-- Выберите проект --</option>
-                        </select>
+                        <div class="d-flex gap-2 align-items-center">
+                            <select class="form-select project-selector" data-system="fire-safety" style="max-width: 300px; color: #212529;">
+                                <option value="">-- Выберите проект --</option>
+                            </select>
+                            <button class="btn-save-cloud" data-system="fire-safety" title="Сохранить расчёт в облако">
+                                <i class="bi bi-cloud-upload"></i> Сохранить
+                            </button>
+                        </div>
                     </div>
                 </div>
 
@@ -1134,9 +1213,14 @@
                             <h1 class="mb-0"><i class="bi bi-snow"></i> Кондиционирование</h1>
                             <p class="lead mb-0">Управление системами кондиционирования воздуха</p>
                         </div>
-                        <select class="form-select project-selector" data-system="conditioning" style="max-width: 300px; color: #212529;">
-                            <option value="">-- Выберите проект --</option>
-                        </select>
+                        <div class="d-flex gap-2 align-items-center">
+                            <select class="form-select project-selector" data-system="conditioning" style="max-width: 300px; color: #212529;">
+                                <option value="">-- Выберите проект --</option>
+                            </select>
+                            <button class="btn-save-cloud" data-system="conditioning" title="Сохранить расчёт в облако">
+                                <i class="bi bi-cloud-upload"></i> Сохранить
+                            </button>
+                        </div>
                     </div>
                 </div>
 
@@ -1151,6 +1235,8 @@
 
     <!-- Уведомление об автосохранении -->
     <div id="autosaveToast" class="autosave-toast"><i class="bi bi-check-circle me-1"></i> Сохранено</div>
+    <!-- Тост облачного сохранения -->
+    <div id="cloudToast" class="cloud-toast"></div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script type="module">
@@ -1171,6 +1257,7 @@
         let projectViewProjectId = null; // ID проекта на странице project-view
         let activeSection = 'dashboard';
         let saveTimer = null;
+        let lastAutoSaveState = null; // Последнее состояние из iframe (для ручного сохранения)
 
         // ==================== Per-system хранение проектов ====================
         function getSystemProjectId(systemType) {
@@ -1673,6 +1760,7 @@
 
         window.addEventListener('message', (event) => {
             if (event.data && event.data.type === 'auto-save') {
+                lastAutoSaveState = event.data.state;
                 handleAutoSave(event.data.state);
             }
             if (event.data && event.data.type === 'iframe-ready') {
@@ -1716,6 +1804,66 @@
                 if (systemType === 'water-supply' && projectId) {
                     sendProjectToIframe(+projectId);
                 }
+            });
+        });
+
+        // ==================== Сохранение в облако ====================
+
+        function showCloudToast(message, type) {
+            const toast = document.getElementById('cloudToast');
+            if (!toast) return;
+            toast.textContent = message;
+            toast.className = 'cloud-toast ' + type;
+            // force reflow
+            void toast.offsetWidth;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 3000);
+        }
+
+        async function saveToCloud(systemType) {
+            const projectId = getSystemProjectId(systemType);
+            const project = portalProjects.find(p => p.id === projectId);
+            if (!project) {
+                showCloudToast('Сначала выберите проект из списка', 'error');
+                return;
+            }
+
+            // Для water-supply берём данные из последнего auto-save
+            let projectData = {};
+            if (systemType === 'water-supply') {
+                if (!lastAutoSaveState) {
+                    showCloudToast('Нет данных расчёта для сохранения', 'error');
+                    return;
+                }
+                projectData = { calculations: { 'water-supply': lastAutoSaveState } };
+            }
+
+            try {
+                const res = await fetch('http://localhost:3000/save', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        name: project.name,
+                        project_data: projectData
+                    })
+                });
+                const result = await res.json();
+                if (result.ok) {
+                    showCloudToast('Данные сохранены в Supabase', 'success');
+                } else {
+                    showCloudToast('Ошибка: ' + (result.error || 'неизвестная'), 'error');
+                }
+            } catch (err) {
+                console.error('Ошибка сохранения в облако:', err);
+                showCloudToast('Сервер недоступен', 'error');
+            }
+        }
+
+        // Кнопки «Сохранить в облако»
+        document.querySelectorAll('.btn-save-cloud').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const systemType = btn.dataset.system;
+                if (systemType) saveToCloud(systemType);
             });
         });
 

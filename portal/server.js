@@ -222,6 +222,49 @@ app.put('/api/calculations/:projectId/:systemType', async (req, res) => {
   res.json({ success: true });
 });
 
+// ==================== API: Сохранение в облако ====================
+
+// POST /save — сохранить название ЖК + данные расчёта в Supabase
+app.post('/save', async (req, res) => {
+  const { name, project_data } = req.body;
+
+  if (!name || !name.trim()) {
+    return res.status(400).json({ ok: false, error: 'Не указано название проекта' });
+  }
+
+  try {
+    // Ищем существующий проект по имени
+    const { data: existing } = await supabase
+      .from('projects')
+      .select('id, project_data')
+      .eq('name', name.trim())
+      .maybeSingle();
+
+    if (existing) {
+      // Обновляем: сливаем с имеющимися данными (чтобы не потерять areas/notes)
+      const merged = { ...(existing.project_data || {}), ...(project_data || {}) };
+      const { error } = await supabase
+        .from('projects')
+        .update({ project_data: merged })
+        .eq('id', existing.id);
+      if (error) return res.status(500).json({ ok: false, error: error.message });
+      return res.json({ ok: true, id: existing.id, message: 'Проект обновлён в Supabase' });
+    } else {
+      // Создаём новый
+      const { data, error } = await supabase
+        .from('projects')
+        .insert({ name: name.trim(), project_data: project_data || {} })
+        .select()
+        .single();
+      if (error) return res.status(500).json({ ok: false, error: error.message });
+      return res.json({ ok: true, id: data.id, message: 'Проект создан в Supabase' });
+    }
+  } catch (err) {
+    console.error('[save] Ошибка:', err);
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
 // ==================== API: Отправка почты ====================
 
 /**
