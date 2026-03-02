@@ -651,7 +651,11 @@ function renderSectionSVG(sec, si, h1, hn) {
         if (aptsCount <= 0) continue;
 
         const y = floorY(f);
-        const aptsPerRiser = Math.ceil(aptsCount / group.risersCount);
+        // Точное распределение квартир по стоякам: floor + remainder
+        const basePerRiser = Math.floor(aptsCount / group.risersCount);
+        const remainder = aptsCount % group.risersCount;
+        const aptsPerRiser = bundle.riserIdx < remainder ? basePerRiser + 1 : basePerRiser;
+        if (aptsPerRiser <= 0) continue;
         const pprYOffset = 4;
         const collEndX = bundle.collectorStartX + aptsPerRiser * aptSpacing;
 
