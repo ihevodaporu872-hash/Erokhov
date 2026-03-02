@@ -1832,9 +1832,9 @@
                         <table class="notes-table excel-chess-grid">
                             <thead><tr>
                                 <th style="text-align:center;">Этаж</th>
-                                <th style="text-align:center;">Кол-во кв</th>
-                                <th style="text-align:center;">С/У</th>
-                                <th style="text-align:center;">Кухонь</th>
+                                <th style="text-align:center;">Кол-во квартир</th>
+                                <th style="text-align:center;">Кол-во С/У</th>
+                                <th style="text-align:center;">Кол-во кухонь</th>
                             </tr></thead><tbody>`;
 
                 // Сортируем этажи по убыванию (сверху — верхний этаж)
@@ -1860,6 +1860,8 @@
 
             container.innerHTML = html;
             container.style.display = 'block';
+            container.style.maxHeight = '75vh';
+            container.style.overflowY = 'auto';
 
             // Вешаем обработчики кликов на аккордеоны корпусов
             buildings.forEach((b, idx) => {
