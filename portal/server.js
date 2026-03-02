@@ -2,10 +2,16 @@ require('dotenv').config();
 const express = require('express');
 const path = require('path');
 const nodemailer = require('nodemailer');
-const db = require('./db');
+const { createClient } = require('@supabase/supabase-js');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// ==================== Supabase ====================
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_KEY
+);
 
 // Middleware
 app.use(express.json({ limit: '10mb' }));
@@ -26,110 +32,192 @@ const SMTP_CONFIG = {
 // Адрес отправителя (From)
 const SMTP_FROM = process.env.SMTP_FROM || SMTP_CONFIG.auth.user;
 
+// ==================== Helpers ====================
+
+// Преобразует строку Supabase в формат, ожидаемый фронтендом
+function toApiProject(row) {
+  const pd = row.project_data || {};
+  return {
+    id: row.id,
+    name: row.name,
+    total_area: pd.total_area || 0,
+    above_ground_area: pd.above_ground_area || 0,
+    underground_area: pd.underground_area || 0,
+    engineering_notes: pd.engineering_notes || '',
+    created_at: row.created_at || new Date().toISOString()
+  };
+}
+
 // ==================== API: Проекты ====================
 
 // Получить все проекты
-app.get('/api/projects', (req, res) => {
-  const projects = db.prepare('SELECT * FROM projects ORDER BY created_at DESC').all();
-  res.json(projects);
+app.get('/api/projects', async (req, res) => {
+  const { data, error } = await supabase
+    .from('projects')
+    .select('*')
+    .order('id', { ascending: false });
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data.map(toApiProject));
 });
 
 // Создать проект
-app.post('/api/projects', (req, res) => {
+app.post('/api/projects', async (req, res) => {
   const { name } = req.body;
   if (!name || !name.trim()) {
     return res.status(400).json({ error: 'Название проекта обязательно' });
   }
-  const result = db.prepare('INSERT INTO projects (name) VALUES (?)').run(name.trim());
-  const project = db.prepare('SELECT * FROM projects WHERE id = ?').get(result.lastInsertRowid);
-  res.status(201).json(project);
+  const { data, error } = await supabase
+    .from('projects')
+    .insert({ name: name.trim(), project_data: {} })
+    .select()
+    .single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.status(201).json(toApiProject(data));
 });
 
 // Переименовать проект
-app.put('/api/projects/:id', (req, res) => {
+app.put('/api/projects/:id', async (req, res) => {
   const { name } = req.body;
   const { id } = req.params;
   if (!name || !name.trim()) {
     return res.status(400).json({ error: 'Название проекта обязательно' });
   }
-  const result = db.prepare('UPDATE projects SET name = ? WHERE id = ?').run(name.trim(), id);
-  if (result.changes === 0) return res.status(404).json({ error: 'Проект не найден' });
-  const project = db.prepare('SELECT * FROM projects WHERE id = ?').get(id);
-  res.json(project);
+  const { data, error } = await supabase
+    .from('projects')
+    .update({ name: name.trim() })
+    .eq('id', id)
+    .select()
+    .single();
+  if (error) return res.status(404).json({ error: 'Проект не найден' });
+  res.json(toApiProject(data));
 });
 
 // Удалить проект
-app.delete('/api/projects/:id', (req, res) => {
+app.delete('/api/projects/:id', async (req, res) => {
   const { id } = req.params;
-  const result = db.prepare('DELETE FROM projects WHERE id = ?').run(id);
-  if (result.changes === 0) return res.status(404).json({ error: 'Проект не найден' });
+  const { error } = await supabase
+    .from('projects')
+    .delete()
+    .eq('id', id);
+  if (error) return res.status(404).json({ error: 'Проект не найден' });
   res.json({ success: true });
 });
 
 // Получить один проект
-app.get('/api/projects/:id', (req, res) => {
+app.get('/api/projects/:id', async (req, res) => {
   const { id } = req.params;
-  const project = db.prepare('SELECT * FROM projects WHERE id = ?').get(id);
-  if (!project) return res.status(404).json({ error: 'Проект не найден' });
-  res.json(project);
+  const { data, error } = await supabase
+    .from('projects')
+    .select('*')
+    .eq('id', id)
+    .single();
+  if (error) return res.status(404).json({ error: 'Проект не найден' });
+  res.json(toApiProject(data));
 });
 
-// Обновить площади проекта
-app.patch('/api/projects/:id/areas', (req, res) => {
+// Обновить площади проекта (хранятся внутри project_data)
+app.patch('/api/projects/:id/areas', async (req, res) => {
   const { id } = req.params;
   const { total_area, above_ground_area, underground_area } = req.body;
 
-  const result = db.prepare(
-    'UPDATE projects SET total_area = ?, above_ground_area = ?, underground_area = ? WHERE id = ?'
-  ).run(
-    total_area ?? 0,
-    above_ground_area ?? 0,
-    underground_area ?? 0,
-    id
-  );
+  // Читаем текущий project_data
+  const { data: current, error: readErr } = await supabase
+    .from('projects')
+    .select('project_data')
+    .eq('id', id)
+    .single();
+  if (readErr) return res.status(404).json({ error: 'Проект не найден' });
 
-  if (result.changes === 0) return res.status(404).json({ error: 'Проект не найден' });
-  const project = db.prepare('SELECT * FROM projects WHERE id = ?').get(id);
-  res.json(project);
+  const pd = current.project_data || {};
+  pd.total_area = total_area ?? 0;
+  pd.above_ground_area = above_ground_area ?? 0;
+  pd.underground_area = underground_area ?? 0;
+
+  const { data, error } = await supabase
+    .from('projects')
+    .update({ project_data: pd })
+    .eq('id', id)
+    .select()
+    .single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(toApiProject(data));
 });
 
 // Обновить технические заметки проекта
-app.patch('/api/projects/:id/notes', (req, res) => {
+app.patch('/api/projects/:id/notes', async (req, res) => {
   const { id } = req.params;
   const { engineering_notes } = req.body;
 
-  const result = db.prepare(
-    'UPDATE projects SET engineering_notes = ? WHERE id = ?'
-  ).run(engineering_notes ?? '', id);
+  const { data: current, error: readErr } = await supabase
+    .from('projects')
+    .select('project_data')
+    .eq('id', id)
+    .single();
+  if (readErr) return res.status(404).json({ error: 'Проект не найден' });
 
-  if (result.changes === 0) return res.status(404).json({ error: 'Проект не найден' });
-  const project = db.prepare('SELECT * FROM projects WHERE id = ?').get(id);
-  res.json(project);
+  const pd = current.project_data || {};
+  pd.engineering_notes = engineering_notes ?? '';
+
+  const { data, error } = await supabase
+    .from('projects')
+    .update({ project_data: pd })
+    .eq('id', id)
+    .select()
+    .single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(toApiProject(data));
 });
 
 // ==================== API: Расчёты ====================
+// Расчёты хранятся внутри project_data.calculations[systemType]
 
 // Получить расчёт для проекта + системы
-app.get('/api/calculations/:projectId/:systemType', (req, res) => {
+app.get('/api/calculations/:projectId/:systemType', async (req, res) => {
   const { projectId, systemType } = req.params;
-  const calc = db.prepare(
-    'SELECT * FROM calculations WHERE project_id = ? AND system_type = ?'
-  ).get(projectId, systemType);
-  res.json(calc || { project_id: +projectId, system_type: systemType, data_json: '{}' });
+  const { data, error } = await supabase
+    .from('projects')
+    .select('project_data')
+    .eq('id', projectId)
+    .single();
+
+  if (error) {
+    return res.json({ project_id: +projectId, system_type: systemType, data_json: '{}' });
+  }
+
+  const pd = data.project_data || {};
+  const calculations = pd.calculations || {};
+  const calcData = calculations[systemType] || {};
+
+  res.json({
+    project_id: +projectId,
+    system_type: systemType,
+    data_json: JSON.stringify(calcData)
+  });
 });
 
-// Сохранить расчёт для проекта + системы (upsert)
-app.put('/api/calculations/:projectId/:systemType', (req, res) => {
+// Сохранить расчёт для проекта + системы (upsert в project_data)
+app.put('/api/calculations/:projectId/:systemType', async (req, res) => {
   const { projectId, systemType } = req.params;
   const { data_json } = req.body;
-  const jsonStr = typeof data_json === 'string' ? data_json : JSON.stringify(data_json);
+  const calcObj = typeof data_json === 'string' ? JSON.parse(data_json) : data_json;
 
-  db.prepare(`
-    INSERT INTO calculations (project_id, system_type, data_json, updated_at)
-    VALUES (?, ?, ?, datetime('now'))
-    ON CONFLICT(project_id, system_type)
-    DO UPDATE SET data_json = excluded.data_json, updated_at = datetime('now')
-  `).run(projectId, systemType, jsonStr);
+  // Читаем текущий project_data
+  const { data: current, error: readErr } = await supabase
+    .from('projects')
+    .select('project_data')
+    .eq('id', projectId)
+    .single();
+  if (readErr) return res.status(404).json({ error: 'Проект не найден' });
+
+  const pd = current.project_data || {};
+  if (!pd.calculations) pd.calculations = {};
+  pd.calculations[systemType] = calcObj;
+
+  const { error } = await supabase
+    .from('projects')
+    .update({ project_data: pd })
+    .eq('id', projectId);
+  if (error) return res.status(500).json({ error: error.message });
 
   res.json({ success: true });
 });
@@ -292,6 +380,7 @@ app.get('/', (req, res) => {
 app.listen(PORT, () => {
   console.log(`\u{1F680} Инженерный портал запущен на http://localhost:${PORT}`);
   console.log(`\u{1F4C2} Статические файлы обслуживаются из папки: ${path.join(__dirname, 'public')}`);
+  console.log(`\u{2601}\u{FE0F}  Supabase: ${process.env.SUPABASE_URL ? 'подключён' : 'НЕ настроен!'}`);
   if (SMTP_CONFIG.auth.user) {
     console.log(`\u{1F4E7} SMTP настроен: ${SMTP_CONFIG.host}:${SMTP_CONFIG.port}, user: ${SMTP_CONFIG.auth.user}`);
   } else {
