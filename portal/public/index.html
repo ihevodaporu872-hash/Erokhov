@@ -1072,6 +1072,29 @@
                             </div><!-- /.notes-collapse-body -->
                         </div>
                     </div>
+
+                    <!-- Загрузка Excel -->
+                    <div class="card project-characteristics-card mt-3">
+                        <div class="card-body px-4 py-3">
+                            <div class="d-flex align-items-center justify-content-between mb-3">
+                                <h6 class="mb-0" style="font-weight: 600;">
+                                    <i class="bi bi-file-earmark-spreadsheet me-2"></i>Загрузка данных из Excel
+                                </h6>
+                                <div id="excelUploadStatus" style="font-size: 0.82rem; color: var(--text-secondary); min-height: 1.2em;"></div>
+                            </div>
+                            <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.75rem;">
+                                Формат: для каждого корпуса столбцы <b>Этаж</b>, <b>Кол-во кв</b>, <b>С/У</b>, <b>Кухонь</b>
+                            </p>
+                            <div class="d-flex align-items-center gap-3">
+                                <label class="btn btn-primary" style="cursor: pointer; margin: 0;">
+                                    <i class="bi bi-upload me-1"></i> Загрузить Excel
+                                    <input type="file" id="projectExcelInput" accept=".xlsx,.xls" style="display: none;">
+                                </label>
+                                <span id="excelFileName" style="font-size: 0.85rem; color: var(--text-secondary);"></span>
+                            </div>
+                            <div id="excelResultsContainer" style="display: none; margin-top: 1rem;"></div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -1238,6 +1261,7 @@
     <!-- Тост облачного сохранения -->
     <div id="cloudToast" class="cloud-toast"></div>
 
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script type="module">
         import {
@@ -1694,6 +1718,170 @@
                 scheduleNotesSave();
             });
         });
+
+        // ==================== Загрузка Excel с данными по корпусам ====================
+
+        document.getElementById('projectExcelInput')?.addEventListener('change', async function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const nameEl = document.getElementById('excelFileName');
+            const statusEl = document.getElementById('excelUploadStatus');
+            const container = document.getElementById('excelResultsContainer');
+            if (nameEl) nameEl.textContent = file.name;
+            if (statusEl) statusEl.textContent = 'Обработка...';
+
+            try {
+                const arrayBuffer = await file.arrayBuffer();
+                const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+                const sheet = workbook.Sheets[workbook.SheetNames[0]];
+                const aoa = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+
+                const result = parseExcelBuildingStats(aoa);
+
+                if (!result.length) {
+                    if (statusEl) statusEl.innerHTML = '<i class="bi bi-exclamation-circle me-1" style="color: #ef4444;"></i>Корпуса не найдены';
+                    if (container) container.style.display = 'none';
+                    return;
+                }
+
+                // Рендерим таблицу результатов
+                let html = '<table class="notes-table"><thead><tr>' +
+                    '<th>Корпус</th><th style="text-align:right;">Квартир</th>' +
+                    '<th style="text-align:right;">С/У</th><th style="text-align:right;">Кухонь</th></tr></thead><tbody>';
+
+                let totalApts = 0, totalBath = 0, totalKitchens = 0;
+                result.forEach(b => {
+                    totalApts += b.totalApts;
+                    totalBath += b.totalBath;
+                    totalKitchens += b.totalKitchens;
+                    html += `<tr>
+                        <td class="system-name">${escapeHtml(b.name)}</td>
+                        <td style="text-align:right; font-weight:600;">${b.totalApts}</td>
+                        <td style="text-align:right; font-weight:600;">${b.totalBath}</td>
+                        <td style="text-align:right; font-weight:600;">${b.totalKitchens}</td>
+                    </tr>`;
+                });
+
+                if (result.length > 1) {
+                    html += `<tr style="border-top: 2px solid var(--border-color);">
+                        <td class="system-name"><b>Итого</b></td>
+                        <td style="text-align:right; font-weight:700;">${totalApts}</td>
+                        <td style="text-align:right; font-weight:700;">${totalBath}</td>
+                        <td style="text-align:right; font-weight:700;">${totalKitchens}</td>
+                    </tr>`;
+                }
+
+                html += '</tbody></table>';
+                if (container) { container.innerHTML = html; container.style.display = 'block'; }
+                if (statusEl) statusEl.innerHTML = '<i class="bi bi-check-circle me-1" style="color: #22c55e;"></i>Загружено';
+                setTimeout(() => { if (statusEl) statusEl.textContent = ''; }, 3000);
+            } catch (err) {
+                console.error('Ошибка чтения Excel:', err);
+                if (statusEl) statusEl.innerHTML = '<i class="bi bi-exclamation-circle me-1" style="color: #ef4444;"></i>Ошибка чтения файла';
+            }
+
+            // Сбрасываем input, чтобы можно было загрузить тот же файл повторно
+            this.value = '';
+        });
+
+        /**
+         * Парсинг Excel: поиск корпусов, подсчёт квартир / С/У / кухонь
+         * Формат: Корпус N → Этаж | Кол-во кв | С/У | Кухонь
+         */
+        function parseExcelBuildingStats(aoa) {
+            const buildings = [];
+
+            // Ищем заголовки «Корпус N»
+            for (let row = 0; row < Math.min(10, aoa.length); row++) {
+                const rowData = aoa[row] || [];
+                for (let col = 0; col < rowData.length; col++) {
+                    const cell = String(rowData[col] || '').trim();
+                    const m = cell.match(/корпус\s*(\d+)/i);
+                    if (!m) continue;
+                    const num = parseInt(m[1], 10);
+                    if (buildings.some(b => b.num === num)) continue;
+
+                    // Ищем строку-заголовок с «Этаж»
+                    const cols = findDataColumns(aoa, row, col);
+                    if (cols) buildings.push({ num, name: `Корпус ${num}`, ...cols });
+                }
+            }
+
+            buildings.sort((a, b) => a.num - b.num);
+
+            // Считываем данные
+            return buildings.map(b => {
+                let totalApts = 0, totalBath = 0, totalKitchens = 0;
+
+                for (let row = b.dataStartRow; row < aoa.length; row++) {
+                    const rd = aoa[row] || [];
+                    const floor = parseFloat(rd[b.floorCol]);
+                    if (isNaN(floor) || floor <= 0) {
+                        // Проверяем, есть ли ещё данные ниже
+                        if (rd[b.floorCol] === '' || rd[b.floorCol] == null) {
+                            let more = false;
+                            for (let cr = row + 1; cr < Math.min(row + 5, aoa.length); cr++) {
+                                if (!isNaN(parseFloat(aoa[cr]?.[b.floorCol])) && parseFloat(aoa[cr]?.[b.floorCol]) > 0) { more = true; break; }
+                            }
+                            if (!more) break;
+                        }
+                        continue;
+                    }
+                    if (floor < 1 || floor > 200) continue;
+
+                    totalApts += parseInt(rd[b.aptsCol], 10) || 0;
+                    totalBath += parseInt(rd[b.bathCol], 10) || 0;
+                    totalKitchens += parseInt(rd[b.kitchenCol], 10) || 0;
+                }
+
+                return { name: b.name, num: b.num, totalApts, totalBath, totalKitchens };
+            });
+        }
+
+        /**
+         * Поиск колонок Этаж / Кол-во кв / С/У / Кухонь для корпуса
+         */
+        function findDataColumns(aoa, headerRow, startCol) {
+            for (let row = headerRow; row < Math.min(headerRow + 5, aoa.length); row++) {
+                const rd = aoa[row] || [];
+                for (let col = startCol; col < Math.min(startCol + 6, rd.length); col++) {
+                    const v = String(rd[col] || '').trim().toLowerCase();
+                    if (v === 'этаж' || v.includes('этаж')) {
+                        // Нашли «Этаж», следующие колонки: кв, с/у, кухни
+                        const aptsCol = col + 1;
+                        const bathCol = col + 2;
+                        const kitchenCol = col + 3;
+
+                        // Проверяем что рядом есть данные
+                        const c1 = String(rd[aptsCol] || '').trim().toLowerCase();
+                        if (c1.includes('кол') || c1.includes('кв') || c1.includes('квартир')) {
+                            return { floorCol: col, aptsCol, bathCol, kitchenCol, dataStartRow: row + 1 };
+                        }
+                        // Или просто берём по порядку
+                        return { floorCol: col, aptsCol, bathCol, kitchenCol, dataStartRow: row + 1 };
+                    }
+                }
+            }
+
+            // Фолбэк: первые 4 колонки от startCol в следующей строке
+            const nextRow = headerRow + 1;
+            if (nextRow < aoa.length) {
+                const v = String(aoa[nextRow]?.[startCol] || '').trim().toLowerCase();
+                if (v.includes('этаж') || !isNaN(parseFloat(v))) {
+                    const isHeader = v.includes('этаж');
+                    return {
+                        floorCol: startCol,
+                        aptsCol: startCol + 1,
+                        bathCol: startCol + 2,
+                        kitchenCol: startCol + 3,
+                        dataStartRow: isHeader ? nextRow + 1 : nextRow
+                    };
+                }
+            }
+
+            return null;
+        }
 
         // ==================== Синхронизация площадей с iframe ====================
 
