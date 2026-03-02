@@ -568,6 +568,20 @@
             opacity: 0;
         }
 
+        /* Шахматка — поэтажная таблица */
+        .excel-chess-grid {
+            font-size: 0.82rem;
+        }
+        .excel-chess-grid th {
+            position: sticky;
+            top: 0;
+            background: var(--card-bg, #fff);
+            z-index: 1;
+        }
+        .excel-chess-grid td {
+            padding: 0.25rem 0.5rem;
+        }
+
         body.dark-theme .navbar-brand {
             color: #e4e4e4;
         }
@@ -1076,12 +1090,14 @@
                     <!-- Загрузка Excel -->
                     <div class="card project-characteristics-card mt-3">
                         <div class="card-body px-4 py-3">
-                            <div class="d-flex align-items-center justify-content-between mb-3">
+                            <div class="d-flex align-items-center justify-content-between mb-3 notes-collapse-toggle collapsed" id="excelToggle">
                                 <h6 class="mb-0" style="font-weight: 600;">
                                     <i class="bi bi-file-earmark-spreadsheet me-2"></i>Загрузка данных из Excel
+                                    <i class="bi bi-chevron-down ms-2"></i>
                                 </h6>
                                 <div id="excelUploadStatus" style="font-size: 0.82rem; color: var(--text-secondary); min-height: 1.2em;"></div>
                             </div>
+                            <div class="notes-collapse-body collapsed" id="excelBody">
                             <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.75rem;">
                                 Формат: для каждого корпуса столбцы <b>Этаж</b>, <b>Кол-во кв</b>, <b>С/У</b>, <b>Кухонь</b>
                             </p>
@@ -1093,6 +1109,7 @@
                                 <span id="excelFileName" style="font-size: 0.85rem; color: var(--text-secondary);"></span>
                             </div>
                             <div id="excelResultsContainer" style="display: none; margin-top: 1rem;"></div>
+                            </div><!-- /.notes-collapse-body -->
                         </div>
                     </div>
                 </div>
@@ -1349,6 +1366,16 @@
             notesToggle.addEventListener('click', () => {
                 notesToggle.classList.toggle('collapsed');
                 notesBody.classList.toggle('collapsed');
+            });
+        }
+
+        // ==================== Аккордеон "Загрузка данных из Excel" ====================
+        const excelToggle = document.getElementById('excelToggle');
+        const excelBody = document.getElementById('excelBody');
+        if (excelToggle && excelBody) {
+            excelToggle.addEventListener('click', () => {
+                excelToggle.classList.toggle('collapsed');
+                excelBody.classList.toggle('collapsed');
             });
         }
 
@@ -1745,9 +1772,9 @@
                     return;
                 }
 
-                // Рендерим таблицу результатов
+                // Рендерим сводную таблицу
                 let html = '<table class="notes-table"><thead><tr>' +
-                    '<th>Корпус</th><th style="text-align:right;">Квартир</th>' +
+                    '<th>Корпус</th><th style="text-align:right;">Высота, м</th><th style="text-align:right;">Квартир</th>' +
                     '<th style="text-align:right;">С/У</th><th style="text-align:right;">Кухонь</th></tr></thead><tbody>';
 
                 let totalApts = 0, totalBath = 0, totalKitchens = 0;
@@ -1755,8 +1782,10 @@
                     totalApts += b.totalApts;
                     totalBath += b.totalBath;
                     totalKitchens += b.totalKitchens;
+                    const heightStr = b.height != null ? b.height.toFixed(3) : '—';
                     html += `<tr>
                         <td class="system-name">${escapeHtml(b.name)}</td>
+                        <td style="text-align:right; font-weight:600;">${heightStr}</td>
                         <td style="text-align:right; font-weight:600;">${b.totalApts}</td>
                         <td style="text-align:right; font-weight:600;">${b.totalBath}</td>
                         <td style="text-align:right; font-weight:600;">${b.totalKitchens}</td>
@@ -1766,6 +1795,7 @@
                 if (result.length > 1) {
                     html += `<tr style="border-top: 2px solid var(--border-color);">
                         <td class="system-name"><b>Итого</b></td>
+                        <td style="text-align:right;"></td>
                         <td style="text-align:right; font-weight:700;">${totalApts}</td>
                         <td style="text-align:right; font-weight:700;">${totalBath}</td>
                         <td style="text-align:right; font-weight:700;">${totalKitchens}</td>
@@ -1773,6 +1803,45 @@
                 }
 
                 html += '</tbody></table>';
+
+                // Шахматка — поэтажные данные для каждого корпуса
+                result.forEach(b => {
+                    if (!b.floors || !b.floors.length) return;
+                    const heightLabel = b.height != null ? ` — высота ${b.height.toFixed(3)} м` : '';
+                    html += `<div style="margin-top: 1rem;">
+                        <h6 style="font-weight: 600; font-size: 0.9rem; margin-bottom: 0.5rem;">
+                            <i class="bi bi-grid-3x3 me-1"></i>${escapeHtml(b.name)}${heightLabel}
+                        </h6>
+                        <div style="max-height: 400px; overflow-y: auto;">
+                        <table class="notes-table excel-chess-grid">
+                            <thead><tr>
+                                <th style="text-align:center;">Этаж</th>
+                                <th style="text-align:center;">Кол-во кв</th>
+                                <th style="text-align:center;">С/У</th>
+                                <th style="text-align:center;">Кухонь</th>
+                            </tr></thead><tbody>`;
+
+                    // Сортируем этажи по убыванию (сверху — верхний этаж)
+                    const sortedFloors = [...b.floors].sort((a, c) => c.floor - a.floor);
+                    sortedFloors.forEach(f => {
+                        html += `<tr>
+                            <td style="text-align:center; font-weight:600;">${f.floor}</td>
+                            <td style="text-align:center;">${f.apts}</td>
+                            <td style="text-align:center;">${f.bath}</td>
+                            <td style="text-align:center;">${f.kitchens}</td>
+                        </tr>`;
+                    });
+
+                    // Итого по корпусу
+                    html += `<tr style="border-top: 2px solid var(--border-color); background: var(--hover-bg);">
+                        <td style="text-align:center; font-weight:700;">Итого</td>
+                        <td style="text-align:center; font-weight:700;">${b.totalApts}</td>
+                        <td style="text-align:center; font-weight:700;">${b.totalBath}</td>
+                        <td style="text-align:center; font-weight:700;">${b.totalKitchens}</td>
+                    </tr>`;
+
+                    html += '</tbody></table></div></div>';
+                });
                 if (container) { container.innerHTML = html; container.style.display = 'block'; }
                 if (statusEl) statusEl.innerHTML = '<i class="bi bi-check-circle me-1" style="color: #22c55e;"></i>Загружено';
                 setTimeout(() => { if (statusEl) statusEl.textContent = ''; }, 3000);
@@ -1802,9 +1871,28 @@
                     const num = parseInt(m[1], 10);
                     if (buildings.some(b => b.num === num)) continue;
 
+                    // Ищем высоту здания правее от «Корпус N»
+                    let buildingHeight = null;
+                    for (let c = col + 1; c < Math.min(col + 5, rowData.length); c++) {
+                        const cv = String(rowData[c] || '').trim().toLowerCase();
+                        if (cv.includes('высота')) {
+                            // Значение высоты — в следующей ячейке или через одну
+                            for (let hc = c + 1; hc < Math.min(c + 3, rowData.length); hc++) {
+                                const hv = String(rowData[hc] || '').trim().replace(',', '.');
+                                const parsed = parseFloat(hv);
+                                if (!isNaN(parsed) && parsed > 0) {
+                                    buildingHeight = parsed;
+                                    break;
+                                }
+                            }
+                            break;
+                        }
+                        // Может быть числом сразу после корпуса (без слова «высота»)
+                    }
+
                     // Ищем строку-заголовок с «Этаж»
                     const cols = findDataColumns(aoa, row, col);
-                    if (cols) buildings.push({ num, name: `Корпус ${num}`, ...cols });
+                    if (cols) buildings.push({ num, name: `Корпус ${num}`, height: buildingHeight, ...cols });
                 }
             }
 
@@ -1813,6 +1901,7 @@
             // Считываем данные
             return buildings.map(b => {
                 let totalApts = 0, totalBath = 0, totalKitchens = 0;
+                const floors = []; // Поэтажные данные для шахматки
 
                 for (let row = b.dataStartRow; row < aoa.length; row++) {
                     const rd = aoa[row] || [];
@@ -1830,12 +1919,18 @@
                     }
                     if (floor < 1 || floor > 200) continue;
 
-                    totalApts += parseInt(rd[b.aptsCol], 10) || 0;
-                    totalBath += parseInt(rd[b.bathCol], 10) || 0;
-                    totalKitchens += parseInt(rd[b.kitchenCol], 10) || 0;
+                    const apts = parseInt(rd[b.aptsCol], 10) || 0;
+                    const bath = parseInt(rd[b.bathCol], 10) || 0;
+                    const kitchens = parseInt(rd[b.kitchenCol], 10) || 0;
+
+                    totalApts += apts;
+                    totalBath += bath;
+                    totalKitchens += kitchens;
+
+                    floors.push({ floor: Math.floor(floor), apts, bath, kitchens });
                 }
 
-                return { name: b.name, num: b.num, totalApts, totalBath, totalKitchens };
+                return { name: b.name, num: b.num, height: b.height, totalApts, totalBath, totalKitchens, floors };
             });
         }
 
