@@ -184,6 +184,50 @@
             background: var(--gray-200); border-radius: 20px;
             padding: 2px 8px;
         }
+
+        /* ── Карточки дополнительного оборудования ────────────────────────── */
+        .equip-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(155px, 1fr));
+            gap: 10px;
+            margin-bottom: 14px;
+        }
+        .equip-card {
+            border: 2px solid var(--gray-200);
+            border-radius: 10px;
+            padding: 14px 15px 12px;
+            cursor: pointer;
+            transition: border-color .15s, box-shadow .15s, background .15s, transform .12s;
+            background: var(--bg-card);
+            user-select: none;
+        }
+        .equip-card:hover:not(.active) {
+            border-color: var(--gray-400, #AEAEB2);
+            box-shadow: 0 2px 8px rgba(0,0,0,.08);
+            transform: translateY(-1px);
+        }
+        .equip-card.active {
+            border-color: var(--accent-blue);
+            background: var(--accent-blue-light);
+            box-shadow: 0 0 0 3px rgba(0,122,255,.12);
+        }
+        .equip-icon {
+            display: block;
+            font-size: 22px;
+            color: var(--gray-400, #AEAEB2);
+            margin-bottom: 8px;
+            transition: color .15s;
+        }
+        .equip-card.active .equip-icon { color: var(--accent-blue); }
+        .equip-card-title {
+            font-size: 12px; font-weight: 600; color: var(--gray-900);
+            line-height: 1.3; margin-bottom: 4px;
+        }
+        .equip-card-desc {
+            font-size: 11px; color: var(--gray-500); line-height: 1.45;
+        }
+        .equip-card.active .equip-card-desc { color: var(--accent-blue); opacity: .8; }
+
         .bld-num-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
         .bld-num-row label { font-size: 13px; color: var(--gray-700); }
         .bld-num {
@@ -860,34 +904,31 @@
                   '</select></div>'
                 : '';
 
-            // Блок дополнительного оборудования
+            // Блок дополнительного оборудования — карточки
             var equipBlock =
                 '<div class="bld-equipment-section">' +
                 '<p class="bld-equipment-title">Дополнительное оборудование</p>' +
-                '<div class="bld-checks">' +
+                '<div class="equip-grid">' +
 
-                '<label class="bld-check-label">' +
-                '<input type="checkbox" data-idx="' + idx + '" data-field="condensate" class="bld-check"' + (s.condensate ? ' checked' : '') + '>' +
-                '<span>Отвод конденсата (кондиционеры)</span>' +
-                '<span class="bld-check-hint">1 воронка\u00a0/\u00a0кв. (' + (b.totalApts || 0) + '\u00a0шт)</span>' +
-                '</label>' +
+                '<div class="equip-card' + (s.condensate ? ' active' : '') + '" data-idx="' + idx + '" data-field="condensate">' +
+                '<i class="bi bi-moisture equip-icon"></i>' +
+                '<div class="equip-card-title">Отвод конденсата</div>' +
+                '<div class="equip-card-desc">1\u00a0воронка\u00a0/\u00a0кв.\u2002(' + (b.totalApts || 0) + '\u00a0шт)</div>' +
+                '</div>' +
 
-                '<label class="bld-check-label">' +
-                '<input type="checkbox" data-idx="' + idx + '" data-field="pui" class="bld-check"' + (s.pui ? ' checked' : '') + '>' +
-                '<span class="bld-check-text">' +
-                '<span>Помещения уборочного инвентаря (ПУИ)</span>' +
-                '<span class="bld-check-sub">(Добавляет\u00a01\u00a0выделенный стояк\u00a0К1 в шахте\u00a0ВК)</span>' +
-                '</span>' +
-                '<span class="bld-check-hint">1 трап DN50\u00a0/\u00a0эт. (' + floorsN + '\u00a0шт)</span>' +
-                '</label>' +
+                '<div class="equip-card' + (s.pui ? ' active' : '') + '" data-idx="' + idx + '" data-field="pui">' +
+                '<i class="bi bi-broom equip-icon"></i>' +
+                '<div class="equip-card-title">ПУИ</div>' +
+                '<div class="equip-card-desc">+1\u00a0стояк\u00a0К1 в\u00a0шахте\u00a0ВК\u2003·\u20031\u00a0трап\u00a0DN50\u00a0/\u00a0эт.\u2002(' + floorsN + '\u00a0шт)</div>' +
+                '</div>' +
 
-                '<label class="bld-check-label">' +
-                '<input type="checkbox" data-idx="' + idx + '" data-field="trashRoom" class="bld-check"' + (s.trashRoom ? ' checked' : '') + '>' +
-                '<span>Мусорокамера</span>' +
-                '<span class="bld-check-hint">1 трап DN50</span>' +
-                '</label>' +
+                '<div class="equip-card' + (s.trashRoom ? ' active' : '') + '" data-idx="' + idx + '" data-field="trashRoom">' +
+                '<i class="bi bi-trash3 equip-icon"></i>' +
+                '<div class="equip-card-title">Мусорокамера</div>' +
+                '<div class="equip-card-desc">1\u00a0трап\u00a0DN50</div>' +
+                '</div>' +
 
-                '</div>' +  // /bld-checks
+                '</div>' +  // /equip-grid
 
                 '</div>';  // /bld-equipment-section
 
@@ -946,10 +987,12 @@
             });
         });
 
-        // Обработчики: чекбоксы оборудования
-        container.querySelectorAll('.bld-check').forEach(function (chk) {
-            chk.addEventListener('change', function () {
-                getSettings(parseInt(chk.dataset.idx, 10))[chk.dataset.field] = chk.checked;
+        // Обработчики: карточки дополнительного оборудования
+        container.querySelectorAll('.equip-card').forEach(function (card) {
+            card.addEventListener('click', function () {
+                var s = getSettings(parseInt(card.dataset.idx, 10));
+                s[card.dataset.field] = !s[card.dataset.field];
+                card.classList.toggle('active', s[card.dataset.field]);
                 renderResultsTable();
             });
         });
