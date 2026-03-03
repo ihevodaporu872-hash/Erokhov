@@ -226,6 +226,27 @@
         #buildingAccordions .accordion {
             margin-bottom: 8px;
         }
+        /* Строка статистики внутри аккордеона корпуса */
+        .bld-stats-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px 20px;
+            padding: 8px 12px;
+            margin-bottom: 16px;
+            background: var(--gray-100, #f5f5f7);
+            border-radius: 8px;
+            font-size: 12px;
+            color: var(--gray-700, #555);
+        }
+        .bld-stats-row strong {
+            color: var(--gray-900);
+            font-weight: 600;
+        }
+        .bld-stats-row i {
+            font-size: 13px;
+            color: var(--accent-blue);
+            margin-right: 3px;
+        }
     </style>
 </head>
 <body>
@@ -598,11 +619,13 @@
         var showKitchen = (activeScenario === 2 || activeScenario === 3);
 
         var html = buildingStats.map(function (b, idx) {
-            var s    = getSettings(idx);
-            var len  = calcRiserLengthM(b, activeScenario);
-            var rc   = calcRisers(b);
-            var open = accordionOpenState[idx] ? ' open' : '';
-            var name = escHtml(b.name || ('Корпус ' + b.num));
+            var s      = getSettings(idx);
+            var len    = calcRiserLengthM(b, activeScenario);
+            var rc     = calcRisers(b);
+            var open   = accordionOpenState[idx] ? ' open' : '';
+            var name   = escHtml(b.name || ('Корпус ' + b.num));
+            var mBath  = maxFloorValue(b, 'bath');
+            var mKitch = maxFloorValue(b, 'kitchens');
 
             var kitRow = showKitchen
                 ? '<div class="input-group">' +
@@ -618,9 +641,14 @@
                 '<summary class="accordion-header">' +
                 '  <span class="accordion-icon"></span>' +
                 '  ' + name +
-                '  <span class="accord-meta">— ' + rc + ' ст. · ' + len + '\u00a0м трубы</span>' +
+                '  <span class="accord-meta">— ' + rc + '\u00a0ст. · ' + len + '\u00a0м</span>' +
                 '</summary>' +
                 '<div class="accordion-content">' +
+                '  <div class="bld-stats-row">' +
+                '    <span><i class="bi bi-house-door"></i> Квартир: <strong>' + (b.totalApts || 0) + '</strong></span>' +
+                '    <span><i class="bi bi-water"></i> С/У макс./эт.: <strong>' + mBath + '</strong></span>' +
+                (showKitchen ? '    <span><i class="bi bi-cup-hot"></i> Кухни макс./эт.: <strong>' + mKitch + '</strong></span>' : '') +
+                '  </div>' +
                 '  <div class="row-2">' +
                 '    <div class="input-group">' +
                 '      <label>Тип трубы:</label>' +
@@ -650,13 +678,14 @@
 
         container.innerHTML = html;
 
-        // Навешиваем обработчики изменения настроек
+        // Навешиваем обработчики: сохраняем настройку и обновляем таблицу результатов
         container.querySelectorAll('.bld-select').forEach(function (sel) {
             sel.addEventListener('change', function () {
-                var idx   = parseInt(sel.dataset.idx, 10);
+                var i     = parseInt(sel.dataset.idx, 10);
                 var field = sel.dataset.field;
-                var s     = getSettings(idx);
+                var s     = getSettings(i);
                 s[field] = (field === 'pipeType') ? sel.value : parseInt(sel.value, 10);
+                renderResultsTable();
             });
         });
     }
@@ -675,27 +704,27 @@
             return;
         }
 
-        var totalApts     = 0;
-        var sumMaxBath    = 0;   // сумма максимумов по корпусам
-        var sumMaxKitch   = 0;
-        var totalRisers   = 0;
-        var totalLength   = 0;
+        var matLabels   = { pp: 'ПП', pp_silent: 'ПП Бесшумный', sml: 'SML' };
+        var showKitchen = (activeScenario === 2 || activeScenario === 3);
+        var totalRisers = 0;
+        var totalLength = 0;
 
-        var rows = buildingStats.map(function (b) {
-            var mBath  = maxFloorValue(b, 'bath');
-            var mKitch = maxFloorValue(b, 'kitchens');
+        var rows = buildingStats.map(function (b, idx) {
+            var s      = getSettings(idx);
             var risers = calcRisers(b);
             var len    = calcRiserLengthM(b, activeScenario);
-            totalApts   += b.totalApts || 0;
-            sumMaxBath  += mBath;
-            sumMaxKitch += mKitch;
             totalRisers += risers;
             totalLength += len;
+
+            var mat  = matLabels[s.pipeType] || s.pipeType;
+            var diam = 'DN\u00a0' + s.riserDiameter;
+            if (showKitchen) diam += '\u00a0/\u00a0' + s.kitchenDiameter;
+            diam += '\u00a0мм';
+
             return '<tr>' +
                 '<td>' + escHtml(b.name || ('Корпус ' + b.num)) + '</td>' +
-                '<td>' + (b.totalApts || 0) + '</td>' +
-                '<td>' + mBath  + '</td>' +
-                '<td>' + mKitch + '</td>' +
+                '<td>' + mat + '</td>' +
+                '<td>' + diam + '</td>' +
                 '<td class="riser-count">' + risers + '</td>' +
                 '<td>' + len + '</td>' +
                 '</tr>';
@@ -706,18 +735,14 @@
             '<table class="riser-table">' +
             '<thead><tr>' +
             '<th>Корпус</th>' +
-            '<th>Квартир</th>' +
-            '<th title="Макс. кол-во С/У на одном этаже корпуса">С/У (макс./эт.)</th>' +
-            '<th title="Макс. кол-во кухонь на одном этаже корпуса">Кухни (макс./эт.)</th>' +
-            '<th>Стояков К1</th>' +
-            '<th title="Расчётная длина стояков К1 с учётом транзита">Длина, м</th>' +
+            '<th>Материал</th>' +
+            '<th title="Основной стояк / кухонный стояк (при сценарии 2 или 3)">Диаметр, мм</th>' +
+            '<th>Стояков, шт</th>' +
+            '<th title="Расчётная длина стояков К1 с учётом транзита">Всего, м.п.</th>' +
             '</tr></thead>' +
             '<tbody>' + rows + '</tbody>' +
             '<tfoot><tr>' +
-            '<td>Итого</td>' +
-            '<td>' + totalApts   + '</td>' +
-            '<td>' + sumMaxBath  + '</td>' +
-            '<td>' + sumMaxKitch + '</td>' +
+            '<td colspan="3">Итого по проекту</td>' +
             '<td class="riser-count">' + totalRisers + '</td>' +
             '<td>' + Math.round(totalLength * 10) / 10 + '</td>' +
             '</tr></tfoot>' +
