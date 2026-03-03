@@ -185,6 +185,47 @@
             flex-shrink: 0;
             margin-top: 1px;
         }
+
+        /* ── Аккордеоны настроек по корпусам ──────────────────────────────── */
+        /* Переопределяем max-width для select внутри аккордеонов */
+        .accordion-content .input-group select {
+            max-width: 100%;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        /* Мета-строка в заголовке аккордеона (стояки · длина) */
+        .accord-meta {
+            font-size: 11px;
+            font-weight: 400;
+            color: var(--gray-500);
+            margin-left: 8px;
+        }
+        /* Блок итоговой длины трубы */
+        .pipe-length-display {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 9px 14px;
+            margin-top: 14px;
+            background: var(--accent-blue-light);
+            border-left: 3px solid var(--accent-blue);
+            border-radius: 0 6px 6px 0;
+            font-size: 13px;
+            color: var(--gray-900);
+        }
+        .pipe-length-display strong {
+            color: var(--accent-blue);
+            font-weight: 700;
+        }
+        .pipe-length-display i {
+            font-size: 15px;
+            color: var(--accent-blue);
+            flex-shrink: 0;
+        }
+        /* Отступ между аккордеонами */
+        #buildingAccordions .accordion {
+            margin-bottom: 8px;
+        }
     </style>
 </head>
 <body>
@@ -295,6 +336,16 @@
                                     <span>Выберите проект и загрузите данные в разделе <strong>Квартирография</strong> — результаты появятся автоматически.</span>
                                 </div>
                             </div>
+                        </div>
+
+                        <!-- Блок: Параметры труб по корпусам -->
+                        <div class="panel-section panel-section-input"
+                             id="buildingSettingsPanel" style="display:none;">
+                            <h3 class="panel-section-title">
+                                <span class="panel-section-icon panel-section-icon-input"></span>
+                                Параметры труб по корпусам
+                            </h3>
+                            <div id="buildingAccordions"></div>
                         </div>
 
                     </div><!-- /control-panel -->
@@ -468,6 +519,128 @@
         return maxBath;
     }
 
+    /* ─── Настройки труб по корпусам ────────────────────────────────────── */
+    var buildingSettings   = {};  // idx → { pipeType, riserDiameter, kitchenDiameter }
+    var accordionOpenState = {};  // idx → boolean (сохраняем раскрытие между перерисовками)
+
+    function getSettings(idx) {
+        if (!buildingSettings[idx]) {
+            buildingSettings[idx] = { pipeType: 'pp', riserDiameter: 110, kitchenDiameter: 50 };
+        }
+        return buildingSettings[idx];
+    }
+
+    /* ─── Расчёт трубы: приборы на этаже по варианту конфигурации ───────── */
+    function getFloorCount(f, scenario) {
+        if (scenario === 1) return f.bath || 0;
+        if (scenario === 2) return (f.bath || 0) + (f.kitchens || 0);
+        if (scenario === 3) return (f.bath || 0) + Math.ceil((f.kitchens || 0) / 2);
+        return f.bath || 0;
+    }
+
+    /* ─── Общая длина труб с учётом транзитных стояков ──────────────────── */
+    // Стояк, начатый на высоком этаже, проходит транзитом через нижние.
+    // effective_count[i] = max(count[i], max(count[j] для j > i))
+    // total = Σ (effective_count[i] × floor_height)
+    function calcRiserLengthM(building, scenario) {
+        if (!building.floors || !building.floors.length || !building.height) return 0;
+        var sorted  = building.floors.slice().sort(function (a, b) { return b.floor - a.floor; });
+        var floorH  = building.height / building.floors.length;
+        var runMax  = 0;
+        var total   = 0;
+        sorted.forEach(function (f) {
+            var cnt = getFloorCount(f, scenario);
+            if (cnt > runMax) runMax = cnt;
+            total += runMax * floorH;
+        });
+        return Math.round(total * 10) / 10;
+    }
+
+    /* ─── Рендер аккордеонов настроек труб ──────────────────────────────── */
+    function renderBuildingAccordions() {
+        var panel     = document.getElementById('buildingSettingsPanel');
+        var container = document.getElementById('buildingAccordions');
+        if (!panel || !container) return;
+
+        if (!buildingStats || !buildingStats.length) {
+            panel.style.display = 'none';
+            container.innerHTML = '';
+            return;
+        }
+        panel.style.display = 'block';
+
+        // Запомнить текущее состояние раскрытия перед перерисовкой
+        container.querySelectorAll('details[id^="sewage-accord-"]').forEach(function (det) {
+            var i = parseInt(det.id.replace('sewage-accord-', ''), 10);
+            accordionOpenState[i] = det.open;
+        });
+
+        var showKitchen = (activeScenario === 2 || activeScenario === 3);
+
+        var html = buildingStats.map(function (b, idx) {
+            var s    = getSettings(idx);
+            var len  = calcRiserLengthM(b, activeScenario);
+            var rc   = calcRisers(b);
+            var open = accordionOpenState[idx] ? ' open' : '';
+            var name = escHtml(b.name || ('Корпус ' + b.num));
+
+            var kitRow = showKitchen
+                ? '<div class="input-group">' +
+                  '  <label>Диаметр кухонного стояка, мм:</label>' +
+                  '  <select data-idx="' + idx + '" data-field="kitchenDiameter" class="bld-select">' +
+                  '    <option value="50"'  + (s.kitchenDiameter === 50  ? ' selected' : '') + '>DN 50 мм</option>' +
+                  '    <option value="110"' + (s.kitchenDiameter === 110 ? ' selected' : '') + '>DN 110 мм</option>' +
+                  '  </select>' +
+                  '</div>'
+                : '';
+
+            return '<details class="accordion" id="sewage-accord-' + idx + '"' + open + '>' +
+                '<summary class="accordion-header">' +
+                '  <span class="accordion-icon"></span>' +
+                '  ' + name +
+                '  <span class="accord-meta">— ' + rc + ' ст. · ' + len + '\u00a0м трубы</span>' +
+                '</summary>' +
+                '<div class="accordion-content">' +
+                '  <div class="row-2">' +
+                '    <div class="input-group">' +
+                '      <label>Тип трубы:</label>' +
+                '      <select data-idx="' + idx + '" data-field="pipeType" class="bld-select">' +
+                '        <option value="pp"'        + (s.pipeType === 'pp'        ? ' selected' : '') + '>ПП (Полипропилен)</option>' +
+                '        <option value="pp_silent"' + (s.pipeType === 'pp_silent' ? ' selected' : '') + '>ПП Бесшумный</option>' +
+                '        <option value="sml"'       + (s.pipeType === 'sml'       ? ' selected' : '') + '>SML (Безраструбный чугун)</option>' +
+                '      </select>' +
+                '    </div>' +
+                '    <div class="input-group">' +
+                '      <label>Диаметр основного стояка, мм:</label>' +
+                '      <select data-idx="' + idx + '" data-field="riserDiameter" class="bld-select">' +
+                '        <option value="110"' + (s.riserDiameter === 110 ? ' selected' : '') + '>DN 110 мм (стандарт)</option>' +
+                '        <option value="160"' + (s.riserDiameter === 160 ? ' selected' : '') + '>DN 160 мм (нагруженная система)</option>' +
+                '      </select>' +
+                '    </div>' +
+                '  </div>' +
+                kitRow +
+                '  <div class="pipe-length-display">' +
+                '    <i class="bi bi-rulers"></i>' +
+                '    Расчётная длина стояков К1 (с учётом транзита):' +
+                '    <strong>\u2009' + len + '\u00a0м</strong>' +
+                '  </div>' +
+                '</div>' +
+                '</details>';
+        }).join('');
+
+        container.innerHTML = html;
+
+        // Навешиваем обработчики изменения настроек
+        container.querySelectorAll('.bld-select').forEach(function (sel) {
+            sel.addEventListener('change', function () {
+                var idx   = parseInt(sel.dataset.idx, 10);
+                var field = sel.dataset.field;
+                var s     = getSettings(idx);
+                s[field] = (field === 'pipeType') ? sel.value : parseInt(sel.value, 10);
+            });
+        });
+    }
+
     /* ─── Рендер таблицы результатов ─────────────────────────────────────── */
     function renderResultsTable() {
         var el = document.getElementById('residentialResults');
@@ -524,6 +697,8 @@
             '</tr></tfoot>' +
             '</table>' +
             '</div>';
+
+        renderBuildingAccordions();
     }
 
     /* ─── Утилита: экранирование HTML ────────────────────────────────────── */
