@@ -1333,6 +1333,8 @@
         const sewageCalcFrame = document.getElementById('sewageCalcFrame');
         if (sewageCalcFrame) {
             sewageCalcFrame.addEventListener('load', function () {
+                const currentTheme = body.classList.contains('dark-theme') ? 'dark' : 'light';
+                sewageCalcFrame.contentWindow.postMessage({ type: 'theme-change', theme: currentTheme }, '*');
                 const sewageProjectId = getSystemProjectId('sewage');
                 if (sewageProjectId) sendBuildingStatsToSewageIframe(sewageProjectId);
             });
@@ -1366,10 +1368,11 @@
 
             const waterCalcFrame = document.getElementById('waterCalcFrame');
             if (waterCalcFrame && waterCalcFrame.contentWindow) {
-                waterCalcFrame.contentWindow.postMessage({
-                    type: 'theme-change',
-                    theme: theme
-                }, '*');
+                waterCalcFrame.contentWindow.postMessage({ type: 'theme-change', theme: theme }, '*');
+            }
+            const sewageFrame = document.getElementById('sewageCalcFrame');
+            if (sewageFrame && sewageFrame.contentWindow) {
+                sewageFrame.contentWindow.postMessage({ type: 'theme-change', theme: theme }, '*');
             }
         });
 
