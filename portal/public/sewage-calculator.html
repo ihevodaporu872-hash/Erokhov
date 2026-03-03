@@ -272,81 +272,100 @@
                 <div class="tab-panel active" id="tab-residential">
                     <div class="control-panel">
 
-                        <!-- Блок: Сценарий расчёта -->
+                        <!-- Секция: Ввод данных -->
                         <div class="panel-section panel-section-input">
                             <h3 class="panel-section-title">
                                 <span class="panel-section-icon panel-section-icon-input"></span>
-                                Конфигурация стояков К1
+                                Ввод данных
                             </h3>
+                            <details class="accordion accordion-input" open>
+                                <summary class="accordion-header">
+                                    <span class="accordion-icon"></span>
+                                    Параметры проекта
+                                </summary>
+                                <div class="accordion-content">
 
-                            <div class="scenario-grid" id="scenarioCards">
+                                    <!-- Информация о высотах -->
+                                    <div class="floor-height-info">
+                                        <span class="floor-height-info-icon">ℹ</span>
+                                        Параметры высот подтягиваются автоматически из раздела <strong>Квартирография</strong>. Высота корпуса используется для расчёта длины трубопроводов стояков.
+                                    </div>
 
-                                <!-- Сценарий 1 -->
-                                <div class="scenario-card active" data-scenario="1">
-                                    <div class="scenario-card-badge">Только шахты С/У</div>
-                                    <div class="scenario-card-title">
-                                        <i class="bi bi-diagram-2"></i>
-                                        Монтаж стояков в шахтах С/У
-                                    </div>
-                                    <div class="scenario-card-desc">
-                                        Кухни подключаются к стоякам санузлов через горизонтальные лежаки в подвале.
-                                    </div>
-                                    <div class="scenario-card-formula">Стояков К1 = Кол-во С/У</div>
-                                </div>
+                                    <!-- Конфигурация стояков К1 -->
+                                    <h4 class="subsection-title">Конфигурация стояков К1</h4>
+                                    <div class="scenario-grid" id="scenarioCards">
 
-                                <!-- Сценарий 2 -->
-                                <div class="scenario-card" data-scenario="2">
-                                    <div class="scenario-card-badge">Шахты С/У и Кухонь</div>
-                                    <div class="scenario-card-title">
-                                        <i class="bi bi-diagram-3"></i>
-                                        Монтаж стояков в шахтах С/У и кухонь
-                                    </div>
-                                    <div class="scenario-card-desc">
-                                        Отдельные стояки для каждой мокрой зоны: С/У и кухня.
-                                    </div>
-                                    <div class="scenario-card-formula">Стояков К1 = С/У + Кухни</div>
-                                </div>
+                                        <!-- Сценарий 1 -->
+                                        <div class="scenario-card active" data-scenario="1">
+                                            <div class="scenario-card-badge">Только шахты С/У</div>
+                                            <div class="scenario-card-title">
+                                                <i class="bi bi-diagram-2"></i>
+                                                Монтаж стояков в шахтах С/У
+                                            </div>
+                                            <div class="scenario-card-desc">
+                                                Кухни подключаются к стоякам санузлов через горизонтальные лежаки в подвале.
+                                            </div>
+                                            <div class="scenario-card-formula">Стояков К1 = Кол-во С/У</div>
+                                        </div>
 
-                                <!-- Сценарий 3 -->
-                                <div class="scenario-card" data-scenario="3">
-                                    <div class="scenario-card-badge">Оптимизированный (смежные кухни)</div>
-                                    <div class="scenario-card-title">
-                                        <i class="bi bi-arrows-collapse"></i>
-                                        Монтаж в шахтах С/У и выборочно кухонь
-                                    </div>
-                                    <div class="scenario-card-desc">
-                                        Смежные кухни объединяются в один стояк, несмежные — отдельные.
-                                    </div>
-                                    <div class="scenario-card-formula">Стояков К1 = С/У + ⌈Кухни / 2⌉</div>
-                                </div>
+                                        <!-- Сценарий 2 -->
+                                        <div class="scenario-card" data-scenario="2">
+                                            <div class="scenario-card-badge">Шахты С/У и Кухонь</div>
+                                            <div class="scenario-card-title">
+                                                <i class="bi bi-diagram-3"></i>
+                                                Монтаж стояков в шахтах С/У и кухонь
+                                            </div>
+                                            <div class="scenario-card-desc">
+                                                Отдельные стояки для каждой мокрой зоны: С/У и кухня.
+                                            </div>
+                                            <div class="scenario-card-formula">Стояков К1 = С/У + Кухни</div>
+                                        </div>
 
-                            </div><!-- /scenario-grid -->
+                                        <!-- Сценарий 3 -->
+                                        <div class="scenario-card" data-scenario="3">
+                                            <div class="scenario-card-badge">Оптимизированный (смежные кухни)</div>
+                                            <div class="scenario-card-title">
+                                                <i class="bi bi-arrows-collapse"></i>
+                                                Монтаж в шахтах С/У и выборочно кухонь
+                                            </div>
+                                            <div class="scenario-card-desc">
+                                                Смежные кухни объединяются в один стояк, несмежные — отдельные.
+                                            </div>
+                                            <div class="scenario-card-formula">Стояков К1 = С/У + ⌈Кухни / 2⌉</div>
+                                        </div>
+
+                                    </div><!-- /scenario-grid -->
+
+                                    <!-- Параметры труб по корпусам -->
+                                    <h4 class="subsection-title">Параметры труб по корпусам</h4>
+                                    <div id="buildingAccordions"></div>
+
+                                </div><!-- /accordion-content -->
+                            </details>
                         </div><!-- /panel-section-input -->
 
-                        <!-- Блок: Результаты по корпусам -->
+                        <!-- Секция: Результаты расчёта -->
                         <div class="panel-section panel-section-output">
                             <h3 class="panel-section-title">
                                 <span class="panel-section-icon panel-section-icon-output"></span>
-                                Предварительный расчёт стояков по корпусам
+                                Результаты расчёта
                             </h3>
-                            <div id="residentialResults">
-                                <!-- рендерится JS-ом -->
-                                <div class="no-data-banner">
-                                    <i class="bi bi-info-circle-fill"></i>
-                                    <span>Выберите проект и загрузите данные в разделе <strong>Квартирография</strong> — результаты появятся автоматически.</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Блок: Параметры труб по корпусам -->
-                        <div class="panel-section panel-section-input"
-                             id="buildingSettingsPanel" style="display:none;">
-                            <h3 class="panel-section-title">
-                                <span class="panel-section-icon panel-section-icon-input"></span>
-                                Параметры труб по корпусам
-                            </h3>
-                            <div id="buildingAccordions"></div>
-                        </div>
+                            <details class="accordion accordion-output" open>
+                                <summary class="accordion-header">
+                                    <span class="accordion-icon"></span>
+                                    Трубопроводы стояков К1
+                                </summary>
+                                <div class="accordion-content">
+                                    <div id="residentialResults">
+                                        <!-- рендерится JS-ом -->
+                                        <div class="no-data-banner">
+                                            <i class="bi bi-info-circle-fill"></i>
+                                            <span>Выберите проект и загрузите данные в разделе <strong>Квартирография</strong> — результаты появятся автоматически.</span>
+                                        </div>
+                                    </div>
+                                </div><!-- /accordion-content -->
+                            </details>
+                        </div><!-- /panel-section-output -->
 
                     </div><!-- /control-panel -->
                 </div><!-- /tab-residential -->
@@ -558,16 +577,17 @@
 
     /* ─── Рендер аккордеонов настроек труб ──────────────────────────────── */
     function renderBuildingAccordions() {
-        var panel     = document.getElementById('buildingSettingsPanel');
         var container = document.getElementById('buildingAccordions');
-        if (!panel || !container) return;
+        if (!container) return;
 
         if (!buildingStats || !buildingStats.length) {
-            panel.style.display = 'none';
-            container.innerHTML = '';
+            container.innerHTML =
+                '<div class="no-data-banner">' +
+                '  <i class="bi bi-info-circle-fill"></i>' +
+                '  <span>Загрузите данные проекта из <strong>Квартирографии</strong> — здесь появятся настройки труб по каждому корпусу.</span>' +
+                '</div>';
             return;
         }
-        panel.style.display = 'block';
 
         // Запомнить текущее состояние раскрытия перед перерисовкой
         container.querySelectorAll('details[id^="sewage-accord-"]').forEach(function (det) {
@@ -659,21 +679,25 @@
         var sumMaxBath    = 0;   // сумма максимумов по корпусам
         var sumMaxKitch   = 0;
         var totalRisers   = 0;
+        var totalLength   = 0;
 
         var rows = buildingStats.map(function (b) {
             var mBath  = maxFloorValue(b, 'bath');
             var mKitch = maxFloorValue(b, 'kitchens');
             var risers = calcRisers(b);
+            var len    = calcRiserLengthM(b, activeScenario);
             totalApts   += b.totalApts || 0;
             sumMaxBath  += mBath;
             sumMaxKitch += mKitch;
             totalRisers += risers;
+            totalLength += len;
             return '<tr>' +
                 '<td>' + escHtml(b.name || ('Корпус ' + b.num)) + '</td>' +
                 '<td>' + (b.totalApts || 0) + '</td>' +
                 '<td>' + mBath  + '</td>' +
                 '<td>' + mKitch + '</td>' +
                 '<td class="riser-count">' + risers + '</td>' +
+                '<td>' + len + '</td>' +
                 '</tr>';
         }).join('');
 
@@ -686,6 +710,7 @@
             '<th title="Макс. кол-во С/У на одном этаже корпуса">С/У (макс./эт.)</th>' +
             '<th title="Макс. кол-во кухонь на одном этаже корпуса">Кухни (макс./эт.)</th>' +
             '<th>Стояков К1</th>' +
+            '<th title="Расчётная длина стояков К1 с учётом транзита">Длина, м</th>' +
             '</tr></thead>' +
             '<tbody>' + rows + '</tbody>' +
             '<tfoot><tr>' +
@@ -694,6 +719,7 @@
             '<td>' + sumMaxBath  + '</td>' +
             '<td>' + sumMaxKitch + '</td>' +
             '<td class="riser-count">' + totalRisers + '</td>' +
+            '<td>' + Math.round(totalLength * 10) / 10 + '</td>' +
             '</tr></tfoot>' +
             '</table>' +
             '</div>';
