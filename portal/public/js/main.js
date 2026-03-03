@@ -240,11 +240,9 @@ function deleteProjectById(projectId) {
 
 // ===== Функции калькулятора =====
 
-// Получение высот этажей из DOM
+// Высоты этажей (fallback — используются только если buildingHeight не задан в секции)
 function getHeights() {
-  const h1 = +document.getElementById('h1').value || 0;
-  const hn = +document.getElementById('hn').value || 0;
-  return { h1, hn };
+  return { h1: 4.0, hn: 3.3 };
 }
 
 // Основной расчёт и рендер
@@ -1422,8 +1420,6 @@ function formatQuoteRequestText(projectName, summary) {
 
   text += `=== ПАРАМЕТРЫ ПРОЕКТА ===\n`;
   text += `Количество корпусов: ${summary.sectionsCount}\n`;
-  text += `Высота 1-го этажа: ${summary.h1} м\n`;
-  text += `Высота типового этажа: ${summary.hn} м\n`;
   text += `Квартир всего: ${summary.totalApartments}\n`;
   if (summary.totalRentUnits > 0) {
     text += `Узлов учёта аренды: ${summary.totalRentUnits}\n`;
@@ -2260,16 +2256,6 @@ window.onload = () => {
 
   // Навешивание обработчиков на элементы калькулятора
   document.getElementById('numSections')?.addEventListener('change', onSectionsCountChange);
-
-  document.getElementById('h1')?.addEventListener('change', () => {
-    recalcAll();
-    saveCurrentProject();
-  });
-
-  document.getElementById('hn')?.addEventListener('change', () => {
-    recalcAll();
-    saveCurrentProject();
-  });
 
   document.getElementById('ivptEnabled')?.addEventListener('change', () => {
     calculateWaterSupply();
