@@ -1330,6 +1330,14 @@
             themeToggle.checked = true;
         }
 
+        const sewageCalcFrame = document.getElementById('sewageCalcFrame');
+        if (sewageCalcFrame) {
+            sewageCalcFrame.addEventListener('load', function () {
+                const sewageProjectId = getSystemProjectId('sewage');
+                if (sewageProjectId) sendBuildingStatsToSewageIframe(sewageProjectId);
+            });
+        }
+
         const waterCalcFrame = document.getElementById('waterCalcFrame');
         if (waterCalcFrame) {
             waterCalcFrame.addEventListener('load', function() {
@@ -2149,6 +2157,20 @@
             }
         }
 
+        // Отправляет building_stats в iframe водоотведения
+        function sendBuildingStatsToSewageIframe(projectId) {
+            if (!projectId) return;
+            const project = portalProjects.find(p => p.id === projectId);
+            const iframe = document.getElementById('sewageCalcFrame');
+            if (!iframe || !iframe.contentWindow) return;
+            iframe.contentWindow.postMessage({
+                type: 'load-project-data',
+                projectId: projectId,
+                projectName: project ? project.name : '',
+                buildingStats: project ? (project.building_stats || null) : null
+            }, '*');
+        }
+
         function handleAutoSave(state) {
             const wsProjectId = getSystemProjectId('water-supply');
             if (!wsProjectId) return;
@@ -2216,6 +2238,10 @@
                 // Для water-supply — отправляем данные в iframe
                 if (systemType === 'water-supply' && projectId) {
                     sendProjectToIframe(+projectId);
+                }
+                // Для sewage — отправляем building_stats в iframe
+                if (systemType === 'sewage' && projectId) {
+                    sendBuildingStatsToSewageIframe(+projectId);
                 }
             });
         });
@@ -2291,9 +2317,11 @@
         (async function init() {
             await loadProjectsList();
 
-            // Отправляем в iframe проект water-supply если был сохранён
+            // Отправляем данные в iframe водоснабжения и водоотведения
             const wsProjectId = getSystemProjectId('water-supply');
             if (wsProjectId) sendProjectToIframe(wsProjectId);
+            const swProjectId = getSystemProjectId('sewage');
+            if (swProjectId) sendBuildingStatsToSewageIframe(swProjectId);
 
             // Бейдж стартует пустым (на dashboard)
             updateNavbarProjectName(null);
