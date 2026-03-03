@@ -213,11 +213,13 @@
         }
         .equip-icon {
             display: block;
-            font-size: 22px;
+            font-size: 24px;
             color: var(--gray-400, #AEAEB2);
             margin-bottom: 8px;
             transition: color .15s;
+            line-height: 1.2;
         }
+        /* span-обёртка для двух иконок: цвет наследуется дочерними <i> */
         .equip-card.active .equip-icon { color: var(--accent-blue); }
         .equip-card-title {
             font-size: 12px; font-weight: 600; color: var(--gray-900);
@@ -917,13 +919,13 @@
                 '</div>' +
 
                 '<div class="equip-card' + (s.pui ? ' active' : '') + '" data-idx="' + idx + '" data-field="pui">' +
-                '<i class="bi bi-broom equip-icon"></i>' +
+                '<span class="equip-icon"><i class="bi bi-bucket"></i>\u2009<i class="bi bi-broom"></i></span>' +
                 '<div class="equip-card-title">ПУИ</div>' +
                 '<div class="equip-card-desc">+1\u00a0стояк\u00a0К1 в\u00a0шахте\u00a0ВК\u2003·\u20031\u00a0трап\u00a0DN50\u00a0/\u00a0эт.\u2002(' + floorsN + '\u00a0шт)</div>' +
                 '</div>' +
 
                 '<div class="equip-card' + (s.trashRoom ? ' active' : '') + '" data-idx="' + idx + '" data-field="trashRoom">' +
-                '<i class="bi bi-trash3 equip-icon"></i>' +
+                '<span class="equip-icon"><i class="bi bi-person-walking"></i>\u2009<i class="bi bi-trash3"></i></span>' +
                 '<div class="equip-card-title">Мусорокамера</div>' +
                 '<div class="equip-card-desc">1\u00a0трап\u00a0DN50</div>' +
                 '</div>' +
