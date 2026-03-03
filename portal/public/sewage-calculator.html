@@ -444,14 +444,28 @@
         });
     });
 
-    /* ─── Расчёт стояков по сценарию ─────────────────────────────────────── */
+    /* ─── Максимум приборов на одном этаже ──────────────────────────────── */
+    // Количество стояков = макс. приборов на любом отдельном этаже:
+    // если на этажах 2–7 по 10 С/У, а на 8–10 по 12 С/У → 12 стояков.
+    function maxFloorValue(building, field) {
+        var floors = building.floors;
+        if (!floors || !floors.length) return 0;
+        var maxVal = 0;
+        floors.forEach(function (f) {
+            var v = f[field] || 0;
+            if (v > maxVal) maxVal = v;
+        });
+        return maxVal;
+    }
+
+    /* ─── Расчёт стояков по варианту конфигурации ────────────────────────── */
     function calcRisers(building) {
-        var bath     = building.totalBath     || 0;
-        var kitchens = building.totalKitchens || 0;
-        if (activeScenario === 1) return bath;
-        if (activeScenario === 2) return bath + kitchens;
-        if (activeScenario === 3) return bath + Math.ceil(kitchens / 2);
-        return bath;
+        var maxBath     = maxFloorValue(building, 'bath');
+        var maxKitchens = maxFloorValue(building, 'kitchens');
+        if (activeScenario === 1) return maxBath;
+        if (activeScenario === 2) return maxBath + maxKitchens;
+        if (activeScenario === 3) return maxBath + Math.ceil(maxKitchens / 2);
+        return maxBath;
     }
 
     /* ─── Рендер таблицы результатов ─────────────────────────────────────── */
@@ -469,21 +483,23 @@
         }
 
         var totalApts     = 0;
-        var totalBath     = 0;
-        var totalKitchens = 0;
+        var sumMaxBath    = 0;   // сумма максимумов по корпусам
+        var sumMaxKitch   = 0;
         var totalRisers   = 0;
 
         var rows = buildingStats.map(function (b) {
+            var mBath  = maxFloorValue(b, 'bath');
+            var mKitch = maxFloorValue(b, 'kitchens');
             var risers = calcRisers(b);
-            totalApts     += b.totalApts     || 0;
-            totalBath     += b.totalBath     || 0;
-            totalKitchens += b.totalKitchens || 0;
-            totalRisers   += risers;
+            totalApts   += b.totalApts || 0;
+            sumMaxBath  += mBath;
+            sumMaxKitch += mKitch;
+            totalRisers += risers;
             return '<tr>' +
                 '<td>' + escHtml(b.name || ('Корпус ' + b.num)) + '</td>' +
-                '<td>' + (b.totalApts     || 0) + '</td>' +
-                '<td>' + (b.totalBath     || 0) + '</td>' +
-                '<td>' + (b.totalKitchens || 0) + '</td>' +
+                '<td>' + (b.totalApts || 0) + '</td>' +
+                '<td>' + mBath  + '</td>' +
+                '<td>' + mKitch + '</td>' +
                 '<td class="riser-count">' + risers + '</td>' +
                 '</tr>';
         }).join('');
@@ -494,16 +510,16 @@
             '<thead><tr>' +
             '<th>Корпус</th>' +
             '<th>Квартир</th>' +
-            '<th>С/У</th>' +
-            '<th>Кухни</th>' +
+            '<th title="Макс. кол-во С/У на одном этаже корпуса">С/У (макс./эт.)</th>' +
+            '<th title="Макс. кол-во кухонь на одном этаже корпуса">Кухни (макс./эт.)</th>' +
             '<th>Стояков К1</th>' +
             '</tr></thead>' +
             '<tbody>' + rows + '</tbody>' +
             '<tfoot><tr>' +
             '<td>Итого</td>' +
-            '<td>' + totalApts     + '</td>' +
-            '<td>' + totalBath     + '</td>' +
-            '<td>' + totalKitchens + '</td>' +
+            '<td>' + totalApts   + '</td>' +
+            '<td>' + sumMaxBath  + '</td>' +
+            '<td>' + sumMaxKitch + '</td>' +
             '<td class="riser-count">' + totalRisers + '</td>' +
             '</tr></tfoot>' +
             '</table>' +
