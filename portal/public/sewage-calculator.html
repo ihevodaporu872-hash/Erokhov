@@ -165,6 +165,21 @@
             font-size: 14px;
         }
 
+        /* ── Строка-разделитель группы в таблице спецификации ────────────── */
+        .spec-group-row td {
+            background: rgba(0,122,255,.10) !important;
+            color: var(--accent-blue) !important;
+            font-weight: 700 !important;
+            font-size: 11px !important;
+            text-transform: uppercase;
+            letter-spacing: .5px;
+            padding: 7px 14px !important;
+            border-bottom: 1px solid rgba(0,122,255,.2) !important;
+        }
+        .riser-table tbody .spec-group-row:hover td {
+            background: rgba(0,122,255,.14) !important;
+        }
+
         /* ── Заглушка "нет данных" ────────────────────────────────────────── */
         .no-data-banner {
             display: flex;
@@ -187,20 +202,17 @@
         }
 
         /* ── Аккордеоны настроек по корпусам ──────────────────────────────── */
-        /* Переопределяем max-width для select внутри аккордеонов */
         .accordion-content .input-group select {
             max-width: 100%;
             width: 100%;
             box-sizing: border-box;
         }
-        /* Мета-строка в заголовке аккордеона (стояки · длина) */
         .accord-meta {
             font-size: 11px;
             font-weight: 400;
             color: var(--gray-500);
             margin-left: 8px;
         }
-        /* Блок итоговой длины трубы */
         .pipe-length-display {
             display: flex;
             align-items: center;
@@ -222,7 +234,6 @@
             color: var(--accent-blue);
             flex-shrink: 0;
         }
-        /* Отступ между аккордеонами */
         #buildingAccordions .accordion {
             margin-bottom: 8px;
         }
@@ -246,6 +257,42 @@
             font-size: 13px;
             color: var(--accent-blue);
             margin-right: 3px;
+        }
+
+        /* ── Второй аккордеон результатов ────────────────────────────────── */
+        .accordion-output + .accordion-output {
+            margin-top: 12px;
+        }
+
+        /* ── Кнопка экспорта в Excel ──────────────────────────────────────── */
+        .btn-export-excel {
+            display: inline-flex;
+            align-items: center;
+            gap: 9px;
+            margin-top: 22px;
+            padding: 12px 28px;
+            background: #1a7a3f;
+            color: #fff;
+            border: none;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 600;
+            font-family: inherit;
+            cursor: pointer;
+            transition: background .15s, transform .1s, box-shadow .15s;
+            box-shadow: 0 2px 8px rgba(26,122,63,.25);
+        }
+        .btn-export-excel:hover {
+            background: #15693a;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 14px rgba(26,122,63,.35);
+        }
+        .btn-export-excel:active { transform: translateY(0); }
+        .btn-export-excel i { font-size: 18px; }
+        .spec-export-bar {
+            margin-top: 24px;
+            display: flex;
+            justify-content: center;
         }
     </style>
 </head>
@@ -371,6 +418,8 @@
                                 <span class="panel-section-icon panel-section-icon-output"></span>
                                 Результаты расчёта
                             </h3>
+
+                            <!-- Аккордеон 1: Трубопроводы -->
                             <details class="accordion accordion-output" open>
                                 <summary class="accordion-header">
                                     <span class="accordion-icon"></span>
@@ -378,14 +427,30 @@
                                 </summary>
                                 <div class="accordion-content">
                                     <div id="residentialResults">
-                                        <!-- рендерится JS-ом -->
                                         <div class="no-data-banner">
                                             <i class="bi bi-info-circle-fill"></i>
                                             <span>Выберите проект и загрузите данные в разделе <strong>Квартирография</strong> — результаты появятся автоматически.</span>
                                         </div>
                                     </div>
-                                </div><!-- /accordion-content -->
+                                </div>
                             </details>
+
+                            <!-- Аккордеон 2: Фасонные изделия -->
+                            <details class="accordion accordion-output" open>
+                                <summary class="accordion-header">
+                                    <span class="accordion-icon"></span>
+                                    Фасонные изделия и крепеж
+                                </summary>
+                                <div class="accordion-content">
+                                    <div id="fittingsResults">
+                                        <div class="no-data-banner">
+                                            <i class="bi bi-info-circle-fill"></i>
+                                            <span>Загрузите данные проекта — изделия рассчитаются автоматически.</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </details>
+
                         </div><!-- /panel-section-output -->
 
                     </div><!-- /control-panel -->
@@ -445,17 +510,32 @@
 
                 <!-- ========== СПЕЦИФИКАЦИЯ ========== -->
                 <div class="tab-panel" id="tab-specification">
-                    <div class="placeholder-container">
-                        <div class="placeholder-content">
-                            <div class="placeholder-icon">
-                                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                                    <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/>
-                                    <rect x="9" y="3" width="6" height="4" rx="1"/>
-                                    <path d="M9 12h6M9 16h6"/>
-                                </svg>
-                            </div>
-                            <h2>Раздел в разработке</h2>
-                            <p class="note">Здесь будет сводная таблица материалов: трубопроводы К1/К2 по диаметрам, фасонные части, ревизии, прочистки, оборудование.</p>
+                    <div class="control-panel">
+                        <div class="panel-section panel-section-output">
+                            <h3 class="panel-section-title">
+                                <span class="panel-section-icon panel-section-icon-output"></span>
+                                Спецификация системы К1
+                            </h3>
+                            <details class="accordion accordion-output" open>
+                                <summary class="accordion-header">
+                                    <span class="accordion-icon"></span>
+                                    Трубопроводы и фасонные изделия
+                                </summary>
+                                <div class="accordion-content">
+                                    <div id="specificationContent">
+                                        <div class="no-data-banner">
+                                            <i class="bi bi-info-circle-fill"></i>
+                                            <span>Перейдите на вкладку <strong>Жилая часть</strong>, выберите проект и настройте параметры — спецификация сформируется автоматически.</span>
+                                        </div>
+                                    </div>
+                                    <div class="spec-export-bar">
+                                        <button class="btn-export-excel" id="btnExportExcel">
+                                            <i class="bi bi-file-earmark-excel-fill"></i>
+                                            Экспорт спецификации в Excel
+                                        </button>
+                                    </div>
+                                </div>
+                            </details>
                         </div>
                     </div>
                 </div>
@@ -509,7 +589,7 @@
     var activeScenario   = 1;      // выбранный сценарий (1, 2 или 3)
 
     /* ─── Переключение вкладок ───────────────────────────────────────────── */
-    var tabBtns  = document.querySelectorAll('#sewageTabs .tab-btn');
+    var tabBtns   = document.querySelectorAll('#sewageTabs .tab-btn');
     var tabPanels = document.querySelectorAll('#sewageTabContent .tab-panel');
 
     tabBtns.forEach(function (btn) {
@@ -520,6 +600,10 @@
             btn.classList.add('active');
             var panel = document.getElementById(targetId);
             if (panel) panel.classList.add('active');
+            // При переходе на спецификацию — рендерим её актуальными данными
+            if (btn.dataset.tab === 'specification') {
+                renderFullSpecification();
+            }
         });
     });
 
@@ -535,9 +619,12 @@
         });
     });
 
-    /* ─── Максимум приборов на одном этаже ──────────────────────────────── */
-    // Количество стояков = макс. приборов на любом отдельном этаже:
-    // если на этажах 2–7 по 10 С/У, а на 8–10 по 12 С/У → 12 стояков.
+    /* ─── Кнопка экспорта ────────────────────────────────────────────────── */
+    document.getElementById('btnExportExcel').addEventListener('click', exportToExcel);
+
+    /* ─── Вспомогательные функции ────────────────────────────────────────── */
+
+    // Максимум поля field среди всех этажей корпуса
     function maxFloorValue(building, field) {
         var floors = building.floors;
         if (!floors || !floors.length) return 0;
@@ -549,19 +636,28 @@
         return maxVal;
     }
 
-    /* ─── Расчёт стояков по варианту конфигурации ────────────────────────── */
+    // Количество стояков С/У
+    function calcBathRisers(building) {
+        return maxFloorValue(building, 'bath');
+    }
+
+    // Количество стояков кухонь (зависит от сценария)
+    function calcKitchenRisers(building) {
+        if (activeScenario === 1) return 0;
+        var mk = maxFloorValue(building, 'kitchens');
+        if (activeScenario === 2) return mk;
+        if (activeScenario === 3) return Math.ceil(mk / 2);
+        return 0;
+    }
+
+    // Суммарное кол-во стояков К1
     function calcRisers(building) {
-        var maxBath     = maxFloorValue(building, 'bath');
-        var maxKitchens = maxFloorValue(building, 'kitchens');
-        if (activeScenario === 1) return maxBath;
-        if (activeScenario === 2) return maxBath + maxKitchens;
-        if (activeScenario === 3) return maxBath + Math.ceil(maxKitchens / 2);
-        return maxBath;
+        return calcBathRisers(building) + calcKitchenRisers(building);
     }
 
     /* ─── Настройки труб по корпусам ────────────────────────────────────── */
     var buildingSettings   = {};  // idx → { pipeType, riserDiameter, kitchenDiameter }
-    var accordionOpenState = {};  // idx → boolean (сохраняем раскрытие между перерисовками)
+    var accordionOpenState = {};  // idx → boolean
 
     function getSettings(idx) {
         if (!buildingSettings[idx]) {
@@ -570,7 +666,7 @@
         return buildingSettings[idx];
     }
 
-    /* ─── Расчёт трубы: приборы на этаже по варианту конфигурации ───────── */
+    // Кол-во приборов на этаже по сценарию (для расчёта длины с транзитом)
     function getFloorCount(f, scenario) {
         if (scenario === 1) return f.bath || 0;
         if (scenario === 2) return (f.bath || 0) + (f.kitchens || 0);
@@ -578,22 +674,162 @@
         return f.bath || 0;
     }
 
-    /* ─── Общая длина труб с учётом транзитных стояков ──────────────────── */
+    /* ─── Длина труб с учётом транзитных стояков ─────────────────────────── */
     // Стояк, начатый на высоком этаже, проходит транзитом через нижние.
     // effective_count[i] = max(count[i], max(count[j] для j > i))
     // total = Σ (effective_count[i] × floor_height)
     function calcRiserLengthM(building, scenario) {
         if (!building.floors || !building.floors.length || !building.height) return 0;
-        var sorted  = building.floors.slice().sort(function (a, b) { return b.floor - a.floor; });
-        var floorH  = building.height / building.floors.length;
-        var runMax  = 0;
-        var total   = 0;
+        var sorted = building.floors.slice().sort(function (a, b) { return b.floor - a.floor; });
+        var floorH = building.height / building.floors.length;
+        var runMax = 0;
+        var total  = 0;
         sorted.forEach(function (f) {
             var cnt = getFloorCount(f, scenario);
             if (cnt > runMax) runMax = cnt;
             total += runMax * floorH;
         });
         return Math.round(total * 10) / 10;
+    }
+
+    /* ─── Сбор фасонных изделий и крепежа (суммарно по всем корпусам) ───── */
+    function collectFittings() {
+        if (!buildingStats || !buildingStats.length) return [];
+
+        var showKitchen = (activeScenario === 2 || activeScenario === 3);
+        var acc = {};   // key → { name, unit, qty }
+
+        function addItem(key, name, unit, qty) {
+            if (!qty || qty <= 0) return;
+            if (acc[key]) { acc[key].qty += qty; }
+            else          { acc[key] = { name: name, unit: unit, qty: qty }; }
+        }
+
+        buildingStats.forEach(function (b, idx) {
+            var s         = getSettings(idx);
+            var floorsN   = b.floors ? b.floors.length : 0;
+            var bathR     = calcBathRisers(b);
+            var kitR      = calcKitchenRisers(b);
+            var len       = calcRiserLengthM(b, activeScenario);
+            var isPlastic = (s.pipeType === 'pp' || s.pipeType === 'pp_silent');
+            var isSML     = (s.pipeType === 'sml');
+            var revPer    = floorsN > 0 ? Math.ceil(floorsN / 3) : 0;
+
+            // ── Противопожарные муфты (только пластик, не SML) ───────────
+            if (isPlastic && floorsN > 0) {
+                if (bathR > 0) {
+                    addItem('mufta_' + s.riserDiameter,
+                        'Муфта противопожарная DN\u00a0' + s.riserDiameter,
+                        'шт', bathR * floorsN);
+                }
+                if (showKitchen && kitR > 0) {
+                    addItem('mufta_' + s.kitchenDiameter,
+                        'Муфта противопожарная DN\u00a0' + s.kitchenDiameter,
+                        'шт', kitR * floorsN);
+                }
+            }
+
+            // ── Ревизии (для всех типов труб) ────────────────────────────
+            if (revPer > 0) {
+                if (bathR > 0) {
+                    addItem('rev_' + s.riserDiameter,
+                        'Ревизия DN\u00a0' + s.riserDiameter,
+                        'шт', bathR * revPer);
+                }
+                if (showKitchen && kitR > 0) {
+                    addItem('rev_' + s.kitchenDiameter,
+                        'Ревизия DN\u00a0' + s.kitchenDiameter,
+                        'шт', kitR * revPer);
+                }
+            }
+
+            // ── Компенсационные патрубки (только пластик) ────────────────
+            if (isPlastic && revPer > 0) {
+                if (bathR > 0) {
+                    addItem('kompens_' + s.riserDiameter,
+                        'Компенсационный патрубок DN\u00a0' + s.riserDiameter,
+                        'шт', bathR * revPer);
+                }
+                if (showKitchen && kitR > 0) {
+                    addItem('kompens_' + s.kitchenDiameter,
+                        'Компенсационный патрубок DN\u00a0' + s.kitchenDiameter,
+                        'шт', kitR * revPer);
+                }
+            }
+
+            // ── Хомуты стальные (пластик) — 1 шт на 1.5 м трубы ─────────
+            if (isPlastic && len > 0) {
+                addItem('khomuty',
+                    'Хомут стальной (крепление трубопроводов)',
+                    'шт', Math.ceil(len / 1.5));
+            }
+
+            // ── Муфты соединительные Rapid (SML) — 1 шт на 3 м трубы ────
+            // Для чугуна противопожарные муфты не нужны, но нужны Rapid-муфты
+            if (isSML && len > 0) {
+                addItem('rapid_' + s.riserDiameter,
+                    'Муфта соединительная Rapid DN\u00a0' + s.riserDiameter + ' (SML)',
+                    'шт', Math.ceil(len / 3));
+            }
+        });
+
+        // Возвращаем в фиксированном порядке групп
+        var ORDER = [
+            'mufta_50', 'mufta_110', 'mufta_160',
+            'rev_50', 'rev_110', 'rev_160',
+            'kompens_50', 'kompens_110', 'kompens_160',
+            'khomuty',
+            'rapid_50', 'rapid_110', 'rapid_160'
+        ];
+        var result = [];
+        ORDER.forEach(function (k) { if (acc[k]) result.push(acc[k]); });
+        // Дополнительные ключи, не вошедшие в ORDER
+        Object.keys(acc).forEach(function (k) {
+            if (ORDER.indexOf(k) === -1) result.push(acc[k]);
+        });
+        return result;
+    }
+
+    /* ─── Рендер таблицы фасонных изделий ───────────────────────────────── */
+    function renderFittingsTable() {
+        var el = document.getElementById('fittingsResults');
+        if (!el) return;
+
+        if (!buildingStats || !buildingStats.length) {
+            el.innerHTML =
+                '<div class="no-data-banner">' +
+                '  <i class="bi bi-info-circle-fill"></i>' +
+                '  <span>Загрузите данные проекта — изделия рассчитаются автоматически.</span>' +
+                '</div>';
+            return;
+        }
+
+        var items = collectFittings();
+
+        if (!items.length) {
+            el.innerHTML =
+                '<p style="color:var(--gray-500);font-size:13px;margin:8px 0">Нет позиций для отображения.</p>';
+            return;
+        }
+
+        var rows = items.map(function (item) {
+            return '<tr>' +
+                '<td>' + escHtml(item.name) + '</td>' +
+                '<td>' + item.unit + '</td>' +
+                '<td class="riser-count">' + item.qty + '</td>' +
+                '</tr>';
+        }).join('');
+
+        el.innerHTML =
+            '<div class="riser-table-wrap">' +
+            '<table class="riser-table">' +
+            '<thead><tr>' +
+            '<th>Наименование</th>' +
+            '<th>Ед.</th>' +
+            '<th>Кол-во</th>' +
+            '</tr></thead>' +
+            '<tbody>' + rows + '</tbody>' +
+            '</table></div>';
     }
 
     /* ─── Рендер аккордеонов настроек труб ──────────────────────────────── */
@@ -610,7 +846,7 @@
             return;
         }
 
-        // Запомнить текущее состояние раскрытия перед перерисовкой
+        // Запомнить состояние раскрытия перед перерисовкой
         container.querySelectorAll('details[id^="sewage-accord-"]').forEach(function (det) {
             var i = parseInt(det.id.replace('sewage-accord-', ''), 10);
             accordionOpenState[i] = det.open;
@@ -678,7 +914,7 @@
 
         container.innerHTML = html;
 
-        // Навешиваем обработчики: сохраняем настройку и обновляем таблицу результатов
+        // Обработчики: сохраняем настройку и обновляем оба блока результатов
         container.querySelectorAll('.bld-select').forEach(function (sel) {
             sel.addEventListener('change', function () {
                 var i     = parseInt(sel.dataset.idx, 10);
@@ -690,7 +926,7 @@
         });
     }
 
-    /* ─── Рендер таблицы результатов ─────────────────────────────────────── */
+    /* ─── Рендер таблицы трубопроводов ───────────────────────────────────── */
     function renderResultsTable() {
         var el = document.getElementById('residentialResults');
         if (!el) return;
@@ -701,6 +937,8 @@
                 '  <i class="bi bi-info-circle-fill"></i>' +
                 '  <span>Выберите проект и загрузите данные в разделе <strong>Квартирография</strong> — результаты появятся автоматически.</span>' +
                 '</div>';
+            renderFittingsTable();
+            renderBuildingAccordions();
             return;
         }
 
@@ -749,7 +987,126 @@
             '</table>' +
             '</div>';
 
+        renderFittingsTable();
         renderBuildingAccordions();
+    }
+
+    /* ─── Рендер полной спецификации ─────────────────────────────────────── */
+    function renderFullSpecification() {
+        var el = document.getElementById('specificationContent');
+        if (!el) return;
+
+        if (!buildingStats || !buildingStats.length) {
+            el.innerHTML =
+                '<div class="no-data-banner">' +
+                '  <i class="bi bi-info-circle-fill"></i>' +
+                '  <span>Перейдите на вкладку <strong>Жилая часть</strong>, выберите проект и настройте параметры — спецификация сформируется автоматически.</span>' +
+                '</div>';
+            return;
+        }
+
+        var matLabels   = { pp: 'ПП', pp_silent: 'ПП Бесшумный', sml: 'SML' };
+        var showKitchen = (activeScenario === 2 || activeScenario === 3);
+        var rowNum = 1;
+        var rows   = '';
+
+        // ── Группа: Трубопроводы ─────────────────────────────────────────
+        rows += '<tr class="spec-group-row"><td colspan="6">Трубопроводы стояков К1</td></tr>';
+        buildingStats.forEach(function (b, idx) {
+            var s    = getSettings(idx);
+            var len  = calcRiserLengthM(b, activeScenario);
+            var lenR = Math.round(len * 1.03 * 10) / 10;
+            var mat  = matLabels[s.pipeType] || s.pipeType;
+            var diam = 'DN\u00a0' + s.riserDiameter;
+            if (showKitchen) diam += '\u00a0/\u00a0' + s.kitchenDiameter;
+            var bname = escHtml(b.name || ('Корпус ' + b.num));
+            rows += '<tr>' +
+                '<td>' + (rowNum++) + '</td>' +
+                '<td>Трубопровод ' + mat + ' ' + diam + '\u00a0мм (' + bname + ')</td>' +
+                '<td>м.п.</td>' +
+                '<td>' + len + '</td>' +
+                '<td>+3%</td>' +
+                '<td>' + lenR + '</td>' +
+                '</tr>';
+        });
+
+        // ── Группа: Фасонные изделия ─────────────────────────────────────
+        rows += '<tr class="spec-group-row"><td colspan="6">Фасонные изделия и крепеж</td></tr>';
+        collectFittings().forEach(function (item) {
+            rows += '<tr>' +
+                '<td>' + (rowNum++) + '</td>' +
+                '<td>' + escHtml(item.name) + '</td>' +
+                '<td>' + item.unit + '</td>' +
+                '<td>' + item.qty + '</td>' +
+                '<td>—</td>' +
+                '<td>' + item.qty + '</td>' +
+                '</tr>';
+        });
+
+        el.innerHTML =
+            '<div class="riser-table-wrap">' +
+            '<table class="riser-table">' +
+            '<thead><tr>' +
+            '<th style="width:38px">№</th>' +
+            '<th>Наименование</th>' +
+            '<th style="width:54px">Ед.</th>' +
+            '<th style="width:80px">Кол-во</th>' +
+            '<th style="width:64px">Запас</th>' +
+            '<th style="width:100px">С учётом запаса</th>' +
+            '</tr></thead>' +
+            '<tbody>' + rows + '</tbody>' +
+            '</table></div>';
+    }
+
+    /* ─── Экспорт спецификации в CSV (кодировка UTF-8 + BOM для Excel) ───── */
+    function exportToExcel() {
+        if (!buildingStats || !buildingStats.length) {
+            alert('Нет данных для экспорта. Загрузите проект и перейдите в «Жилую часть».');
+            return;
+        }
+
+        var matLabels   = { pp: 'ПП', pp_silent: 'ПП Бесшумный', sml: 'SML' };
+        var showKitchen = (activeScenario === 2 || activeScenario === 3);
+        var sep    = ';';
+        var lines  = [];
+        var rowNum = 1;
+
+        lines.push(['№', 'Наименование', 'Ед.', 'Кол-во', 'Запас', 'С учётом запаса'].join(sep));
+
+        // Трубопроводы
+        lines.push([sep + 'Трубопроводы стояков К1', '', '', '', ''].join(sep));
+        buildingStats.forEach(function (b, idx) {
+            var s    = getSettings(idx);
+            var len  = calcRiserLengthM(b, activeScenario);
+            var lenR = Math.round(len * 1.03 * 10) / 10;
+            var mat  = matLabels[s.pipeType] || s.pipeType;
+            var diam = 'DN ' + s.riserDiameter;
+            if (showKitchen) diam += ' / ' + s.kitchenDiameter;
+            var bname = b.name || ('Корпус ' + b.num);
+            lines.push([
+                rowNum++,
+                'Трубопровод ' + mat + ' ' + diam + ' мм (' + bname + ')',
+                'м.п.', len, '+3%', lenR
+            ].join(sep));
+        });
+
+        // Фасонные изделия
+        lines.push([sep + 'Фасонные изделия и крепеж', '', '', '', ''].join(sep));
+        collectFittings().forEach(function (item) {
+            lines.push([rowNum++, item.name, item.unit, item.qty, '—', item.qty].join(sep));
+        });
+
+        // UTF-8 BOM обеспечивает корректное открытие кириллицы в Excel
+        var csv  = '\uFEFF' + lines.join('\r\n');
+        var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        var url  = URL.createObjectURL(blob);
+        var a    = document.createElement('a');
+        a.href     = url;
+        a.download = 'Specification_K1.csv';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
     }
 
     /* ─── Утилита: экранирование HTML ────────────────────────────────────── */
@@ -778,7 +1135,7 @@
         }
     });
 
-    /* ─── Инициировать первый рендер (будет fallback до прихода данных) ──── */
+    /* ─── Инициировать первый рендер (fallback до прихода данных) ─────────── */
     renderResultsTable();
 
 }());
