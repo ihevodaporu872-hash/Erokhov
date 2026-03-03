@@ -176,6 +176,8 @@
             width: 16px; height: 16px; flex-shrink: 0;
             accent-color: var(--accent-blue); cursor: pointer;
         }
+        .bld-check-text { display: flex; flex-direction: column; gap: 2px; }
+        .bld-check-sub  { font-size: 11px; color: var(--accent-blue); }
         .bld-check-hint {
             margin-left: auto; white-space: nowrap;
             font-size: 11px; color: var(--gray-500);
@@ -504,7 +506,10 @@
         return 0;
     }
 
-    function calcRisers(building) { return calcBathRisers(building) + calcKitchenRisers(building); }
+    function calcRisers(building, idx) {
+        var base = calcBathRisers(building) + calcKitchenRisers(building);
+        return base + (idx !== undefined && getSettings(idx).pui ? 1 : 0);
+    }
 
     /* ─── Настройки корпусов ─────────────────────────────────────────────── */
     var buildingSettings   = {};
@@ -545,6 +550,12 @@
             total += runMax * floorH;
         });
         return Math.round(total * 10) / 10;
+    }
+
+    function calcTotalLengthM(b, scenario, idx) {
+        var riserLen = calcRiserLengthM(b, scenario);
+        var puiLen   = (idx !== undefined && getSettings(idx).pui) ? (b.height || 0) : 0;
+        return Math.round((riserLen + puiLen) * 10) / 10;
     }
 
     /* ─── Сбор фасонных изделий и оборудования ───────────────────────────── */
@@ -634,6 +645,36 @@
                     'Трап напольный DN\u00a050 (ПУИ)', 'шт',
                     floorsN);
 
+            // Фасонные изделия для выделенного стояка ПУИ DN110 (полная высота корпуса)
+            if (s.pui && floorsN > 0) {
+                var puiLen = b.height || 0;
+                // Противопожарные муфты (пластик)
+                if (isPlastic)
+                    addItem('mufta_' + s.riserDiameter,
+                        'Муфта противопожарная DN\u00a0' + s.riserDiameter, 'шт',
+                        floorsN);
+                // Ревизии
+                if (revPer > 0)
+                    addItem('rev_' + s.riserDiameter,
+                        'Ревизия DN\u00a0' + s.riserDiameter, 'шт',
+                        revPer);
+                // Компенсационные патрубки (пластик)
+                if (isPlastic && revPer > 0)
+                    addItem('kompens_' + s.riserDiameter,
+                        'Компенсационный патрубок DN\u00a0' + s.riserDiameter, 'шт',
+                        revPer);
+                // Хомуты (пластик)
+                if (isPlastic && puiLen > 0)
+                    addItem('khomuty',
+                        'Хомут стальной (крепление трубопроводов)', 'шт',
+                        Math.ceil(puiLen / 1.5));
+                // Муфты Rapid (SML)
+                if (isSML && puiLen > 0)
+                    addItem('rapid_' + s.riserDiameter,
+                        'Муфта соединительная Rapid DN\u00a0' + s.riserDiameter + ' (SML)', 'шт',
+                        Math.ceil(puiLen / 3));
+            }
+
             // Трап мусорокамеры — 1 шт на корпус
             if (s.trashRoom)
                 addItem('trap_dn50_trash',
@@ -719,8 +760,8 @@
 
         var html = buildingStats.map(function (b, idx) {
             var s      = getSettings(idx);
-            var len    = calcRiserLengthM(b, activeScenario);
-            var rc     = calcRisers(b);
+            var len    = calcTotalLengthM(b, activeScenario, idx);
+            var rc     = calcRisers(b, idx);
             var open   = accordionOpenState[idx] ? ' open' : '';
             var name   = escHtml(b.name || ('Корпус ' + b.num));
             var mBath  = maxFloorValue(b, 'bath');
@@ -750,7 +791,10 @@
 
                 '<label class="bld-check-label">' +
                 '<input type="checkbox" data-idx="' + idx + '" data-field="pui" class="bld-check"' + (s.pui ? ' checked' : '') + '>' +
+                '<span class="bld-check-text">' +
                 '<span>Помещения уборочного инвентаря (ПУИ)</span>' +
+                '<span class="bld-check-sub">(Добавляет\u00a01\u00a0выделенный стояк\u00a0К1 в шахте\u00a0ВК)</span>' +
+                '</span>' +
                 '<span class="bld-check-hint">1 трап DN50\u00a0/\u00a0эт. (' + floorsN + '\u00a0шт)</span>' +
                 '</label>' +
 
@@ -864,8 +908,8 @@
 
         var rows = buildingStats.map(function (b, idx) {
             var s      = getSettings(idx);
-            var risers = calcRisers(b);
-            var len    = calcRiserLengthM(b, activeScenario);
+            var risers = calcRisers(b, idx);
+            var len    = calcTotalLengthM(b, activeScenario, idx);
             totalRisers += risers;
             totalLength += len;
             var mat  = matLabels[s.pipeType] || s.pipeType;
@@ -921,7 +965,7 @@
         rows += '<tr class="spec-group-row"><td colspan="7">Трубопроводы стояков К1</td></tr>';
         buildingStats.forEach(function (b, idx) {
             var s    = getSettings(idx);
-            var len  = calcRiserLengthM(b, activeScenario);
+            var len  = calcTotalLengthM(b, activeScenario, idx);
             var lenR = Math.round(len * 1.03 * 10) / 10;
             var mat  = matLabels[s.pipeType] || s.pipeType;
             var diam = 'DN\u00a0' + s.riserDiameter;
@@ -982,7 +1026,7 @@
         lines.push([sep + 'Трубопроводы стояков К1','','','','',''].join(sep));
         buildingStats.forEach(function (b, idx) {
             var s    = getSettings(idx);
-            var len  = calcRiserLengthM(b, activeScenario);
+            var len  = calcTotalLengthM(b, activeScenario, idx);
             var lenR = Math.round(len * 1.03 * 10) / 10;
             var mat  = matLabels[s.pipeType] || s.pipeType;
             var diam = 'DN ' + s.riserDiameter + (showKitchen ? ' / ' + s.kitchenDiameter : '') + ' мм';
