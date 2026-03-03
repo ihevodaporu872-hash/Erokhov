@@ -557,7 +557,9 @@ function renderSectionSVG(sec, si, h1, hn) {
     const yZoneBot = floorY(zr.from);
     const yFloor1 = floorY(1);
     const zoneName = zr.zone.name || 'Зона ' + (zi + 1);
-    const hZone = floorRangeHeightMeters(h1, hn, 1, zr.to);
+    const hZone = (sec.buildingHeight && sec.floors > 0)
+      ? (sec.buildingHeight * zr.to) / sec.floors
+      : floorRangeHeightMeters(h1, hn, 1, zr.to);
 
     group.bundles.forEach((bundle) => {
       const riserNum = bundle.riserIdx + 1;
@@ -623,7 +625,9 @@ function renderSectionSVG(sec, si, h1, hn) {
 
       // --- Компенсаторы на Т3 и Т4 ---
       const zoneFloors = zr.to - zr.from + 1;
-      const zoneH = (zr.from === 1 ? h1 : hn) + (zoneFloors > 1 ? (zoneFloors - 1) * hn : 0);
+      const zoneH = (sec.buildingHeight && sec.floors > 0)
+        ? (sec.buildingHeight * zoneFloors) / sec.floors
+        : (zr.from === 1 ? h1 : hn) + (zoneFloors > 1 ? (zoneFloors - 1) * hn : 0);
       const compCountT3 = calcCompensators(zoneH, d.T3);
       const compCountT4 = calcCompensators(zoneH, d.T4);
 

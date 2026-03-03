@@ -2069,7 +2069,8 @@
                     floorsLocked: false,
                     apts: apts,
                     rent: { enabled: false, qty: 1 },
-                    zones: generateDefaultZonesForWater(maxFloor)
+                    zones: generateDefaultZonesForWater(maxFloor),
+                    buildingHeight: b.height || null  // высота корпуса из Квартирографии
                 };
             });
         }
