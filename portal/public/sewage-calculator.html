@@ -33,6 +33,62 @@
         .tab-panel        { display: none; }
         .tab-panel.active { display: block; }
 
+        /* ── Выбор системы (К1/К2/К3) ────────────────────────────────────── */
+        .system-selection-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 14px;
+            margin: 0 0 28px;
+        }
+        .system-card {
+            position: relative;
+            border: 2px solid var(--gray-200);
+            border-radius: 14px;
+            padding: 20px 22px 18px;
+            cursor: pointer;
+            transition: border-color .15s, box-shadow .15s, background .15s, transform .12s;
+            background: var(--bg-card);
+            user-select: none;
+            text-align: left;
+        }
+        .system-card:hover:not(.active):not(.disabled) {
+            border-color: var(--gray-400, #AEAEB2);
+            box-shadow: 0 2px 12px rgba(0,0,0,.09);
+            transform: translateY(-1px);
+        }
+        .system-card.active {
+            border-color: var(--accent-blue);
+            background: var(--accent-blue-light);
+            box-shadow: 0 0 0 3px rgba(0,122,255,.12);
+        }
+        .system-card.disabled {
+            opacity: .45;
+            cursor: not-allowed;
+        }
+        .system-card-icon {
+            display: block;
+            font-size: 28px;
+            color: var(--gray-400, #AEAEB2);
+            margin-bottom: 10px;
+            transition: color .15s;
+        }
+        .system-card.active .system-card-icon { color: var(--accent-blue); }
+        .system-card-name {
+            font-size: 15px; font-weight: 700; color: var(--gray-900);
+            margin-bottom: 4px;
+        }
+        .system-card.active .system-card-name { color: var(--accent-blue); }
+        .system-card-desc {
+            font-size: 12px; color: var(--gray-500); line-height: 1.45;
+        }
+        .system-card-badge {
+            display: inline-block;
+            font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px;
+            color: var(--gray-500); background: var(--gray-200);
+            border-radius: 20px; padding: 2px 8px; margin-top: 10px;
+        }
+        .system-card.active .system-card-badge { color: var(--accent-blue); background: rgba(0,122,255,.15); }
+
         /* ── Карточки сценариев ───────────────────────────────────────────── */
         .scenario-grid {
             display: grid;
@@ -269,7 +325,6 @@
             <div class="tabs-container">
                 <div class="tabs-nav" id="sewageTabs">
                     <button class="tab-btn active" data-tab="residential"><i class="bi bi-building"></i>Жилая часть</button>
-                    <button class="tab-btn" data-tab="storm"><i class="bi bi-cloud-rain-fill"></i>К2 Ливнесток</button>
                     <button class="tab-btn" data-tab="underground"><i class="bi bi-layers"></i>Подземная часть</button>
                     <button class="tab-btn" data-tab="equipment"><i class="bi bi-gear-fill"></i>Оборудование</button>
                     <button class="tab-btn" data-tab="external"><i class="bi bi-map"></i>Наружные сети</button>
@@ -282,174 +337,199 @@
             <!-- ===== Контент вкладок ===== -->
             <div class="tab-content" id="sewageTabContent">
 
-                <!-- ========== ЖИЛАЯ ЧАСТЬ ========== -->
+                <!-- ========== ЖИЛАЯ ЧАСТЬ (К1 / К2 / К3) ========== -->
                 <div class="tab-panel active" id="tab-residential">
                     <div class="control-panel">
 
-                        <!-- Секция: Ввод данных -->
-                        <div class="panel-section panel-section-input">
-                            <h3 class="panel-section-title">
-                                <span class="panel-section-icon panel-section-icon-input"></span>
-                                Ввод данных
-                            </h3>
-                            <details class="accordion accordion-input" open>
-                                <summary class="accordion-header">
-                                    <span class="accordion-icon"></span>
-                                    Параметры проекта
-                                </summary>
-                                <div class="accordion-content">
-
-                                    <div class="floor-height-info">
-                                        <span class="floor-height-info-icon">ℹ</span>
-                                        Параметры высот подтягиваются автоматически из раздела <strong>Квартирография</strong>. Высота корпуса используется для расчёта длины трубопроводов стояков.
-                                    </div>
-
-                                    <h4 class="subsection-title">Конфигурация стояков К1</h4>
-                                    <div class="scenario-grid" id="scenarioCards">
-
-                                        <div class="scenario-card active" data-scenario="1">
-                                            <div class="scenario-card-badge">Только шахты С/У</div>
-                                            <div class="scenario-card-title"><i class="bi bi-diagram-2"></i>Монтаж стояков в шахтах С/У</div>
-                                            <div class="scenario-card-desc">Кухни подключаются к стоякам санузлов через горизонтальные лежаки в подвале.</div>
-                                            <div class="scenario-card-formula">Стояков К1 = Кол-во С/У</div>
-                                        </div>
-
-                                        <div class="scenario-card" data-scenario="2">
-                                            <div class="scenario-card-badge">Шахты С/У и Кухонь</div>
-                                            <div class="scenario-card-title"><i class="bi bi-diagram-3"></i>Монтаж стояков в шахтах С/У и кухонь</div>
-                                            <div class="scenario-card-desc">Отдельные стояки для каждой мокрой зоны: С/У и кухня.</div>
-                                            <div class="scenario-card-formula">Стояков К1 = С/У + Кухни</div>
-                                        </div>
-
-                                        <div class="scenario-card" data-scenario="3">
-                                            <div class="scenario-card-badge">Оптимизированный (смежные кухни)</div>
-                                            <div class="scenario-card-title"><i class="bi bi-arrows-collapse"></i>Монтаж в шахтах С/У и выборочно кухонь</div>
-                                            <div class="scenario-card-desc">Смежные кухни объединяются в один стояк, несмежные — отдельные.</div>
-                                            <div class="scenario-card-formula">Стояков К1 = С/У + ⌈Кухни / 2⌉</div>
-                                        </div>
-
-                                    </div>
-
-                                    <h4 class="subsection-title">Параметры труб по корпусам</h4>
-                                    <div id="buildingAccordions"></div>
-
-                                </div>
-                            </details>
+                        <!-- Системный дашборд -->
+                        <div class="system-selection-grid">
+                            <div class="system-card active" data-system="K1">
+                                <i class="bi bi-house-gear system-card-icon"></i>
+                                <div class="system-card-name">Система К1</div>
+                                <div class="system-card-desc">Бытовая канализация</div>
+                                <span class="system-card-badge">Активна</span>
+                            </div>
+                            <div class="system-card" data-system="K2">
+                                <i class="bi bi-cloud-rain system-card-icon"></i>
+                                <div class="system-card-name">Система К2</div>
+                                <div class="system-card-desc">Ливневая канализация</div>
+                                <span class="system-card-badge">Активна</span>
+                            </div>
+                            <div class="system-card disabled" data-system="K3">
+                                <i class="bi bi-cup-hot system-card-icon"></i>
+                                <div class="system-card-name">Система К3</div>
+                                <div class="system-card-desc">Производственная канализация</div>
+                                <span class="system-card-badge">В разработке</span>
+                            </div>
                         </div>
 
-                        <!-- Секция: Результаты расчёта -->
-                        <div class="panel-section panel-section-output">
-                            <h3 class="panel-section-title">
-                                <span class="panel-section-icon panel-section-icon-output"></span>
-                                Результаты расчёта
-                            </h3>
+                        <!-- ── К1: Бытовая канализация ── -->
+                        <div id="k1-section">
 
-                            <details class="accordion accordion-output" open>
-                                <summary class="accordion-header">
-                                    <span class="accordion-icon"></span>Трубопроводы стояков К1
-                                </summary>
-                                <div class="accordion-content">
-                                    <div id="residentialResults">
-                                        <div class="no-data-banner">
-                                            <i class="bi bi-info-circle-fill"></i>
-                                            <span>Выберите проект и загрузите данные в разделе <strong>Квартирография</strong> — результаты появятся автоматически.</span>
+                            <!-- Секция: Ввод данных -->
+                            <div class="panel-section panel-section-input">
+                                <h3 class="panel-section-title">
+                                    <span class="panel-section-icon panel-section-icon-input"></span>
+                                    Ввод данных
+                                </h3>
+                                <details class="accordion accordion-input" open>
+                                    <summary class="accordion-header">
+                                        <span class="accordion-icon"></span>
+                                        Параметры проекта
+                                    </summary>
+                                    <div class="accordion-content">
+
+                                        <div class="floor-height-info">
+                                            <span class="floor-height-info-icon">ℹ</span>
+                                            Параметры высот подтягиваются автоматически из раздела <strong>Квартирография</strong>. Высота корпуса используется для расчёта длины трубопроводов стояков.
+                                        </div>
+
+                                        <h4 class="subsection-title">Конфигурация стояков К1</h4>
+                                        <div class="scenario-grid" id="scenarioCards">
+
+                                            <div class="scenario-card active" data-scenario="1">
+                                                <div class="scenario-card-badge">Только шахты С/У</div>
+                                                <div class="scenario-card-title"><i class="bi bi-diagram-2"></i>Монтаж стояков в шахтах С/У</div>
+                                                <div class="scenario-card-desc">Кухни подключаются к стоякам санузлов через горизонтальные лежаки в подвале.</div>
+                                                <div class="scenario-card-formula">Стояков К1 = Кол-во С/У</div>
+                                            </div>
+
+                                            <div class="scenario-card" data-scenario="2">
+                                                <div class="scenario-card-badge">Шахты С/У и Кухонь</div>
+                                                <div class="scenario-card-title"><i class="bi bi-diagram-3"></i>Монтаж стояков в шахтах С/У и кухонь</div>
+                                                <div class="scenario-card-desc">Отдельные стояки для каждой мокрой зоны: С/У и кухня.</div>
+                                                <div class="scenario-card-formula">Стояков К1 = С/У + Кухни</div>
+                                            </div>
+
+                                            <div class="scenario-card" data-scenario="3">
+                                                <div class="scenario-card-badge">Оптимизированный (смежные кухни)</div>
+                                                <div class="scenario-card-title"><i class="bi bi-arrows-collapse"></i>Монтаж в шахтах С/У и выборочно кухонь</div>
+                                                <div class="scenario-card-desc">Смежные кухни объединяются в один стояк, несмежные — отдельные.</div>
+                                                <div class="scenario-card-formula">Стояков К1 = С/У + ⌈Кухни / 2⌉</div>
+                                            </div>
+
+                                        </div>
+
+                                        <h4 class="subsection-title">Параметры труб по корпусам</h4>
+                                        <div id="buildingAccordions"></div>
+
+                                    </div>
+                                </details>
+                            </div>
+
+                            <!-- Секция: Результаты расчёта К1 -->
+                            <div class="panel-section panel-section-output">
+                                <h3 class="panel-section-title">
+                                    <span class="panel-section-icon panel-section-icon-output"></span>
+                                    Результаты расчёта
+                                </h3>
+
+                                <details class="accordion accordion-output" open>
+                                    <summary class="accordion-header">
+                                        <span class="accordion-icon"></span>Трубопроводы стояков К1
+                                    </summary>
+                                    <div class="accordion-content">
+                                        <div id="residentialResults">
+                                            <div class="no-data-banner">
+                                                <i class="bi bi-info-circle-fill"></i>
+                                                <span>Выберите проект и загрузите данные в разделе <strong>Квартирография</strong> — результаты появятся автоматически.</span>
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
-                            </details>
+                                </details>
 
-                            <details class="accordion accordion-output" open>
-                                <summary class="accordion-header">
-                                    <span class="accordion-icon"></span>Фасонные изделия и общедомовое оборудование
-                                </summary>
-                                <div class="accordion-content">
-                                    <div id="fittingsResults">
-                                        <div class="no-data-banner">
-                                            <i class="bi bi-info-circle-fill"></i>
-                                            <span>Загрузите данные проекта — изделия рассчитаются автоматически.</span>
+                                <details class="accordion accordion-output" open>
+                                    <summary class="accordion-header">
+                                        <span class="accordion-icon"></span>Фасонные изделия и общедомовое оборудование
+                                    </summary>
+                                    <div class="accordion-content">
+                                        <div id="fittingsResults">
+                                            <div class="no-data-banner">
+                                                <i class="bi bi-info-circle-fill"></i>
+                                                <span>Загрузите данные проекта — изделия рассчитаются автоматически.</span>
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
-                            </details>
+                                </details>
 
-                        </div>
+                            </div>
 
-                    </div>
-                </div>
+                        </div><!-- /k1-section -->
 
-                <!-- ========== К2: ЛИВНЕСТОК ========== -->
-                <div class="tab-panel" id="tab-storm">
-                    <div class="control-panel">
+                        <!-- ── К2: Ливневая канализация ── -->
+                        <div id="k2-section" style="display:none">
 
-                        <!-- Секция: Ввод данных -->
-                        <div class="panel-section panel-section-input">
-                            <h3 class="panel-section-title">
-                                <span class="panel-section-icon panel-section-icon-input"></span>
-                                Ввод данных
-                            </h3>
-                            <details class="accordion accordion-input" open>
-                                <summary class="accordion-header">
-                                    <span class="accordion-icon"></span>
-                                    Параметры системы К2 (Ливнесток)
-                                </summary>
-                                <div class="accordion-content">
+                            <!-- Секция: Ввод данных -->
+                            <div class="panel-section panel-section-input">
+                                <h3 class="panel-section-title">
+                                    <span class="panel-section-icon panel-section-icon-input"></span>
+                                    Ввод данных
+                                </h3>
+                                <details class="accordion accordion-input" open>
+                                    <summary class="accordion-header">
+                                        <span class="accordion-icon"></span>
+                                        Параметры системы К2 (Ливнесток)
+                                    </summary>
+                                    <div class="accordion-content">
 
-                                    <div class="floor-height-info">
-                                        <span class="floor-height-info-icon">ℹ</span>
-                                        Высота корпусов подтягивается из раздела <strong>Квартирография</strong>. Длина стояков = Кол-во стояков × Высота корпуса.
+                                        <div class="floor-height-info">
+                                            <span class="floor-height-info-icon">ℹ</span>
+                                            Высота корпусов подтягивается из раздела <strong>Квартирография</strong>. Длина стояков = Кол-во стояков × Высота корпуса.
+                                        </div>
+
+                                        <div class="bld-checks" style="margin-bottom:20px">
+                                            <label class="bld-check-label">
+                                                <input type="checkbox" id="stormInsulationCheck" checked>
+                                                <span>Изоляция трубопроводов из вспененного каучука DN&nbsp;50</span>
+                                                <span class="bld-check-hint">Метраж = длине труб</span>
+                                            </label>
+                                        </div>
+
+                                        <h4 class="subsection-title">Параметры стояков и трапов по корпусам</h4>
+                                        <div id="stormBuildingAccordions"></div>
+
                                     </div>
+                                </details>
+                            </div>
 
-                                    <div class="bld-checks" style="margin-bottom:20px">
-                                        <label class="bld-check-label">
-                                            <input type="checkbox" id="stormInsulationCheck" checked>
-                                            <span>Изоляция трубопроводов из вспененного каучука DN&nbsp;50</span>
-                                            <span class="bld-check-hint">Метраж = длине труб</span>
-                                        </label>
-                                    </div>
+                            <!-- Секция: Результаты расчёта К2 -->
+                            <div class="panel-section panel-section-output">
+                                <h3 class="panel-section-title">
+                                    <span class="panel-section-icon panel-section-icon-output"></span>
+                                    Результаты расчёта
+                                </h3>
 
-                                    <h4 class="subsection-title">Параметры стояков и трапов по корпусам</h4>
-                                    <div id="stormBuildingAccordions"></div>
-
-                                </div>
-                            </details>
-                        </div>
-
-                        <!-- Секция: Результаты расчёта -->
-                        <div class="panel-section panel-section-output">
-                            <h3 class="panel-section-title">
-                                <span class="panel-section-icon panel-section-icon-output"></span>
-                                Результаты расчёта
-                            </h3>
-
-                            <details class="accordion accordion-output" open>
-                                <summary class="accordion-header">
-                                    <span class="accordion-icon"></span>Трубопроводы стояков К2
-                                </summary>
-                                <div class="accordion-content">
-                                    <div id="stormResults">
-                                        <div class="no-data-banner">
-                                            <i class="bi bi-info-circle-fill"></i>
-                                            <span>Загрузите данные проекта из <strong>Квартирографии</strong> — результаты появятся автоматически.</span>
+                                <details class="accordion accordion-output" open>
+                                    <summary class="accordion-header">
+                                        <span class="accordion-icon"></span>Трубопроводы стояков К2
+                                    </summary>
+                                    <div class="accordion-content">
+                                        <div id="stormResults">
+                                            <div class="no-data-banner">
+                                                <i class="bi bi-info-circle-fill"></i>
+                                                <span>Загрузите данные проекта из <strong>Квартирографии</strong> — результаты появятся автоматически.</span>
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
-                            </details>
+                                </details>
 
-                            <details class="accordion accordion-output" open>
-                                <summary class="accordion-header">
-                                    <span class="accordion-icon"></span>Фасонные изделия и оборудование К2
-                                </summary>
-                                <div class="accordion-content">
-                                    <div id="stormFittingsResults">
-                                        <div class="no-data-banner">
-                                            <i class="bi bi-info-circle-fill"></i>
-                                            <span>Загрузите данные проекта — изделия рассчитаются автоматически.</span>
+                                <details class="accordion accordion-output" open>
+                                    <summary class="accordion-header">
+                                        <span class="accordion-icon"></span>Фасонные изделия и оборудование К2
+                                    </summary>
+                                    <div class="accordion-content">
+                                        <div id="stormFittingsResults">
+                                            <div class="no-data-banner">
+                                                <i class="bi bi-info-circle-fill"></i>
+                                                <span>Загрузите данные проекта — изделия рассчитаются автоматически.</span>
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
-                            </details>
+                                </details>
 
-                        </div>
+                            </div>
+
+                        </div><!-- /k2-section -->
 
                     </div>
                 </div>
@@ -580,10 +660,11 @@
     /* ─── Состояние ──────────────────────────────────────────────────────── */
     var buildingStats  = null;
     var activeScenario = 1;
+    var activeSystem   = 'K1';
 
     /* К2 */
-    var stormSettings          = {};
-    var stormInsulation        = true;
+    var stormSettings           = {};
+    var stormInsulation         = true;
     var stormAccordionOpenState = {};
 
     /* ─── Переключение вкладок ───────────────────────────────────────────── */
@@ -599,8 +680,23 @@
             var panel = document.getElementById(targetId);
             if (panel) panel.classList.add('active');
             if (btn.dataset.tab === 'specification') renderFullSpecification();
-            if (btn.dataset.tab === 'storm')         renderStormResults();
         });
+    });
+
+    /* ─── Переключение систем К1 / К2 / К3 ──────────────────────────────── */
+    function switchSystem(system) {
+        activeSystem = system;
+        document.querySelectorAll('.system-card').forEach(function (c) {
+            c.classList.toggle('active', c.dataset.system === system);
+        });
+        document.getElementById('k1-section').style.display = (system === 'K1') ? '' : 'none';
+        document.getElementById('k2-section').style.display = (system === 'K2') ? '' : 'none';
+        if (system === 'K1') renderResultsTable();
+        if (system === 'K2') renderStormResults();
+    }
+
+    document.querySelectorAll('.system-card:not(.disabled)').forEach(function (card) {
+        card.addEventListener('click', function () { switchSystem(card.dataset.system); });
     });
 
     /* ─── Чекбокс изоляции К2 ───────────────────────────────────────────── */
