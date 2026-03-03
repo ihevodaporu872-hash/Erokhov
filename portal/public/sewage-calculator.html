@@ -223,6 +223,7 @@
             <div class="tabs-container">
                 <div class="tabs-nav" id="sewageTabs">
                     <button class="tab-btn active" data-tab="residential"><i class="bi bi-building"></i>Жилая часть</button>
+                    <button class="tab-btn" data-tab="storm"><i class="bi bi-cloud-rain-fill"></i>К2 Ливнесток</button>
                     <button class="tab-btn" data-tab="underground"><i class="bi bi-layers"></i>Подземная часть</button>
                     <button class="tab-btn" data-tab="equipment"><i class="bi bi-gear-fill"></i>Оборудование</button>
                     <button class="tab-btn" data-tab="external"><i class="bi bi-map"></i>Наружные сети</button>
@@ -330,6 +331,83 @@
                     </div>
                 </div>
 
+                <!-- ========== К2: ЛИВНЕСТОК ========== -->
+                <div class="tab-panel" id="tab-storm">
+                    <div class="control-panel">
+
+                        <!-- Секция: Ввод данных -->
+                        <div class="panel-section panel-section-input">
+                            <h3 class="panel-section-title">
+                                <span class="panel-section-icon panel-section-icon-input"></span>
+                                Ввод данных
+                            </h3>
+                            <details class="accordion accordion-input" open>
+                                <summary class="accordion-header">
+                                    <span class="accordion-icon"></span>
+                                    Параметры системы К2 (Ливнесток)
+                                </summary>
+                                <div class="accordion-content">
+
+                                    <div class="floor-height-info">
+                                        <span class="floor-height-info-icon">ℹ</span>
+                                        Высота корпусов подтягивается из раздела <strong>Квартирография</strong>. Длина стояков = Кол-во стояков × Высота корпуса.
+                                    </div>
+
+                                    <div class="bld-checks" style="margin-bottom:20px">
+                                        <label class="bld-check-label">
+                                            <input type="checkbox" id="stormInsulationCheck" checked>
+                                            <span>Изоляция трубопроводов из вспененного каучука DN&nbsp;50</span>
+                                            <span class="bld-check-hint">Метраж = длине труб</span>
+                                        </label>
+                                    </div>
+
+                                    <h4 class="subsection-title">Параметры стояков и трапов по корпусам</h4>
+                                    <div id="stormBuildingAccordions"></div>
+
+                                </div>
+                            </details>
+                        </div>
+
+                        <!-- Секция: Результаты расчёта -->
+                        <div class="panel-section panel-section-output">
+                            <h3 class="panel-section-title">
+                                <span class="panel-section-icon panel-section-icon-output"></span>
+                                Результаты расчёта
+                            </h3>
+
+                            <details class="accordion accordion-output" open>
+                                <summary class="accordion-header">
+                                    <span class="accordion-icon"></span>Трубопроводы стояков К2
+                                </summary>
+                                <div class="accordion-content">
+                                    <div id="stormResults">
+                                        <div class="no-data-banner">
+                                            <i class="bi bi-info-circle-fill"></i>
+                                            <span>Загрузите данные проекта из <strong>Квартирографии</strong> — результаты появятся автоматически.</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </details>
+
+                            <details class="accordion accordion-output" open>
+                                <summary class="accordion-header">
+                                    <span class="accordion-icon"></span>Фасонные изделия и оборудование К2
+                                </summary>
+                                <div class="accordion-content">
+                                    <div id="stormFittingsResults">
+                                        <div class="no-data-banner">
+                                            <i class="bi bi-info-circle-fill"></i>
+                                            <span>Загрузите данные проекта — изделия рассчитаются автоматически.</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </details>
+
+                        </div>
+
+                    </div>
+                </div>
+
                 <!-- ========== ПОДЗЕМНАЯ ЧАСТЬ ========== -->
                 <div class="tab-panel" id="tab-underground">
                     <div class="placeholder-container">
@@ -385,7 +463,7 @@
                         <div class="panel-section panel-section-output">
                             <h3 class="panel-section-title">
                                 <span class="panel-section-icon panel-section-icon-output"></span>
-                                Спецификация системы К1
+                                Спецификация систем К1 и К2
                             </h3>
                             <details class="accordion accordion-output" open>
                                 <summary class="accordion-header">
@@ -457,6 +535,11 @@
     var buildingStats  = null;
     var activeScenario = 1;
 
+    /* К2 */
+    var stormSettings          = {};
+    var stormInsulation        = true;
+    var stormAccordionOpenState = {};
+
     /* ─── Переключение вкладок ───────────────────────────────────────────── */
     var tabBtns   = document.querySelectorAll('#sewageTabs .tab-btn');
     var tabPanels = document.querySelectorAll('#sewageTabContent .tab-panel');
@@ -470,7 +553,14 @@
             var panel = document.getElementById(targetId);
             if (panel) panel.classList.add('active');
             if (btn.dataset.tab === 'specification') renderFullSpecification();
+            if (btn.dataset.tab === 'storm')         renderStormResults();
         });
+    });
+
+    /* ─── Чекбокс изоляции К2 ───────────────────────────────────────────── */
+    document.getElementById('stormInsulationCheck').addEventListener('change', function () {
+        stormInsulation = this.checked;
+        renderStormResults();
     });
 
     /* ─── Выбор сценария ─────────────────────────────────────────────────── */
@@ -681,12 +771,6 @@
                     'Трап напольный DN\u00a050 (мусорокамера)', 'шт',
                     1);
 
-            // Трапы балконов/террас DN110
-            if (s.balconies > 0)
-                addItem('trap_dn110_balcony',
-                    'Трап кровельный DN\u00a0110 (балконы/террасы, тип HL\u00a090.2)', 'шт',
-                    s.balconies,
-                    'Предусмотреть подключение к сети электрообогрева (раздел ЭО)');
         });
 
         // Фиксированный порядок вывода
@@ -697,8 +781,7 @@
             'khomuty',
             'rapid_50','rapid_110','rapid_160',
             'voronka_condensate',
-            'trap_dn50_pui','trap_dn50_trash',
-            'trap_dn110_balcony'
+            'trap_dn50_pui','trap_dn50_trash'
         ];
         var result = [];
         ORDER.forEach(function (k) { if (acc[k]) result.push(acc[k]); });
@@ -805,13 +888,6 @@
                 '</label>' +
 
                 '</div>' +  // /bld-checks
-
-                '<div class="bld-num-row">' +
-                '<label>Балконы\u00a0/\u00a0Террасы,\u00a0шт:</label>' +
-                '<input type="number" min="0" value="' + (s.balconies || 0) + '" ' +
-                'data-idx="' + idx + '" data-field="balconies" class="bld-num">' +
-                '<span style="font-size:11px;color:var(--gray-500)">→ трап DN110 (тип HL\u00a090.2)</span>' +
-                '</div>' +
 
                 '</div>';  // /bld-equipment-section
 
@@ -995,6 +1071,37 @@
                 '</tr>';
         });
 
+        // ── Группа: Система К2 ───────────────────────────────────────────
+        if (buildingStats && buildingStats.length) {
+            rows += '<tr class="spec-group-row"><td colspan="7">Система К2 (Дождевая канализация)</td></tr>';
+            var k2Note = 'Трубопроводы изолировать вспененным каучуком. Предусмотреть электрообогрев стояков и трапов';
+            buildingStats.forEach(function (b, idx) {
+                var len2  = calcStormPipeLength(b, idx);
+                if (!len2) return;
+                var len2R = Math.round(len2 * 1.03 * 10) / 10;
+                rows += '<tr>' +
+                    '<td>' + (rowNum++) + '</td>' +
+                    '<td>Трубопровод SML DN\u00a050\u00a0мм (' + escHtml(b.name || 'Корпус ' + b.num) + ')</td>' +
+                    '<td>м.п.</td>' +
+                    '<td>' + len2 + '</td>' +
+                    '<td>+3%</td>' +
+                    '<td>' + len2R + '</td>' +
+                    '<td class="spec-note-cell">' + k2Note + '</td>' +
+                    '</tr>';
+            });
+            collectStormFittings().forEach(function (item) {
+                rows += '<tr>' +
+                    '<td>' + (rowNum++) + '</td>' +
+                    '<td>' + escHtml(item.name) + '</td>' +
+                    '<td>' + item.unit + '</td>' +
+                    '<td>' + item.qty + '</td>' +
+                    '<td>—</td>' +
+                    '<td>' + item.qty + '</td>' +
+                    '<td class="spec-note-cell">' + escHtml(item.note || '—') + '</td>' +
+                    '</tr>';
+            });
+        }
+
         el.innerHTML =
             '<div class="riser-table-wrap"><table class="riser-table">' +
             '<thead><tr>' +
@@ -1041,6 +1148,21 @@
             lines.push([rowNum++, item.name, item.unit, item.qty, '—', item.qty, item.note || ''].join(sep));
         });
 
+        // К2: Ливневая канализация
+        lines.push([sep + 'Система К2 (Дождевая канализация)','','','','',''].join(sep));
+        var k2Note = 'Трубопроводы изолировать вспененным каучуком. Предусмотреть электрообогрев стояков и трапов';
+        buildingStats.forEach(function (b, idx) {
+            var len2  = calcStormPipeLength(b, idx);
+            if (!len2) return;
+            var len2R = Math.round(len2 * 1.03 * 10) / 10;
+            lines.push([rowNum++,
+                'Трубопровод SML DN 50 мм (' + (b.name || 'Корпус ' + b.num) + ')',
+                'м.п.', len2, '+3%', len2R, k2Note].join(sep));
+        });
+        collectStormFittings().forEach(function (item) {
+            lines.push([rowNum++, item.name, item.unit, item.qty, '—', item.qty, item.note || ''].join(sep));
+        });
+
         var csv  = '\uFEFF' + lines.join('\r\n');
         var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
         var url  = URL.createObjectURL(blob);
@@ -1048,6 +1170,235 @@
         a.href = url; a.download = 'Specification_K1.csv';
         document.body.appendChild(a); a.click();
         document.body.removeChild(a); URL.revokeObjectURL(url);
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════════
+       К2 — Ливневая канализация
+    ═══════════════════════════════════════════════════════════════════════ */
+
+    function getStormSettings(idx) {
+        if (!stormSettings[idx]) {
+            // Предзаполнение: корпус 0 → 12 стояков, корпус 1 → 18 стояков
+            var defaultRisers = idx === 0 ? 12 : idx === 1 ? 18 : 0;
+            stormSettings[idx] = {
+                risers:    defaultRisers,
+                balconies: 0
+            };
+        }
+        return stormSettings[idx];
+    }
+
+    function calcStormPipeLength(b, idx) {
+        var s = getStormSettings(idx);
+        if (!s.risers || !b.height) return 0;
+        return Math.round(s.risers * b.height * 10) / 10;
+    }
+
+    function collectStormFittings() {
+        if (!buildingStats || !buildingStats.length) return [];
+        var acc = {};
+
+        function addItem(key, name, unit, qty, note) {
+            if (!qty || qty <= 0) return;
+            if (acc[key]) { acc[key].qty += qty; }
+            else          { acc[key] = { name: name, unit: unit, qty: qty, note: note || '' }; }
+        }
+
+        buildingStats.forEach(function (b, idx) {
+            var s   = getStormSettings(idx);
+            var len = calcStormPipeLength(b, idx);
+
+            // Муфты Rapid DN50 для SML: ⌈len/3⌉
+            if (len > 0)
+                addItem('storm_rapid_50',
+                    'Муфта соединительная Rapid DN\u00a050 (SML, К2)', 'шт',
+                    Math.ceil(len / 3));
+
+            // Хомуты стальные: ⌈len/1.5⌉
+            if (len > 0)
+                addItem('storm_khomuty',
+                    'Хомут стальной (крепление стояков К2)', 'шт',
+                    Math.ceil(len / 1.5));
+
+            // Трапы HL 90.2 — 1 шт на каждый балкон/террасу
+            if (s.balconies > 0)
+                addItem('storm_trap_hl902',
+                    'Трап кровельный HL\u00a090.2 DN\u00a050 (балконы/террасы)', 'шт',
+                    s.balconies,
+                    'Предусмотреть подключение к сети электрообогрева (раздел ЭО)');
+
+            // Аварийные гильзы — 1 шт на каждый балкон
+            if (s.balconies > 0)
+                addItem('storm_gilza',
+                    'Гильза аварийная (стальная труба DN\u00a050–100, l\u00a0=\u00a00,3\u00a0м)', 'шт',
+                    s.balconies);
+
+            // Изоляция вспененный каучук — метраж = длине труб
+            if (stormInsulation && len > 0)
+                addItem('storm_insulation',
+                    'Изоляция из вспененного каучука DN\u00a050 (стояки К2)', 'м.п.',
+                    len,
+                    'Трубопроводы изолировать вспененным каучуком. Предусмотреть электрообогрев стояков и трапов');
+        });
+
+        var ORDER = [
+            'storm_rapid_50', 'storm_khomuty',
+            'storm_trap_hl902', 'storm_gilza',
+            'storm_insulation'
+        ];
+        var result = [];
+        ORDER.forEach(function (k) { if (acc[k]) result.push(acc[k]); });
+        Object.keys(acc).forEach(function (k) { if (ORDER.indexOf(k) === -1) result.push(acc[k]); });
+        return result;
+    }
+
+    /* ─── Рендер аккордеонов К2 ──────────────────────────────────────────── */
+    function renderStormAccordions() {
+        var container = document.getElementById('stormBuildingAccordions');
+        if (!container) return;
+
+        if (!buildingStats || !buildingStats.length) {
+            container.innerHTML =
+                '<div class="no-data-banner"><i class="bi bi-info-circle-fill"></i>' +
+                '<span>Загрузите данные проекта из <strong>Квартирографии</strong> — здесь появятся настройки по каждому корпусу.</span></div>';
+            return;
+        }
+
+        // Сохраняем состояние раскрытия
+        container.querySelectorAll('details[id^="storm-accord-"]').forEach(function (det) {
+            stormAccordionOpenState[parseInt(det.id.replace('storm-accord-', ''), 10)] = det.open;
+        });
+
+        var html = buildingStats.map(function (b, idx) {
+            var s    = getStormSettings(idx);
+            var len  = calcStormPipeLength(b, idx);
+            var open = stormAccordionOpenState[idx] ? ' open' : '';
+            var name = escHtml(b.name || ('Корпус ' + b.num));
+
+            return '<details class="accordion" id="storm-accord-' + idx + '"' + open + '>' +
+                '<summary class="accordion-header">' +
+                '<span class="accordion-icon"></span>' +
+                name +
+                '<span class="accord-meta">— ' + s.risers + '\u00a0ст. · ' + len + '\u00a0м</span>' +
+                '</summary>' +
+                '<div class="accordion-content">' +
+
+                '<div class="bld-stats-row">' +
+                '<span><i class="bi bi-layers"></i> Высота корпуса: <strong>' + (b.height || '—') + '\u00a0м</strong></span>' +
+                '</div>' +
+
+                '<div class="bld-num-row" style="margin-bottom:12px">' +
+                '<label>Фасадные стояки DN50, шт:</label>' +
+                '<input type="number" min="0" value="' + (s.risers || 0) + '" ' +
+                'data-idx="' + idx + '" data-field="risers" class="storm-num bld-num">' +
+                '</div>' +
+
+                '<div class="bld-num-row" style="margin-bottom:12px">' +
+                '<label>Трапы балконов\u00a0/\u00a0террас (HL\u00a090.2), шт:</label>' +
+                '<input type="number" min="0" value="' + (s.balconies || 0) + '" ' +
+                'data-idx="' + idx + '" data-field="balconies" class="storm-num bld-num">' +
+                '</div>' +
+
+                '<div class="pipe-length-display">' +
+                '<i class="bi bi-rulers"></i>' +
+                'Длина стояков К2 (стояков\u00a0×\u00a0высота корпуса):' +
+                '<strong>\u2009' + len + '\u00a0м</strong>' +
+                '</div>' +
+
+                '</div>' + // /accordion-content
+                '</details>';
+        }).join('');
+
+        container.innerHTML = html;
+
+        // Обработчики числовых полей К2
+        container.querySelectorAll('.storm-num').forEach(function (inp) {
+            inp.addEventListener('input', function () {
+                getStormSettings(parseInt(inp.dataset.idx, 10))[inp.dataset.field] =
+                    Math.max(0, parseInt(inp.value, 10) || 0);
+                renderStormResults();
+            });
+        });
+    }
+
+    /* ─── Рендер таблицы трубопроводов К2 ───────────────────────────────── */
+    function renderStormResults() {
+        var el = document.getElementById('stormResults');
+        if (!el) return;
+
+        if (!buildingStats || !buildingStats.length) {
+            el.innerHTML =
+                '<div class="no-data-banner"><i class="bi bi-info-circle-fill"></i>' +
+                '<span>Загрузите данные проекта из <strong>Квартирографии</strong> — результаты появятся автоматически.</span></div>';
+            renderStormFittingsTable();
+            renderStormAccordions();
+            return;
+        }
+
+        var totalRisers = 0, totalLength = 0;
+        var rows = buildingStats.map(function (b, idx) {
+            var s   = getStormSettings(idx);
+            var len = calcStormPipeLength(b, idx);
+            totalRisers += (s.risers || 0);
+            totalLength += len;
+            return '<tr>' +
+                '<td>' + escHtml(b.name || ('Корпус ' + b.num)) + '</td>' +
+                '<td>SML</td>' +
+                '<td>DN\u00a050\u00a0мм</td>' +
+                '<td class="riser-count">' + (s.risers || 0) + '</td>' +
+                '<td>' + len + '</td>' +
+                '</tr>';
+        }).join('');
+
+        el.innerHTML =
+            '<div class="riser-table-wrap"><table class="riser-table">' +
+            '<thead><tr>' +
+            '<th>Корпус</th><th>Материал</th><th>Диаметр, мм</th>' +
+            '<th>Стояков, шт</th><th>Всего, м.п.</th>' +
+            '</tr></thead>' +
+            '<tbody>' + rows + '</tbody>' +
+            '<tfoot><tr>' +
+            '<td colspan="3">Итого по проекту</td>' +
+            '<td class="riser-count">' + totalRisers + '</td>' +
+            '<td>' + Math.round(totalLength * 10) / 10 + '</td>' +
+            '</tr></tfoot>' +
+            '</table></div>';
+
+        renderStormFittingsTable();
+        renderStormAccordions();
+    }
+
+    /* ─── Рендер фасонных изделий К2 ────────────────────────────────────── */
+    function renderStormFittingsTable() {
+        var el = document.getElementById('stormFittingsResults');
+        if (!el) return;
+
+        if (!buildingStats || !buildingStats.length) {
+            el.innerHTML =
+                '<div class="no-data-banner"><i class="bi bi-info-circle-fill"></i>' +
+                '<span>Загрузите данные проекта — изделия рассчитаются автоматически.</span></div>';
+            return;
+        }
+
+        var items = collectStormFittings();
+        if (!items.length) {
+            el.innerHTML = '<p style="color:var(--gray-500);font-size:13px;margin:8px 0">Нет позиций.</p>';
+            return;
+        }
+
+        var rows = items.map(function (item) {
+            return '<tr>' +
+                '<td>' + escHtml(item.name) + '</td>' +
+                '<td>' + item.unit + '</td>' +
+                '<td class="riser-count">' + item.qty + '</td>' +
+                '</tr>';
+        }).join('');
+
+        el.innerHTML =
+            '<div class="riser-table-wrap"><table class="riser-table">' +
+            '<thead><tr><th>Наименование</th><th>Ед.</th><th>Кол-во</th></tr></thead>' +
+            '<tbody>' + rows + '</tbody>' +
+            '</table></div>';
     }
 
     /* ─── Утилита ────────────────────────────────────────────────────────── */
@@ -1064,6 +1415,7 @@
         if (msg.type === 'load-project-data') {
             buildingStats = msg.buildingStats || null;
             renderResultsTable();
+            renderStormResults();
         }
         if (msg.type === 'theme-change') {
             document.body.classList.toggle('dark-theme', msg.theme === 'dark');
