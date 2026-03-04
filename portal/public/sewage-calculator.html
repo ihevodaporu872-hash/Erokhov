@@ -327,6 +327,13 @@
             background: var(--accent-blue-light); border-radius: 6px;
         }
         .k3-vent-info i { font-size: 14px; }
+        .k3-zone-summary {
+            display: flex; align-items: center; gap: 6px;
+            font-size: 12px; color: var(--gray-700);
+            padding: 6px 10px; margin-top: 4px;
+            background: var(--gray-100); border-radius: 6px;
+        }
+        .k3-zone-summary i { font-size: 14px; color: var(--gray-500); }
 
         .bld-num-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
         .bld-num-row label { font-size: 13px; color: var(--gray-700); }
@@ -1707,38 +1714,41 @@
             var bHeight = b.height || 0;
 
             s.zones.forEach(function (z) {
+                var n = z.qty || 1;
+
                 if (z.type === 'restaurant') {
-                    addItem('k3_grease_trap', 'Жироуловитель', 'шт', 1);
-                    addItem('k3_pump_wilo', 'Насосная установка Wilo N-Lift', 'шт', 1);
-                    addItem('k3_steel_pipe', 'Стальная напорная труба DN\u00a050', 'м.п.', 15);
-                    addItem('k3_voronka_20', 'Воронка с разрывом струи 20\u00a0мм', 'шт', 2);
+                    addItem('k3_grease_trap', 'Жироуловитель', 'шт', 1 * n);
+                    addItem('k3_pump_wilo', 'Насосная установка Wilo N-Lift', 'шт', 1 * n);
+                    addItem('k3_steel_pipe', 'Стальная напорная труба DN\u00a050', 'м.п.', 15 * n);
+                    addItem('k3_voronka_20', 'Воронка с разрывом струи 20\u00a0мм', 'шт', 2 * n);
                 }
 
                 if (z.type === 'commercial') {
                     var pLen = z.pipeLength || 0;
                     if (pLen > 0) {
-                        addItem('k3_sml_pipe', 'Самотечный выпуск SML DN\u00a0100', 'м.п.', pLen);
+                        addItem('k3_sml_pipe', 'Самотечный выпуск SML DN\u00a0100', 'м.п.', pLen * n);
                         addItem('k3_rapid_100', 'Муфта соединительная Rapid DN\u00a0100 (SML)', 'шт',
-                            Math.ceil(pLen / 3));
+                            Math.ceil(pLen / 3) * n);
                     }
-                    addItem('k3_voronka_20', 'Воронка с разрывом струи 20\u00a0мм', 'шт', 1);
+                    addItem('k3_voronka_20', 'Воронка с разрывом струи 20\u00a0мм', 'шт', 1 * n);
                 }
 
-                // Вентиляция — per-zone
+                // Вентиляция — per-zone × qty
                 var vt = z.ventType || 'none';
                 var ventLen = 0;
                 if (vt === 'riser') {
                     ventLen = bHeight;
                 } else if (vt === 'valve') {
                     ventLen = 3;
-                    addItem('k3_air_valve', 'Воздушный клапан HL905 DN\u00a0110', 'шт', 1);
+                    addItem('k3_air_valve', 'Воздушный клапан HL905 DN\u00a0110', 'шт', 1 * n);
                 }
                 if (ventLen > 0) {
-                    addItem('k3_vent_sml', 'Вентиляционная труба SML DN\u00a0110', 'м.п.', ventLen);
+                    var totalVent = ventLen * n;
+                    addItem('k3_vent_sml', 'Вентиляционная труба SML DN\u00a0110', 'м.п.', totalVent);
                     addItem('k3_rapid_110', 'Муфта соединительная Rapid DN\u00a0110 (SML)', 'шт',
-                        Math.ceil(ventLen / 3));
+                        Math.ceil(ventLen / 3) * n);
                     addItem('k3_khomuty', 'Хомут стальной (крепление стояков К3)', 'шт',
-                        Math.ceil(ventLen / 1.5));
+                        Math.ceil(ventLen / 1.5) * n);
                 }
             });
         });
@@ -1787,6 +1797,7 @@
             var zonesHtml = s.zones.map(function (z, zi) {
                 var isComm = z.type === 'commercial';
                 var vt = z.ventType || 'none';
+                var n  = z.qty || 1;
                 var typeIcon = z.type === 'restaurant'
                     ? '<span class="equip-icon"><i class="bi bi-person-walking"></i>\u2009<i class="bi bi-trash3"></i></span>'
                     : '<span class="equip-icon"><i class="bi bi-bucket"></i>\u2009<i class="bi bi-broom"></i></span>';
@@ -1796,8 +1807,29 @@
                 var ventIcon = vt === 'riser' ? 'bi-arrow-up-circle' : 'bi-wind';
                 var ventInfo = vt !== 'none'
                     ? '<div class="k3-vent-info"><i class="bi ' + ventIcon + '"></i> Вентиляция: ' +
-                      ventLabels[vt] + ' — <strong>' + ventLen + '\u00a0м</strong> SML DN\u00a0110</div>'
+                      ventLabels[vt] + ' — <strong>' + ventLen + '\u00a0м</strong> SML DN\u00a0110' +
+                      (n > 1 ? ' &times;\u00a0' + n + ' = <strong>' + (ventLen * n) + '\u00a0м</strong>' : '') +
+                      '</div>'
                     : '';
+
+                // Сводка по зоне при qty > 1
+                var summaryInfo = '';
+                if (n > 1) {
+                    var parts = [];
+                    if (z.type === 'restaurant') {
+                        parts.push(n + '\u00a0жироулов.', n + '\u00a0насос.', (2 * n) + '\u00a0воронок', (15 * n) + '\u00a0м стали');
+                    }
+                    if (isComm && (z.pipeLength || 0) > 0) {
+                        parts.push(((z.pipeLength || 0) * n) + '\u00a0м SML\u00a0100');
+                    }
+                    if (isComm) {
+                        parts.push(n + '\u00a0воронок');
+                    }
+                    if (parts.length) {
+                        summaryInfo = '<div class="k3-zone-summary"><i class="bi bi-calculator"></i> ' +
+                            'Итого (\u00d7' + n + '): ' + parts.join(', ') + '</div>';
+                    }
+                }
 
                 return '<div class="k3-zone-card" data-idx="' + idx + '" data-zone-id="' + z.id + '">' +
                     '<div class="k3-zone-header">' +
@@ -1812,6 +1844,12 @@
                     '<option value="restaurant"' + (z.type === 'restaurant' ? ' selected' : '') + '>Технологический цикл (Ресторан)</option>' +
                     '<option value="commercial"' + (z.type === 'commercial' ? ' selected' : '') + '>Коммерческий блок (Торговля)</option>' +
                     '</select></div>' +
+
+                    '<div class="bld-num-row">' +
+                    '<label><i class="bi bi-hash"></i> Количество:</label>' +
+                    '<input type="number" min="1" max="50" step="1" value="' + n + '" ' +
+                    'class="k3-qty bld-num" data-idx="' + idx + '" data-zone-id="' + z.id + '" style="width:64px">' +
+                    '</div>' +
 
                     '<div class="bld-num-row" style="' + (isComm ? '' : 'display:none') + '">' +
                     '<label>Длина самотечного выпуска SML, м:</label>' +
@@ -1830,6 +1868,7 @@
                     '</select></div>' +
 
                     ventInfo +
+                    summaryInfo +
 
                     '</div>';
             }).join('');
@@ -1873,7 +1912,7 @@
             btn.addEventListener('click', function () {
                 var idx = parseInt(btn.dataset.idx, 10);
                 var s = getK3Settings(idx);
-                s.zones.push({ id: s.nextId++, type: 'restaurant', ventType: 'riser', pipeLength: 0 });
+                s.zones.push({ id: s.nextId++, type: 'restaurant', ventType: 'riser', pipeLength: 0, qty: 1 });
                 renderK3BuildingAccordions();
                 renderK3Results();
             });
@@ -1909,6 +1948,16 @@
             sel.addEventListener('change', function () {
                 var zone = findK3Zone(parseInt(sel.dataset.idx, 10), parseInt(sel.dataset.zoneId, 10));
                 if (zone) zone.ventType = sel.value;
+                renderK3BuildingAccordions();
+                renderK3Results();
+            });
+        });
+
+        // Количество блоков/зон
+        container.querySelectorAll('.k3-qty').forEach(function (inp) {
+            inp.addEventListener('input', function () {
+                var zone = findK3Zone(parseInt(inp.dataset.idx, 10), parseInt(inp.dataset.zoneId, 10));
+                if (zone) zone.qty = Math.max(1, parseInt(inp.value, 10) || 1);
                 renderK3BuildingAccordions();
                 renderK3Results();
             });
