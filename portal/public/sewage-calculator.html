@@ -1715,6 +1715,8 @@
 
             s.zones.forEach(function (z) {
                 var n = z.qty || 1;
+                var defPipe = z.type === 'restaurant' ? 15 : 5;
+                var pLen = z.pipeLength || defPipe;
 
                 if (z.type === 'restaurant') {
                     addItem('k3_grease_trap', 'Жироуловитель', 'шт', 1 * n);
@@ -1724,13 +1726,14 @@
                 }
 
                 if (z.type === 'commercial') {
-                    var pLen = z.pipeLength || 0;
-                    if (pLen > 0) {
-                        addItem('k3_sml_pipe', 'Самотечный выпуск SML DN\u00a0100', 'м.п.', pLen * n);
-                        addItem('k3_rapid_100', 'Муфта соединительная Rapid DN\u00a0100 (SML)', 'шт',
-                            Math.ceil(pLen / 3) * n);
-                    }
                     addItem('k3_voronka_20', 'Воронка с разрывом струи 20\u00a0мм', 'шт', 1 * n);
+                }
+
+                // Самотечный выпуск SML DN100 — для обоих типов
+                if (pLen > 0) {
+                    addItem('k3_sml_pipe', 'Самотечный выпуск SML DN\u00a0100', 'м.п.', pLen * n);
+                    addItem('k3_rapid_100', 'Муфта соединительная Rapid DN\u00a0100 (SML)', 'шт',
+                        Math.ceil(pLen / 3) * n);
                 }
 
                 // Вентиляция — per-zone × qty
@@ -1798,6 +1801,8 @@
                 var isComm = z.type === 'commercial';
                 var vt = z.ventType || 'none';
                 var n  = z.qty || 1;
+                var defPipe = z.type === 'restaurant' ? 15 : 5;
+                var pLen = z.pipeLength || defPipe;
                 var typeIcon = z.type === 'restaurant'
                     ? '<span class="equip-icon"><i class="bi bi-person-walking"></i>\u2009<i class="bi bi-trash3"></i></span>'
                     : '<span class="equip-icon"><i class="bi bi-bucket"></i>\u2009<i class="bi bi-broom"></i></span>';
@@ -1812,6 +1817,14 @@
                       '</div>'
                     : '';
 
+                // Инфо-строка самотечного выпуска
+                var pipeInfo = pLen > 0
+                    ? '<div class="k3-vent-info"><i class="bi bi-pipe"></i> Самотечный выпуск SML DN\u00a0100: <strong>' +
+                      pLen + '\u00a0м</strong>' +
+                      (n > 1 ? ' &times;\u00a0' + n + ' = <strong>' + (pLen * n) + '\u00a0м</strong>' : '') +
+                      '</div>'
+                    : '';
+
                 // Сводка по зоне при qty > 1
                 var summaryInfo = '';
                 if (n > 1) {
@@ -1819,16 +1832,12 @@
                     if (z.type === 'restaurant') {
                         parts.push(n + '\u00a0жироулов.', n + '\u00a0насос.', (2 * n) + '\u00a0воронок', (15 * n) + '\u00a0м стали');
                     }
-                    if (isComm && (z.pipeLength || 0) > 0) {
-                        parts.push(((z.pipeLength || 0) * n) + '\u00a0м SML\u00a0100');
-                    }
                     if (isComm) {
                         parts.push(n + '\u00a0воронок');
                     }
-                    if (parts.length) {
-                        summaryInfo = '<div class="k3-zone-summary"><i class="bi bi-calculator"></i> ' +
-                            'Итого (\u00d7' + n + '): ' + parts.join(', ') + '</div>';
-                    }
+                    parts.push((pLen * n) + '\u00a0м SML\u00a0100');
+                    summaryInfo = '<div class="k3-zone-summary"><i class="bi bi-calculator"></i> ' +
+                        'Итого (\u00d7' + n + '): ' + parts.join(', ') + '</div>';
                 }
 
                 return '<div class="k3-zone-card" data-idx="' + idx + '" data-zone-id="' + z.id + '">' +
@@ -1851,9 +1860,10 @@
                     'class="k3-qty bld-num" data-idx="' + idx + '" data-zone-id="' + z.id + '" style="width:64px">' +
                     '</div>' +
 
-                    '<div class="bld-num-row" style="' + (isComm ? '' : 'display:none') + '">' +
+                    '<div class="bld-num-row">' +
                     '<label>Длина самотечного выпуска SML, м:</label>' +
-                    '<input type="number" min="0" step="0.1" value="' + (z.pipeLength || 0) + '" ' +
+                    '<input type="number" min="0" step="0.1" value="' + pLen + '" ' +
+                    'placeholder="' + defPipe + '" ' +
                     'class="k3-pipe bld-num" data-idx="' + idx + '" data-zone-id="' + z.id + '">' +
                     '</div>' +
 
@@ -1868,6 +1878,7 @@
                     '</select></div>' +
 
                     ventInfo +
+                    pipeInfo +
                     summaryInfo +
 
                     '</div>';
@@ -1912,7 +1923,7 @@
             btn.addEventListener('click', function () {
                 var idx = parseInt(btn.dataset.idx, 10);
                 var s = getK3Settings(idx);
-                s.zones.push({ id: s.nextId++, type: 'restaurant', ventType: 'riser', pipeLength: 0, qty: 1 });
+                s.zones.push({ id: s.nextId++, type: 'restaurant', ventType: 'riser', pipeLength: 15, qty: 1 });
                 renderK3BuildingAccordions();
                 renderK3Results();
             });
@@ -1937,6 +1948,7 @@
                 if (zone) {
                     zone.type = sel.value;
                     zone.ventType = (sel.value === 'restaurant') ? 'riser' : 'valve';
+                    zone.pipeLength = (sel.value === 'restaurant') ? 15 : 5;
                 }
                 renderK3BuildingAccordions();
                 renderK3Results();
@@ -1968,6 +1980,7 @@
             inp.addEventListener('input', function () {
                 var zone = findK3Zone(parseInt(inp.dataset.idx, 10), parseInt(inp.dataset.zoneId, 10));
                 if (zone) zone.pipeLength = Math.max(0, parseFloat(inp.value) || 0);
+                renderK3BuildingAccordions();
                 renderK3Results();
             });
         });
