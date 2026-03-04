@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-    <title>Система водоотведения (К1/К2)</title>
+    <title>Система водоотведения (К1/К2/К3)</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap">
@@ -286,6 +286,41 @@
         }
         .equip-card.active .equip-card-desc { color: var(--accent-blue); opacity: .8; }
 
+        /* ── К3: Зоны ────────────────────────────────────────────────────────── */
+        .btn-add-zone {
+            display: inline-flex; align-items: center; gap: 7px;
+            padding: 9px 18px;
+            border: 2px dashed var(--accent-blue); border-radius: 10px;
+            background: transparent; color: var(--accent-blue);
+            font-size: 13px; font-weight: 600; font-family: inherit; cursor: pointer;
+            transition: background .15s, transform .1s;
+        }
+        .btn-add-zone:hover { background: var(--accent-blue-light); transform: translateY(-1px); }
+        .btn-add-zone i { font-size: 16px; }
+
+        .k3-zone-card {
+            border: 1px solid var(--gray-200); border-radius: 10px;
+            padding: 16px; margin-bottom: 10px;
+            background: var(--bg-card);
+        }
+        .k3-zone-header {
+            display: flex; align-items: center; justify-content: space-between;
+            margin-bottom: 14px;
+        }
+        .k3-zone-name { font-size: 13px; font-weight: 700; color: var(--gray-900); }
+        .k3-zone-type-badge {
+            display: inline-block; font-size: 10px; font-weight: 600;
+            color: var(--accent-blue); background: rgba(0,122,255,.1);
+            border-radius: 20px; padding: 2px 8px; margin-left: 8px;
+        }
+        .k3-zone-remove {
+            border: none; background: none; color: var(--gray-400);
+            font-size: 20px; cursor: pointer; padding: 0 4px; line-height: 1;
+            transition: color .15s;
+        }
+        .k3-zone-remove:hover { color: #d00; }
+        .k3-zone-card .bld-num-row { margin-bottom: 10px; }
+
         .bld-num-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
         .bld-num-row label { font-size: 13px; color: var(--gray-700); }
         .bld-num {
@@ -317,7 +352,7 @@
         <div class="main-container">
             <div class="header">
                 <div class="header-left">
-                    <h1>Расчёт системы водоотведения (К1/К2)</h1>
+                    <h1>Расчёт системы водоотведения (К1/К2/К3)</h1>
                 </div>
             </div>
 
@@ -355,11 +390,11 @@
                                 <div class="system-card-desc">Ливневая канализация</div>
                                 <span class="system-card-badge">Активна</span>
                             </div>
-                            <div class="system-card disabled" data-system="K3">
+                            <div class="system-card" data-system="K3">
                                 <i class="bi bi-cup-hot system-card-icon"></i>
                                 <div class="system-card-name">Система К3</div>
                                 <div class="system-card-desc">Производственная канализация</div>
-                                <span class="system-card-badge">В разработке</span>
+                                <span class="system-card-badge">Активна</span>
                             </div>
                         </div>
 
@@ -531,6 +566,61 @@
 
                         </div><!-- /k2-section -->
 
+                        <!-- ── К3: Производственная канализация ── -->
+                        <div id="k3-section" style="display:none">
+
+                            <!-- Секция: Ввод данных -->
+                            <div class="panel-section panel-section-input">
+                                <h3 class="panel-section-title">
+                                    <span class="panel-section-icon panel-section-icon-input"></span>
+                                    Ввод данных
+                                </h3>
+                                <details class="accordion accordion-input" open>
+                                    <summary class="accordion-header">
+                                        <span class="accordion-icon"></span>
+                                        Зоны системы К3
+                                    </summary>
+                                    <div class="accordion-content">
+
+                                        <div class="floor-height-info">
+                                            <span class="floor-height-info-icon">ℹ</span>
+                                            Добавляйте зоны К3: <strong>Ресторан</strong> (жироуловитель, насос, напорная труба) или <strong>Торговля</strong> (самотечный выпуск SML). Для каждой зоны укажите высоту здания до кровли — она определяет длину вытяжного стояка DN110.
+                                        </div>
+
+                                        <div style="margin-bottom:16px">
+                                            <button class="btn-add-zone" id="addK3Zone">
+                                                <i class="bi bi-plus-circle"></i> Добавить зону К3
+                                            </button>
+                                        </div>
+                                        <div id="k3ZonesContainer"></div>
+
+                                    </div>
+                                </details>
+                            </div>
+
+                            <!-- Секция: Результаты расчёта К3 -->
+                            <div class="panel-section panel-section-output">
+                                <h3 class="panel-section-title">
+                                    <span class="panel-section-icon panel-section-icon-output"></span>
+                                    Результаты расчёта
+                                </h3>
+                                <details class="accordion accordion-output" open>
+                                    <summary class="accordion-header">
+                                        <span class="accordion-icon"></span>Спецификация К3
+                                    </summary>
+                                    <div class="accordion-content">
+                                        <div id="k3Results">
+                                            <div class="no-data-banner">
+                                                <i class="bi bi-info-circle-fill"></i>
+                                                <span>Добавьте зоны К3 — результаты рассчитаются автоматически.</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </details>
+                            </div>
+
+                        </div><!-- /k3-section -->
+
                     </div>
                 </div>
 
@@ -589,7 +679,7 @@
                         <div class="panel-section panel-section-output">
                             <h3 class="panel-section-title">
                                 <span class="panel-section-icon panel-section-icon-output"></span>
-                                Спецификация систем К1 и К2
+                                Спецификация систем К1, К2 и К3
                             </h3>
                             <details class="accordion accordion-output" open>
                                 <summary class="accordion-header">
@@ -667,6 +757,10 @@
     var stormInsulation         = true;
     var stormAccordionOpenState = {};
 
+    /* К3 */
+    var k3Zones  = [];
+    var k3NextId = 1;
+
     /* ─── Переключение вкладок ───────────────────────────────────────────── */
     var tabBtns   = document.querySelectorAll('#sewageTabs .tab-btn');
     var tabPanels = document.querySelectorAll('#sewageTabContent .tab-panel');
@@ -691,11 +785,13 @@
         });
         document.getElementById('k1-section').style.display = (system === 'K1') ? '' : 'none';
         document.getElementById('k2-section').style.display = (system === 'K2') ? '' : 'none';
+        document.getElementById('k3-section').style.display = (system === 'K3') ? '' : 'none';
         if (system === 'K1') renderResultsTable();
         if (system === 'K2') renderStormResults();
+        if (system === 'K3') { renderK3Zones(); renderK3Results(); }
     }
 
-    document.querySelectorAll('.system-card:not(.disabled)').forEach(function (card) {
+    document.querySelectorAll('.system-card').forEach(function (card) {
         card.addEventListener('click', function () { switchSystem(card.dataset.system); });
     });
 
@@ -703,6 +799,13 @@
     document.getElementById('stormInsulationCheck').addEventListener('change', function () {
         stormInsulation = this.checked;
         renderStormResults();
+    });
+
+    /* ─── Кнопка «Добавить зону К3» ─────────────────────────────────────── */
+    document.getElementById('addK3Zone').addEventListener('click', function () {
+        k3Zones.push({ id: k3NextId++, type: 'restaurant', buildingHeight: 0, pipeLength: 0 });
+        renderK3Zones();
+        renderK3Results();
     });
 
     /* ─── Выбор сценария ─────────────────────────────────────────────────── */
@@ -1243,6 +1346,23 @@
             });
         }
 
+        // ── Группа: Система К3 ───────────────────────────────────────────
+        if (k3Zones.length) {
+            rows += '<tr class="spec-group-row"><td colspan="7">Система К3 (Производственная канализация)</td></tr>';
+            collectK3Fittings().forEach(function (item) {
+                var qty = typeof item.qty === 'number' ? (Math.round(item.qty * 10) / 10) : item.qty;
+                rows += '<tr>' +
+                    '<td>' + (rowNum++) + '</td>' +
+                    '<td>' + escHtml(item.name) + '</td>' +
+                    '<td>' + item.unit + '</td>' +
+                    '<td>' + qty + '</td>' +
+                    '<td>—</td>' +
+                    '<td>' + qty + '</td>' +
+                    '<td class="spec-note-cell">' + escHtml(item.note || '—') + '</td>' +
+                    '</tr>';
+            });
+        }
+
         el.innerHTML =
             '<div class="riser-table-wrap"><table class="riser-table">' +
             '<thead><tr>' +
@@ -1304,11 +1424,20 @@
             lines.push([rowNum++, item.name, item.unit, item.qty, '—', item.qty, item.note || ''].join(sep));
         });
 
+        // К3: Производственная канализация
+        if (k3Zones.length) {
+            lines.push([sep + 'Система К3 (Производственная канализация)','','','','',''].join(sep));
+            collectK3Fittings().forEach(function (item) {
+                var qty = typeof item.qty === 'number' ? (Math.round(item.qty * 10) / 10) : item.qty;
+                lines.push([rowNum++, item.name, item.unit, qty, '—', qty, item.note || ''].join(sep));
+            });
+        }
+
         var csv  = '\uFEFF' + lines.join('\r\n');
         var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
         var url  = URL.createObjectURL(blob);
         var a    = document.createElement('a');
-        a.href = url; a.download = 'Specification_K1.csv';
+        a.href = url; a.download = 'Specification_K1_K2_K3.csv';
         document.body.appendChild(a); a.click();
         document.body.removeChild(a); URL.revokeObjectURL(url);
     }
@@ -1532,6 +1661,181 @@
                 '<td>' + escHtml(item.name) + '</td>' +
                 '<td>' + item.unit + '</td>' +
                 '<td class="riser-count">' + item.qty + '</td>' +
+                '</tr>';
+        }).join('');
+
+        el.innerHTML =
+            '<div class="riser-table-wrap"><table class="riser-table">' +
+            '<thead><tr><th>Наименование</th><th>Ед.</th><th>Кол-во</th></tr></thead>' +
+            '<tbody>' + rows + '</tbody>' +
+            '</table></div>';
+    }
+
+    /* ═══════════════════════════════════════════════════════════════════════
+       К3 — Производственная канализация
+    ═══════════════════════════════════════════════════════════════════════ */
+
+    function findK3Zone(id) {
+        for (var i = 0; i < k3Zones.length; i++) {
+            if (k3Zones[i].id === id) return k3Zones[i];
+        }
+        return null;
+    }
+
+    function collectK3Fittings() {
+        if (!k3Zones.length) return [];
+        var acc = {};
+
+        function addItem(key, name, unit, qty, note) {
+            if (!qty || qty <= 0) return;
+            if (acc[key]) { acc[key].qty += qty; }
+            else          { acc[key] = { name: name, unit: unit, qty: qty, note: note || '' }; }
+        }
+
+        k3Zones.forEach(function (z) {
+            var ventLen = z.buildingHeight || 0;
+
+            if (z.type === 'restaurant') {
+                addItem('k3_grease_trap', 'Жироуловитель', 'шт', 1);
+                addItem('k3_pump_wilo', 'Насосная установка Wilo N-Lift', 'шт', 1);
+                addItem('k3_steel_pipe', 'Стальная напорная труба DN\u00a050', 'м.п.', 15);
+                addItem('k3_voronka_20', 'Воронка с разрывом струи 20\u00a0мм', 'шт', 2);
+            }
+
+            if (z.type === 'commercial') {
+                var pLen = z.pipeLength || 0;
+                if (pLen > 0) {
+                    addItem('k3_sml_pipe', 'Самотечный выпуск SML DN\u00a0100', 'м.п.', pLen);
+                    addItem('k3_rapid_100', 'Муфта соединительная Rapid DN\u00a0100 (SML)', 'шт',
+                        Math.ceil(pLen / 3));
+                }
+                addItem('k3_voronka_20', 'Воронка с разрывом струи 20\u00a0мм', 'шт', 1);
+            }
+
+            // Вытяжной стояк DN110 SML — для всех типов зон
+            if (ventLen > 0) {
+                addItem('k3_vent_sml', 'Вытяжной стояк SML DN\u00a0110 (вентиляция К3)', 'м.п.', ventLen);
+                addItem('k3_rapid_110', 'Муфта соединительная Rapid DN\u00a0110 (SML)', 'шт',
+                    Math.ceil(ventLen / 3));
+                addItem('k3_khomuty', 'Хомут стальной (крепление стояков К3)', 'шт',
+                    Math.ceil(ventLen / 1.5));
+            }
+        });
+
+        var ORDER = [
+            'k3_grease_trap', 'k3_pump_wilo', 'k3_steel_pipe',
+            'k3_sml_pipe', 'k3_voronka_20',
+            'k3_vent_sml', 'k3_rapid_100', 'k3_rapid_110', 'k3_khomuty'
+        ];
+        var result = [];
+        ORDER.forEach(function (k) { if (acc[k]) result.push(acc[k]); });
+        Object.keys(acc).forEach(function (k) { if (ORDER.indexOf(k) === -1) result.push(acc[k]); });
+        return result;
+    }
+
+    /* ─── Рендер зон К3 ──────────────────────────────────────────────────── */
+    function renderK3Zones() {
+        var container = document.getElementById('k3ZonesContainer');
+        if (!container) return;
+
+        if (!k3Zones.length) {
+            container.innerHTML = '<p style="color:var(--gray-500);font-size:13px;margin:8px 0">Нет зон. Нажмите «Добавить зону К3».</p>';
+            return;
+        }
+
+        var typeLabels = { restaurant: 'Ресторан', commercial: 'Торговля' };
+
+        var html = k3Zones.map(function (z, i) {
+            var isComm = z.type === 'commercial';
+            return '<div class="k3-zone-card" data-zone-id="' + z.id + '">' +
+                '<div class="k3-zone-header">' +
+                '<span><span class="k3-zone-name">Зона ' + (i + 1) + '</span>' +
+                '<span class="k3-zone-type-badge">' + typeLabels[z.type] + '</span></span>' +
+                '<button class="k3-zone-remove" data-zone-id="' + z.id + '">&times;</button>' +
+                '</div>' +
+
+                '<div class="bld-num-row">' +
+                '<label>Тип зоны:</label>' +
+                '<select class="k3-type bld-select" data-zone-id="' + z.id + '">' +
+                '<option value="restaurant"' + (z.type === 'restaurant' ? ' selected' : '') + '>Технологический цикл (Ресторан)</option>' +
+                '<option value="commercial"' + (z.type === 'commercial' ? ' selected' : '') + '>Коммерческий блок (Торговля)</option>' +
+                '</select></div>' +
+
+                '<div class="bld-num-row">' +
+                '<label>Высота здания до кровли, м:</label>' +
+                '<input type="number" min="0" step="0.1" value="' + (z.buildingHeight || 0) + '" ' +
+                'class="k3-height bld-num" data-zone-id="' + z.id + '">' +
+                '</div>' +
+
+                '<div class="bld-num-row" style="' + (isComm ? '' : 'display:none') + '">' +
+                '<label>Длина самотечного выпуска SML, м:</label>' +
+                '<input type="number" min="0" step="0.1" value="' + (z.pipeLength || 0) + '" ' +
+                'class="k3-pipe bld-num" data-zone-id="' + z.id + '">' +
+                '</div>' +
+
+                '</div>';
+        }).join('');
+
+        container.innerHTML = html;
+
+        // Обработчики
+        container.querySelectorAll('.k3-zone-remove').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                k3Zones = k3Zones.filter(function (z) { return z.id !== parseInt(btn.dataset.zoneId, 10); });
+                renderK3Zones();
+                renderK3Results();
+            });
+        });
+
+        container.querySelectorAll('.k3-type').forEach(function (sel) {
+            sel.addEventListener('change', function () {
+                var zone = findK3Zone(parseInt(sel.dataset.zoneId, 10));
+                if (zone) zone.type = sel.value;
+                renderK3Zones();
+                renderK3Results();
+            });
+        });
+
+        container.querySelectorAll('.k3-height').forEach(function (inp) {
+            inp.addEventListener('input', function () {
+                var zone = findK3Zone(parseInt(inp.dataset.zoneId, 10));
+                if (zone) zone.buildingHeight = Math.max(0, parseFloat(inp.value) || 0);
+                renderK3Results();
+            });
+        });
+
+        container.querySelectorAll('.k3-pipe').forEach(function (inp) {
+            inp.addEventListener('input', function () {
+                var zone = findK3Zone(parseInt(inp.dataset.zoneId, 10));
+                if (zone) zone.pipeLength = Math.max(0, parseFloat(inp.value) || 0);
+                renderK3Results();
+            });
+        });
+    }
+
+    /* ─── Рендер результатов К3 ──────────────────────────────────────────── */
+    function renderK3Results() {
+        var el = document.getElementById('k3Results');
+        if (!el) return;
+
+        if (!k3Zones.length) {
+            el.innerHTML =
+                '<div class="no-data-banner"><i class="bi bi-info-circle-fill"></i>' +
+                '<span>Добавьте зоны К3 — результаты рассчитаются автоматически.</span></div>';
+            return;
+        }
+
+        var items = collectK3Fittings();
+        if (!items.length) {
+            el.innerHTML = '<p style="color:var(--gray-500);font-size:13px;margin:8px 0">Задайте параметры зон.</p>';
+            return;
+        }
+
+        var rows = items.map(function (item) {
+            return '<tr>' +
+                '<td>' + escHtml(item.name) + '</td>' +
+                '<td>' + item.unit + '</td>' +
+                '<td class="riser-count">' + (typeof item.qty === 'number' ? (Math.round(item.qty * 10) / 10) : item.qty) + '</td>' +
                 '</tr>';
         }).join('');
 
