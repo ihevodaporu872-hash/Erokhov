@@ -320,6 +320,13 @@
         }
         .k3-zone-remove:hover { color: #d00; }
         .k3-zone-card .bld-num-row { margin-bottom: 10px; }
+        .k3-vent-info {
+            display: flex; align-items: center; gap: 6px;
+            font-size: 12px; color: var(--accent-blue);
+            padding: 6px 10px; margin-top: 2px;
+            background: var(--accent-blue-light); border-radius: 6px;
+        }
+        .k3-vent-info i { font-size: 14px; }
 
         .bld-num-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
         .bld-num-row label { font-size: 13px; color: var(--gray-700); }
@@ -754,7 +761,7 @@
 
     function getK3Settings(idx) {
         if (!k3Settings[idx]) {
-            k3Settings[idx] = { zones: [], nextId: 1, ventRiser: false };
+            k3Settings[idx] = { zones: [], nextId: 1 };
         }
         return k3Settings[idx];
     }
@@ -1680,7 +1687,7 @@
         if (!buildingStats) return false;
         for (var i = 0; i < buildingStats.length; i++) {
             var s = getK3Settings(i);
-            if (s.zones.length || s.ventRiser) return true;
+            if (s.zones.length) return true;
         }
         return false;
     }
@@ -1716,22 +1723,31 @@
                     }
                     addItem('k3_voronka_20', 'Воронка с разрывом струи 20\u00a0мм', 'шт', 1);
                 }
-            });
 
-            // Вытяжной стояк DN110 SML — один на корпус, если включён
-            if (s.ventRiser && bHeight > 0) {
-                addItem('k3_vent_sml', 'Вытяжной стояк SML DN\u00a0110 (вентиляция К3)', 'м.п.', bHeight);
-                addItem('k3_rapid_110', 'Муфта соединительная Rapid DN\u00a0110 (SML)', 'шт',
-                    Math.ceil(bHeight / 3));
-                addItem('k3_khomuty', 'Хомут стальной (крепление стояков К3)', 'шт',
-                    Math.ceil(bHeight / 1.5));
-            }
+                // Вентиляция — per-zone
+                var vt = z.ventType || 'none';
+                var ventLen = 0;
+                if (vt === 'riser') {
+                    ventLen = bHeight;
+                } else if (vt === 'valve') {
+                    ventLen = 3;
+                    addItem('k3_air_valve', 'Воздушный клапан HL905 DN\u00a0110', 'шт', 1);
+                }
+                if (ventLen > 0) {
+                    addItem('k3_vent_sml', 'Вентиляционная труба SML DN\u00a0110', 'м.п.', ventLen);
+                    addItem('k3_rapid_110', 'Муфта соединительная Rapid DN\u00a0110 (SML)', 'шт',
+                        Math.ceil(ventLen / 3));
+                    addItem('k3_khomuty', 'Хомут стальной (крепление стояков К3)', 'шт',
+                        Math.ceil(ventLen / 1.5));
+                }
+            });
         });
 
         var ORDER = [
             'k3_grease_trap', 'k3_pump_wilo', 'k3_steel_pipe',
             'k3_sml_pipe', 'k3_voronka_20',
-            'k3_vent_sml', 'k3_rapid_100', 'k3_rapid_110', 'k3_khomuty'
+            'k3_vent_sml', 'k3_air_valve',
+            'k3_rapid_100', 'k3_rapid_110', 'k3_khomuty'
         ];
         var result = [];
         ORDER.forEach(function (k) { if (acc[k]) result.push(acc[k]); });
@@ -1766,11 +1782,22 @@
             var bHeight = b.height || 0;
 
             // Зонные карточки
+            var ventLabels = { riser: 'Стояк на кровлю', valve: 'Воздушный клапан', none: 'Нет' };
+
             var zonesHtml = s.zones.map(function (z, zi) {
                 var isComm = z.type === 'commercial';
+                var vt = z.ventType || 'none';
                 var typeIcon = z.type === 'restaurant'
                     ? '<span class="equip-icon"><i class="bi bi-person-walking"></i>\u2009<i class="bi bi-trash3"></i></span>'
                     : '<span class="equip-icon"><i class="bi bi-bucket"></i>\u2009<i class="bi bi-broom"></i></span>';
+
+                // Расчёт длины вентиляции для отображения
+                var ventLen = vt === 'riser' ? bHeight : (vt === 'valve' ? 3 : 0);
+                var ventIcon = vt === 'riser' ? 'bi-arrow-up-circle' : 'bi-wind';
+                var ventInfo = vt !== 'none'
+                    ? '<div class="k3-vent-info"><i class="bi ' + ventIcon + '"></i> Вентиляция: ' +
+                      ventLabels[vt] + ' — <strong>' + ventLen + '\u00a0м</strong> SML DN\u00a0110</div>'
+                    : '';
 
                 return '<div class="k3-zone-card" data-idx="' + idx + '" data-zone-id="' + z.id + '">' +
                     '<div class="k3-zone-header">' +
@@ -1792,20 +1819,20 @@
                     'class="k3-pipe bld-num" data-idx="' + idx + '" data-zone-id="' + z.id + '">' +
                     '</div>' +
 
+                    '<div class="bld-num-row">' +
+                    '<label>Тип вентиляции:</label>' +
+                    '<select class="k3-vent bld-select" data-idx="' + idx + '" data-zone-id="' + z.id + '">' +
+                    '<option value="riser"' + (vt === 'riser' ? ' selected' : '') + '>' +
+                    '\u2191 Вытяжной стояк на кровлю (' + bHeight + '\u00a0м)</option>' +
+                    '<option value="valve"' + (vt === 'valve' ? ' selected' : '') + '>' +
+                    '\u25cb Воздушный клапан HL905 (3\u00a0м)</option>' +
+                    '<option value="none"' + (vt === 'none' ? ' selected' : '') + '>Без вентиляции</option>' +
+                    '</select></div>' +
+
+                    ventInfo +
+
                     '</div>';
             }).join('');
-
-            // Карточка вытяжного стояка
-            var ventCard =
-                '<div class="bld-equipment-section">' +
-                '<div class="equip-grid">' +
-                '<div class="equip-card' + (s.ventRiser ? ' active' : '') + '" data-idx="' + idx + '" data-field="k3ventRiser">' +
-                '<i class="bi bi-arrow-up-circle equip-icon"></i>' +
-                '<div class="equip-card-title">Вытяжной стояк</div>' +
-                '<div class="equip-card-desc">DN\u00a0110 SML на кровлю · ' + bHeight + '\u00a0м</div>' +
-                '</div>' +
-                '</div>' +
-                '</div>';
 
             var meta = zoneCount + '\u00a0зон' + (zoneCount === 1 ? 'а' : (zoneCount >= 2 && zoneCount <= 4 ? 'ы' : ''));
 
@@ -1813,7 +1840,7 @@
                 '<summary class="accordion-header">' +
                 '<span class="accordion-icon"></span>' +
                 name +
-                '<span class="accord-meta">— ' + meta + (s.ventRiser ? ' · стояк ' + bHeight + '\u00a0м' : '') + '</span>' +
+                '<span class="accord-meta">— ' + meta + '</span>' +
                 '</summary>' +
                 '<div class="accordion-content">' +
 
@@ -1821,8 +1848,6 @@
                 '<span><i class="bi bi-building"></i> Высота: <strong>' + bHeight + '\u00a0м</strong></span>' +
                 '<span><i class="bi bi-layers"></i> Этажей: <strong>' + (b.floors ? b.floors.length : 0) + '</strong></span>' +
                 '</div>' +
-
-                ventCard +
 
                 '<div style="margin:12px 0 8px">' +
                 '<button class="btn-add-zone" data-idx="' + idx + '">' +
@@ -1842,23 +1867,13 @@
         container.innerHTML = html;
 
         // ─── Обработчики ───
-        // Вытяжной стояк — переключатель карточки
-        container.querySelectorAll('.equip-card[data-field="k3ventRiser"]').forEach(function (card) {
-            card.addEventListener('click', function () {
-                var idx = parseInt(card.dataset.idx, 10);
-                var s = getK3Settings(idx);
-                s.ventRiser = !s.ventRiser;
-                renderK3BuildingAccordions();
-                renderK3Results();
-            });
-        });
 
-        // Добавить зону
+        // Добавить зону (с авто-выбором типа вентиляции)
         container.querySelectorAll('.btn-add-zone').forEach(function (btn) {
             btn.addEventListener('click', function () {
                 var idx = parseInt(btn.dataset.idx, 10);
                 var s = getK3Settings(idx);
-                s.zones.push({ id: s.nextId++, type: 'restaurant', pipeLength: 0 });
+                s.zones.push({ id: s.nextId++, type: 'restaurant', ventType: 'riser', pipeLength: 0 });
                 renderK3BuildingAccordions();
                 renderK3Results();
             });
@@ -1876,11 +1891,24 @@
             });
         });
 
-        // Смена типа зоны
+        // Смена типа зоны — авто-переключение вентиляции
         container.querySelectorAll('.k3-type').forEach(function (sel) {
             sel.addEventListener('change', function () {
                 var zone = findK3Zone(parseInt(sel.dataset.idx, 10), parseInt(sel.dataset.zoneId, 10));
-                if (zone) zone.type = sel.value;
+                if (zone) {
+                    zone.type = sel.value;
+                    zone.ventType = (sel.value === 'restaurant') ? 'riser' : 'valve';
+                }
+                renderK3BuildingAccordions();
+                renderK3Results();
+            });
+        });
+
+        // Смена типа вентиляции
+        container.querySelectorAll('.k3-vent').forEach(function (sel) {
+            sel.addEventListener('change', function () {
+                var zone = findK3Zone(parseInt(sel.dataset.idx, 10), parseInt(sel.dataset.zoneId, 10));
+                if (zone) zone.ventType = sel.value;
                 renderK3BuildingAccordions();
                 renderK3Results();
             });
