@@ -1023,10 +1023,10 @@
         var showKitchen = (activeScenario === 2 || activeScenario === 3);
         var acc = {};
 
-        function addItem(key, name, unit, qty, note) {
+        function addItem(key, name, unit, qty, note, group) {
             if (!qty || qty <= 0) return;
             if (acc[key]) { acc[key].qty += qty; }
-            else          { acc[key] = { name: name, unit: unit, qty: qty, note: note || '' }; }
+            else          { acc[key] = { name: name, unit: unit, qty: qty, note: note || '', group: group || '' }; }
         }
 
         buildingStats.forEach(function (b, idx) {
@@ -1144,6 +1144,110 @@
                     'Муфта противопожарная DN\u00a0' + s.riserDiameter, 'шт',
                     floorsN);
 
+            // ── Фасонные изделия для подключения приборов на этажах ──────
+            if (floorsN > 0) {
+                var FG = 'fixture'; // группа для фильтрации в спецификации
+                if (activeScenario === 1) {
+                    // Сценарий 1: Только шахты С/У
+                    // Каждый стояк С/У на каждом этаже: крестовина 110×110×50 + отвод 110/45°
+                    if (bathR > 0) {
+                        var totalPts = bathR * floorsN;
+                        if (isPlastic) {
+                            addItem('krest_110_110_50',
+                                'Крестовина двухплоскостная ПП 110×110×50', 'шт', totalPts,
+                                'Подключение С/У (сценарий 1)', FG);
+                            addItem('otvod_110_45',
+                                'Отвод ПП 110/45°', 'шт', totalPts,
+                                'Подключение С/У (сценарий 1)', FG);
+                        } else {
+                            addItem('krest_sml_110_110_50',
+                                'Крестовина SML 110×110×50', 'шт', totalPts,
+                                'Подключение С/У (сценарий 1)', FG);
+                            addItem('otvod_sml_110_45',
+                                'Отвод SML 110/45°', 'шт', totalPts,
+                                'Подключение С/У (сценарий 1)', FG);
+                            addItem('rapid_fit_110',
+                                'Муфта соединительная Rapid DN\u00a0110 (фасонные)', 'шт',
+                                totalPts * 3,
+                                '3 муфты на узел (крестовина + отвод)', FG);
+                        }
+                    }
+                } else if (activeScenario === 2) {
+                    // Сценарий 2: Шахты С/У + кухни
+                    // Стояк С/У: тройник 110×110 + тройник 110×50
+                    if (bathR > 0) {
+                        var bPts = bathR * floorsN;
+                        if (isPlastic) {
+                            addItem('tee_110_110',
+                                'Тройник ПП 110×110', 'шт', bPts,
+                                'Подключение С/У (сценарий 2)', FG);
+                            addItem('tee_110_50',
+                                'Тройник ПП 110×50', 'шт', bPts,
+                                'Подключение С/У (сценарий 2)', FG);
+                        } else {
+                            addItem('tee_sml_110_110',
+                                'Тройник SML 110×110', 'шт', bPts,
+                                'Подключение С/У (сценарий 2)', FG);
+                            addItem('tee_sml_110_50',
+                                'Тройник SML 110×50', 'шт', bPts,
+                                'Подключение С/У (сценарий 2)', FG);
+                            addItem('rapid_fit_110',
+                                'Муфта соединительная Rapid DN\u00a0110 (фасонные)', 'шт',
+                                bPts * 3,
+                                '3 муфты на узел (2 тройника)', FG);
+                        }
+                    }
+                    // Стояк кухни: тройник 50×50 + 2 отвода 50/45°
+                    if (kitR > 0) {
+                        var kPts = kitR * floorsN;
+                        if (isPlastic) {
+                            addItem('tee_50_50',
+                                'Тройник ПП 50×50', 'шт', kPts,
+                                'Подключение кухни (сценарий 2)', FG);
+                            addItem('otvod_50_45',
+                                'Отвод ПП 50/45°', 'шт', kPts * 2,
+                                'Подключение кухни (сценарий 2)', FG);
+                        } else {
+                            addItem('tee_sml_50_50',
+                                'Тройник SML 50×50', 'шт', kPts,
+                                'Подключение кухни (сценарий 2)', FG);
+                            addItem('otvod_sml_50_45',
+                                'Отвод SML 50/45°', 'шт', kPts * 2,
+                                'Подключение кухни (сценарий 2)', FG);
+                            addItem('rapid_fit_50',
+                                'Муфта соединительная Rapid DN\u00a050 (фасонные)', 'шт',
+                                kPts * 3,
+                                '3 муфты на узел (тройник + 2 отвода)', FG);
+                        }
+                    }
+                } else if (activeScenario === 3) {
+                    // Сценарий 3: Оптимизированный (С/У + ceil(кухни/2))
+                    // Каждый основной стояк: крестовина 110×50×50 + стандартный набор С/У
+                    if (bathR > 0) {
+                        var bPts = bathR * floorsN;
+                        if (isPlastic) {
+                            addItem('krest_110_50_50',
+                                'Крестовина двухплоскостная ПП 110×50×50', 'шт', bPts,
+                                'Подключение С/У+кухня (сценарий 3)', FG);
+                            addItem('otvod_110_45',
+                                'Отвод ПП 110/45°', 'шт', bPts,
+                                'Подключение С/У (сценарий 3)', FG);
+                        } else {
+                            addItem('krest_sml_110_50_50',
+                                'Крестовина SML 110×50×50', 'шт', bPts,
+                                'Подключение С/У+кухня (сценарий 3)', FG);
+                            addItem('otvod_sml_110_45',
+                                'Отвод SML 110/45°', 'шт', bPts,
+                                'Подключение С/У (сценарий 3)', FG);
+                            addItem('rapid_fit_110',
+                                'Муфта соединительная Rapid DN\u00a0110 (фасонные)', 'шт',
+                                bPts * 3,
+                                '3 муфты на узел (крестовина + отвод)', FG);
+                        }
+                    }
+                }
+            }
+
             // ── Дюбель-гвозди для крепления противопожарных муфт ────────
             if (isPlastic && floorsN > 0) {
                 var totalCollars = 0;
@@ -1171,6 +1275,13 @@
             'dubel_fire',
             'khomuty',
             'rapid_50','rapid_110','rapid_160',
+            'krest_110_110_50','krest_110_50_50',
+            'krest_sml_110_110_50','krest_sml_110_50_50',
+            'tee_110_110','tee_110_50','tee_50_50',
+            'tee_sml_110_110','tee_sml_110_50','tee_sml_50_50',
+            'otvod_110_45','otvod_50_45',
+            'otvod_sml_110_45','otvod_sml_50_45',
+            'rapid_fit_110','rapid_fit_50',
             'voronka_condensate',
             'trap_dn50_pui','trap_dn50_trash'
         ];
@@ -1483,11 +1594,20 @@
 
         var k1EqCount = 0;
         var k1Fittings = collectFittings();
-        if (k1Fittings.length) {
+        var k1Base = k1Fittings.filter(function (i) { return i.group !== 'fixture'; });
+        var k1Fixture = k1Fittings.filter(function (i) { return i.group === 'fixture'; });
+        if (k1Base.length) {
             rows += '<tr class="spec-group-row"><td colspan="7">Фасонные изделия и оборудование</td></tr>';
-            k1Fittings.forEach(function (item) {
+            k1Base.forEach(function (item) {
                 if (item.unit === 'шт') k1EqCount += item.qty;
                 else k1PipeM += item.qty;
+                rows += itemRow(item.name, item.unit, item.qty, '', item.qty, item.note);
+            });
+        }
+        if (k1Fixture.length) {
+            rows += '<tr class="spec-group-row"><td colspan="7">Фасонные изделия для подключения приборов</td></tr>';
+            k1Fixture.forEach(function (item) {
+                k1EqCount += item.qty;
                 rows += itemRow(item.name, item.unit, item.qty, '', item.qty, item.note);
             });
         }
@@ -1604,9 +1724,17 @@
                 'м.п.', len, '+3%', lenR, ''].join(sep));
         });
         var csvK1Fittings = collectFittings();
-        if (csvK1Fittings.length) {
+        var csvK1Base = csvK1Fittings.filter(function (i) { return i.group !== 'fixture'; });
+        var csvK1Fixture = csvK1Fittings.filter(function (i) { return i.group === 'fixture'; });
+        if (csvK1Base.length) {
             lines.push(['','Фасонные изделия и оборудование','','','','',''].join(sep));
-            csvK1Fittings.forEach(function (item) {
+            csvK1Base.forEach(function (item) {
+                lines.push([rowNum++, item.name, item.unit, item.qty, '—', item.qty, item.note || ''].join(sep));
+            });
+        }
+        if (csvK1Fixture.length) {
+            lines.push(['','Фасонные изделия для подключения приборов','','','','',''].join(sep));
+            csvK1Fixture.forEach(function (item) {
                 lines.push([rowNum++, item.name, item.unit, item.qty, '—', item.qty, item.note || ''].join(sep));
             });
         }
@@ -2657,6 +2785,12 @@
                             'Противопожарная муфта DN' + s1.riserDiameter, svg);
                     }
                 }
+                // Горизонтальные отводы подключения приборов
+                for (var fi = 0; fi < nF; fi++) {
+                    var fy2 = PAD + fi * FLOOR_H + FLOOR_H / 2;
+                    svgEl('line', { x1: rx, y1: fy2, x2: rx + 10, y2: fy2,
+                        stroke: isPlastic ? '#8B4513' : '#666', 'stroke-width': 1.5, 'stroke-linecap': 'round' }, svg);
+                }
                 svgText(rx, topY - 4, 'C/У', 'viz-label', svg);
             }
 
@@ -2669,6 +2803,12 @@
                         svgIcon(rx, PAD + fi * FLOOR_H, 'bi-shield-check', '#E04000', 12,
                             'Противопожарная муфта DN' + s1.kitchenDiameter, svg);
                     }
+                }
+                // Горизонтальные отводы подключения кухни
+                for (var fi = 0; fi < nF; fi++) {
+                    var fy2 = PAD + fi * FLOOR_H + FLOOR_H / 2;
+                    svgEl('line', { x1: rx, y1: fy2, x2: rx + 8, y2: fy2,
+                        stroke: isPlastic ? '#8B4513' : '#666', 'stroke-width': 1.2, 'stroke-linecap': 'round' }, svg);
                 }
                 svgText(rx, topY - 4, 'Кух', 'viz-label', svg);
             }
