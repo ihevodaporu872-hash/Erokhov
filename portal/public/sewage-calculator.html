@@ -1459,7 +1459,9 @@
             var defaultRisers = idx === 0 ? 12 : idx === 1 ? 18 : 0;
             stormSettings[idx] = {
                 risers:    defaultRisers,
-                balconies: 0
+                balconies: 0,
+                mains:     [],
+                mainsNextId: 1
             };
         }
         return stormSettings[idx];
@@ -1527,11 +1529,48 @@
                     '0,5 м на каждую гильзу');
             }
 
-            // Изоляция вспененный каучук — метраж = длине труб
-            if (stormInsulation && len > 0)
+            // ── Магистральные стояки (Кровля) ──
+            var bH = b.height || 0;
+            var mainInsLen = 0;
+            (s.mains || []).forEach(function (m) {
+                var dn = m.diameter || 100;
+                var reserve = m.reserve ? 2 : 1;
+                var pipeLen = bH * reserve;
+                if (pipeLen > 0) {
+                    addItem('storm_main_sml_' + dn,
+                        'Труба SML DN\u00a0' + dn + ' (магистральный водосток)', 'м.п.', pipeLen);
+                    addItem('storm_main_rapid_' + dn,
+                        'Муфта соединительная Rapid DN\u00a0' + dn + ' (SML)', 'шт',
+                        Math.ceil(pipeLen / 3));
+                    addItem('storm_main_khomuty',
+                        'Хомут стальной (крепление магистралей К2)', 'шт',
+                        Math.ceil(pipeLen / 1.5));
+                    mainInsLen += pipeLen;
+                }
+                // Воронки кровельные — по 1 на стояк (включая резервный)
+                addItem('storm_main_funnel',
+                    'Воронка кровельная HL62 с электроподогревом', 'шт', reserve);
+                addItem('storm_main_funnel_cable',
+                    'Саморегулирующийся греющий кабель (обогрев воронок)', 'м.п.',
+                    reserve * 2, '2 м на каждую воронку');
+                // Перемычки — только при резервном стояке
+                if (m.reserve && nFloors > 0) {
+                    var nJumpers = Math.floor(nFloors / 5);
+                    if (nJumpers > 0) {
+                        addItem('storm_main_jumper_elbow_' + dn,
+                            'Отвод 90° SML DN\u00a0' + dn + ' (перемычки)', 'шт', nJumpers * 2);
+                        addItem('storm_main_jumper_pipe_' + dn,
+                            'Труба SML DN\u00a0' + dn + ' (перемычки, 1\u00a0м)', 'м.п.', nJumpers);
+                    }
+                }
+            });
+
+            // Изоляция вспененный каучук — метраж = длине фасадных труб + магистралей
+            var totalInsLen = len + mainInsLen;
+            if (stormInsulation && totalInsLen > 0)
                 addItem('storm_insulation',
-                    'Изоляция из вспененного каучука DN\u00a050 (стояки К2)', 'м.п.',
-                    len,
+                    'Изоляция из вспененного каучука (стояки К2)', 'м.п.',
+                    totalInsLen,
                     'Трубопроводы изолировать вспененным каучуком. Предусмотреть электрообогрев стояков и трапов');
         });
 
@@ -1539,6 +1578,12 @@
             'storm_rapid_50', 'storm_khomuty',
             'storm_trap_hl902', 'storm_gilza',
             'storm_sleeve', 'storm_sleeve_sealant', 'storm_sleeve_cable',
+            'storm_main_sml_100', 'storm_main_sml_150',
+            'storm_main_rapid_100', 'storm_main_rapid_150',
+            'storm_main_khomuty',
+            'storm_main_funnel', 'storm_main_funnel_cable',
+            'storm_main_jumper_elbow_100', 'storm_main_jumper_elbow_150',
+            'storm_main_jumper_pipe_100', 'storm_main_jumper_pipe_150',
             'storm_insulation'
         ];
         var result = [];
@@ -1614,6 +1659,51 @@
                     return '';
                 })() +
 
+                // ── Магистральные стояки (Кровля) ──
+                '<div class="bld-equipment-section" style="margin-top:16px">' +
+                '<p class="bld-equipment-title">Магистральные стояки (Кровля)</p>' +
+                '<div style="margin-bottom:8px">' +
+                '<button class="btn-add-zone storm-add-main" data-idx="' + idx + '">' +
+                '<i class="bi bi-plus-circle"></i> Добавить магистраль' +
+                '</button></div>' +
+
+                (function () {
+                    var bH = b.height || 0;
+                    var nF = b.floors ? b.floors.length : 0;
+                    var mainsCards = (s.mains || []).map(function (m, mi) {
+                        var dn = m.diameter || 100;
+                        var reserve = m.reserve ? 2 : 1;
+                        var pipeLen = Math.round(bH * reserve * 10) / 10;
+                        var nJumpers = m.reserve ? Math.floor(nF / 5) : 0;
+                        var infoLine = '<div class="k3-vent-info" style="margin-top:6px">' +
+                            '<i class="bi bi-building-up"></i> Магистраль DN' + dn + ': <strong>' + pipeLen + '\u00a0м</strong>' +
+                            (m.reserve ? ' (основной + резервный)' : ' (основной)') +
+                            (nJumpers > 0 ? ' · ' + nJumpers + '\u00a0перемычек' : '') +
+                            ' · ' + reserve + '\u00a0воронок HL62' +
+                            '</div>';
+                        return '<div class="k3-zone-card" style="margin-bottom:8px">' +
+                            '<div class="k3-zone-header">' +
+                            '<span><span class="k3-zone-name">Магистраль ' + (mi + 1) + '</span></span>' +
+                            '<button class="k3-zone-remove storm-remove-main" data-idx="' + idx + '" data-main-id="' + m.id + '">&times;</button>' +
+                            '</div>' +
+                            '<div class="bld-num-row">' +
+                            '<label>Диаметр:</label>' +
+                            '<select class="storm-main-dn bld-select" data-idx="' + idx + '" data-main-id="' + m.id + '">' +
+                            '<option value="100"' + (dn === 100 ? ' selected' : '') + '>DN 100</option>' +
+                            '<option value="150"' + (dn === 150 ? ' selected' : '') + '>DN 150</option>' +
+                            '</select></div>' +
+                            '<div class="bld-num-row">' +
+                            '<label><input type="checkbox" class="storm-main-reserve" data-idx="' + idx + '" data-main-id="' + m.id + '"' +
+                            (m.reserve ? ' checked' : '') + '> Резервный стояк (1+1)</label>' +
+                            '</div>' +
+                            infoLine +
+                            '</div>';
+                    });
+                    return mainsCards.join('');
+                })() +
+
+                '</div>' + // /bld-equipment-section
+
                 '</div>' + // /accordion-content
                 '</details>';
         }).join('');
@@ -1625,6 +1715,49 @@
             inp.addEventListener('input', function () {
                 getStormSettings(parseInt(inp.dataset.idx, 10))[inp.dataset.field] =
                     Math.max(0, parseInt(inp.value, 10) || 0);
+                renderStormResults();
+            });
+        });
+
+        // Добавить магистраль
+        container.querySelectorAll('.storm-add-main').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var s = getStormSettings(parseInt(btn.dataset.idx, 10));
+                s.mains.push({ id: s.mainsNextId++, diameter: 100, reserve: false });
+                renderStormResults();
+            });
+        });
+
+        // Удалить магистраль
+        container.querySelectorAll('.storm-remove-main').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var s = getStormSettings(parseInt(btn.dataset.idx, 10));
+                var mid = parseInt(btn.dataset.mainId, 10);
+                s.mains = s.mains.filter(function (m) { return m.id !== mid; });
+                renderStormResults();
+            });
+        });
+
+        // Диаметр магистрали
+        container.querySelectorAll('.storm-main-dn').forEach(function (sel) {
+            sel.addEventListener('change', function () {
+                var s = getStormSettings(parseInt(sel.dataset.idx, 10));
+                var mid = parseInt(sel.dataset.mainId, 10);
+                for (var i = 0; i < s.mains.length; i++) {
+                    if (s.mains[i].id === mid) { s.mains[i].diameter = parseInt(sel.value, 10); break; }
+                }
+                renderStormResults();
+            });
+        });
+
+        // Резервный стояк
+        container.querySelectorAll('.storm-main-reserve').forEach(function (cb) {
+            cb.addEventListener('change', function () {
+                var s = getStormSettings(parseInt(cb.dataset.idx, 10));
+                var mid = parseInt(cb.dataset.mainId, 10);
+                for (var i = 0; i < s.mains.length; i++) {
+                    if (s.mains[i].id === mid) { s.mains[i].reserve = cb.checked; break; }
+                }
                 renderStormResults();
             });
         });
