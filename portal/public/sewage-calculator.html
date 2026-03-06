@@ -207,6 +207,61 @@
             max-width: 220px; line-height: 1.4;
         }
 
+        /* ── Визуализация ────────────────────────────────────────────────── */
+        .viz-toolbar {
+            display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+            padding: 10px 0; margin-bottom: 8px;
+        }
+        .viz-system-btns, .viz-building-btns, .viz-zoom-btns {
+            display: flex; gap: 4px;
+        }
+        .viz-sys-btn, .viz-building-btns button, .viz-zoom-btns button {
+            background: var(--bg-card); border: 1px solid var(--gray-300); border-radius: 6px;
+            padding: 4px 12px; font-size: 12px; color: var(--gray-600);
+            cursor: pointer; transition: all .15s; font-family: inherit;
+        }
+        .viz-sys-btn.active, .viz-building-btns button.active {
+            background: var(--accent-blue); color: #fff; border-color: var(--accent-blue);
+        }
+        .viz-sys-btn:hover, .viz-building-btns button:hover, .viz-zoom-btns button:hover {
+            border-color: var(--accent-blue); color: var(--accent-blue);
+        }
+        .viz-sys-btn.active:hover, .viz-building-btns button.active:hover { color: #fff; }
+        .viz-viewport {
+            position: relative; overflow: hidden; border: 1px solid var(--gray-200);
+            border-radius: 10px; background: #fafbfc; min-height: 400px;
+            cursor: grab; user-select: none;
+        }
+        .viz-viewport:active { cursor: grabbing; }
+        .viz-viewport svg { display: block; transform-origin: 0 0; }
+        .viz-tooltip {
+            display: none; position: fixed; z-index: 999;
+            background: var(--gray-900); color: #fff; font-size: 11px;
+            padding: 5px 10px; border-radius: 6px; pointer-events: none;
+            max-width: 260px; line-height: 1.4;
+        }
+        .viz-legend {
+            display: flex; flex-wrap: wrap; gap: 14px; align-items: center;
+            padding: 10px 0; font-size: 12px; color: var(--gray-600);
+        }
+        .viz-legend-title { font-weight: 700; color: var(--gray-800); }
+        .viz-leg-item { display: flex; align-items: center; gap: 4px; }
+        .viz-leg-line { display: inline-block; width: 18px; height: 3px; border-radius: 2px; }
+        /* SVG classes */
+        .viz-floor-line { stroke: var(--gray-300); stroke-width: 1; stroke-dasharray: 4 2; }
+        .viz-floor-label { font-size: 10px; fill: var(--gray-500); font-family: 'DM Sans', sans-serif; }
+        .viz-riser-k1-pp { stroke: #8B4513; stroke-width: 3; stroke-linecap: round; }
+        .viz-riser-k1-sml { stroke: #555; stroke-width: 3; stroke-linecap: round; }
+        .viz-riser-k2 { stroke: #0066CC; stroke-width: 2.5; stroke-linecap: round; }
+        .viz-riser-k2-main { stroke: #0066CC; stroke-width: 4; stroke-linecap: round; }
+        .viz-zone-k3 { fill: rgba(224,64,0,.08); stroke: #E04000; stroke-width: 1.5; rx: 4; }
+        .viz-icon { cursor: pointer; transition: opacity .15s; }
+        .viz-icon:hover { opacity: .7; }
+        .viz-label { font-size: 9px; font-family: 'DM Sans', sans-serif; text-anchor: middle; }
+        .viz-building-outline { fill: none; stroke: var(--gray-400); stroke-width: 1.5; rx: 3; }
+        .viz-building-title { font-size: 12px; font-weight: 700; fill: var(--gray-800); font-family: 'DM Sans', sans-serif; }
+        .viz-ground-line { stroke: #7B5B3A; stroke-width: 2; stroke-dasharray: 8 4; }
+
         /* ── Заглушка "нет данных" ────────────────────────────────────────── */
         .no-data-banner {
             display: flex; align-items: flex-start; gap: 10px;
@@ -755,18 +810,49 @@
 
                 <!-- ========== ВИЗУАЛИЗАЦИЯ ========== -->
                 <div class="tab-panel" id="tab-visualization">
-                    <div class="placeholder-container">
-                        <div class="placeholder-content">
-                            <div class="placeholder-icon">
-                                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                                    <rect x="3" y="3" width="7" height="7" rx="1"/>
-                                    <rect x="14" y="3" width="7" height="7" rx="1"/>
-                                    <rect x="3" y="14" width="7" height="7" rx="1"/>
-                                    <path d="M17.5 14v3h3M17.5 17h-3"/>
-                                </svg>
+                    <div class="control-panel">
+                        <div class="panel-section">
+                            <h3 class="panel-section-title">
+                                <span class="panel-section-icon panel-section-icon-output"></span>
+                                Схема систем здания (Preview)
+                            </h3>
+
+                            <!-- Toolbar -->
+                            <div class="viz-toolbar">
+                                <div class="viz-system-btns">
+                                    <button class="viz-sys-btn active" data-viz="all">Все</button>
+                                    <button class="viz-sys-btn" data-viz="K1">К1</button>
+                                    <button class="viz-sys-btn" data-viz="K2">К2</button>
+                                    <button class="viz-sys-btn" data-viz="K3">К3</button>
+                                </div>
+                                <div class="viz-building-btns" id="vizBuildingBtns"></div>
+                                <div class="viz-zoom-btns">
+                                    <button id="vizZoomIn" title="Приблизить"><i class="bi bi-zoom-in"></i></button>
+                                    <button id="vizZoomReset" title="Сбросить">1:1</button>
+                                    <button id="vizZoomOut" title="Отдалить"><i class="bi bi-zoom-out"></i></button>
+                                </div>
                             </div>
-                            <h2>Раздел в разработке</h2>
-                            <p class="note">Здесь будет визуализация расчёта: аксонометрическая схема системы К1/К2, поэтажная схема разводки, схема выпусков.</p>
+
+                            <!-- SVG viewport -->
+                            <div class="viz-viewport" id="vizViewport">
+                                <svg id="vizSvg" xmlns="http://www.w3.org/2000/svg"></svg>
+                            </div>
+
+                            <!-- Tooltip -->
+                            <div class="viz-tooltip" id="vizTooltip"></div>
+
+                            <!-- Legend -->
+                            <div class="viz-legend">
+                                <span class="viz-legend-title">Условные обозначения:</span>
+                                <span class="viz-leg-item"><span class="viz-leg-line" style="background:#8B4513"></span>Труба ПП (К1)</span>
+                                <span class="viz-leg-item"><span class="viz-leg-line" style="background:#555"></span>Труба SML (К1)</span>
+                                <span class="viz-leg-item"><span class="viz-leg-line" style="background:#0066CC"></span>Стояк К2</span>
+                                <span class="viz-leg-item"><span class="viz-leg-line" style="background:#E04000"></span>Зона К3</span>
+                                <span class="viz-leg-item"><i class="bi bi-shield-check" style="color:#E04000"></i> Муфта</span>
+                                <span class="viz-leg-item"><i class="bi bi-funnel" style="color:#0066CC"></i> Воронка</span>
+                                <span class="viz-leg-item"><i class="bi bi-water" style="color:#0066CC"></i> Трап</span>
+                                <span class="viz-leg-item"><i class="bi bi-gear" style="color:#E04000"></i> Насос</span>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -814,6 +900,7 @@
             var panel = document.getElementById(targetId);
             if (panel) panel.classList.add('active');
             if (btn.dataset.tab === 'specification') renderFullSpecification();
+            if (btn.dataset.tab === 'visualization') renderVisualization();
         });
     });
 
@@ -2320,6 +2407,380 @@
             document.body.classList.toggle('dark-theme', msg.theme === 'dark');
         }
     });
+
+    /* ═══════════════════════════════════════════════════════════════════════
+       Визуализация расчётной схемы
+    ═══════════════════════════════════════════════════════════════════════ */
+
+    var vizFilter    = 'all';
+    var vizBldIdx    = 0;
+    var vizScale     = 1;
+    var vizPanX      = 0, vizPanY = 0;
+    var vizDragging  = false, vizDragX = 0, vizDragY = 0;
+
+    // ── SVG helpers ────────────────────────────────────────────────────
+    var NS = 'http://www.w3.org/2000/svg';
+    function svgEl(tag, attrs, parent) {
+        var el = document.createElementNS(NS, tag);
+        if (attrs) Object.keys(attrs).forEach(function (k) { el.setAttribute(k, attrs[k]); });
+        if (parent) parent.appendChild(el);
+        return el;
+    }
+    function svgText(x, y, text, cls, parent) {
+        var t = svgEl('text', { x: x, y: y, 'class': cls }, parent);
+        t.textContent = text;
+        return t;
+    }
+    function svgIcon(x, y, icon, color, size, tooltip, parent) {
+        var g = svgEl('g', { 'class': 'viz-icon', transform: 'translate(' + x + ',' + y + ')' }, parent);
+        g.dataset.vizTip = tooltip || '';
+        var fo = svgEl('foreignObject', { x: -(size/2), y: -(size/2), width: size, height: size }, g);
+        var div = document.createElement('div');
+        div.style.cssText = 'display:flex;align-items:center;justify-content:center;width:100%;height:100%;color:' + color + ';font-size:' + (size * 0.7) + 'px';
+        div.innerHTML = '<i class="bi ' + icon + '"></i>';
+        fo.appendChild(div);
+        return g;
+    }
+
+    // ── Tooltip ────────────────────────────────────────────────────────
+    function setupTooltip() {
+        var tip = document.getElementById('vizTooltip');
+        var svg = document.getElementById('vizSvg');
+        if (!tip || !svg) return;
+        svg.addEventListener('mouseover', function (e) {
+            var el = e.target.closest('.viz-icon');
+            if (el && el.dataset.vizTip) {
+                tip.textContent = el.dataset.vizTip;
+                tip.style.display = 'block';
+            }
+        });
+        svg.addEventListener('mousemove', function (e) {
+            if (tip.style.display === 'block') {
+                tip.style.left = (e.clientX + 12) + 'px';
+                tip.style.top  = (e.clientY - 8) + 'px';
+            }
+        });
+        svg.addEventListener('mouseout', function (e) {
+            var el = e.target.closest('.viz-icon');
+            if (el) tip.style.display = 'none';
+        });
+    }
+
+    // ── Pan & Zoom ────────────────────────────────────────────────────
+    function applyTransform() {
+        var svg = document.getElementById('vizSvg');
+        if (svg) svg.style.transform = 'translate(' + vizPanX + 'px,' + vizPanY + 'px) scale(' + vizScale + ')';
+    }
+    function setupPanZoom() {
+        var vp = document.getElementById('vizViewport');
+        if (!vp) return;
+        vp.addEventListener('mousedown', function (e) {
+            if (e.button !== 0) return;
+            vizDragging = true; vizDragX = e.clientX - vizPanX; vizDragY = e.clientY - vizPanY;
+        });
+        window.addEventListener('mousemove', function (e) {
+            if (!vizDragging) return;
+            vizPanX = e.clientX - vizDragX; vizPanY = e.clientY - vizDragY;
+            applyTransform();
+        });
+        window.addEventListener('mouseup', function () { vizDragging = false; });
+        vp.addEventListener('wheel', function (e) {
+            e.preventDefault();
+            var d = e.deltaY > 0 ? -0.1 : 0.1;
+            vizScale = Math.max(0.3, Math.min(3, vizScale + d));
+            applyTransform();
+        }, { passive: false });
+    }
+
+    // ── Toolbar handlers ──────────────────────────────────────────────
+    document.querySelectorAll('.viz-sys-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            document.querySelectorAll('.viz-sys-btn').forEach(function (b) { b.classList.remove('active'); });
+            btn.classList.add('active');
+            vizFilter = btn.dataset.viz;
+            renderVisualization();
+        });
+    });
+    document.getElementById('vizZoomIn').addEventListener('click', function () {
+        vizScale = Math.min(3, vizScale + 0.2); applyTransform();
+    });
+    document.getElementById('vizZoomOut').addEventListener('click', function () {
+        vizScale = Math.max(0.3, vizScale - 0.2); applyTransform();
+    });
+    document.getElementById('vizZoomReset').addEventListener('click', function () {
+        vizScale = 1; vizPanX = 0; vizPanY = 0; applyTransform();
+    });
+
+    setupTooltip();
+    setupPanZoom();
+
+    // ── Main render ───────────────────────────────────────────────────
+    function renderVisualization() {
+        var svg = document.getElementById('vizSvg');
+        if (!svg) return;
+        svg.innerHTML = '';
+
+        if (!buildingStats || !buildingStats.length) {
+            svgText(20, 30, 'Загрузите данные проекта для визуализации.', 'viz-floor-label', svg);
+            svg.setAttribute('width', 400); svg.setAttribute('height', 60);
+            return;
+        }
+
+        // Render building selector buttons
+        var btnsDiv = document.getElementById('vizBuildingBtns');
+        if (btnsDiv) {
+            btnsDiv.innerHTML = buildingStats.map(function (b, i) {
+                return '<button class="' + (i === vizBldIdx ? 'active' : '') + '" data-viz-bld="' + i + '">' +
+                    escHtml(b.name || 'Корпус ' + b.num) + '</button>';
+            }).join('');
+            btnsDiv.querySelectorAll('button').forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    vizBldIdx = parseInt(btn.dataset.vizBld, 10);
+                    renderVisualization();
+                });
+            });
+        }
+
+        var b   = buildingStats[vizBldIdx] || buildingStats[0];
+        var s1  = getSettings(vizBldIdx);
+        var s2  = getStormSettings(vizBldIdx);
+        var s3  = getK3Settings(vizBldIdx);
+        var nF  = b.floors ? b.floors.length : 0;
+        var bH  = b.height || 0;
+        var showK1 = (vizFilter === 'all' || vizFilter === 'K1');
+        var showK2 = (vizFilter === 'all' || vizFilter === 'K2');
+        var showK3 = (vizFilter === 'all' || vizFilter === 'K3');
+
+        // Layout constants
+        var PAD     = 40;
+        var LABEL_W = 36;
+        var FLOOR_H = 36;
+        var totalH  = nF * FLOOR_H;
+        var svgH    = totalH + PAD * 2 + 50;
+
+        // Calculate risers to draw
+        var bathR = calcBathRisers(b);
+        var kitR  = calcKitchenRisers(b);
+        var puiR  = s1.pui ? 1 : 0;
+        var trashR = s1.trashRoom ? 1 : 0;
+        var k1Risers = bathR + kitR + puiR + trashR;
+        var k2Facade = s2.risers || 0;
+        var k2Mains  = (s2.mains || []).length;
+        var k2MainsReserve = 0;
+        (s2.mains || []).forEach(function (m) { if (m.reserve) k2MainsReserve++; });
+        var k3Zones  = s3.zones || [];
+
+        // Riser spacing
+        var RISER_GAP = 18;
+        var SECTION_GAP = 30;
+
+        // X positions
+        var x = PAD + LABEL_W;
+        var k1StartX = x;
+        var k1Positions = [];
+        if (showK1) {
+            for (var i = 0; i < k1Risers; i++) { k1Positions.push(x); x += RISER_GAP; }
+            if (k1Risers > 0) x += SECTION_GAP;
+        }
+        var k2StartX = x;
+        var k2FacadePositions = [];
+        var k2MainPositions = [];
+        if (showK2) {
+            var k2FacadeShow = Math.min(k2Facade, 8); // show max 8 facade lines
+            for (var i = 0; i < k2FacadeShow; i++) { k2FacadePositions.push(x); x += RISER_GAP; }
+            if (k2Facade > 8) { x += 10; } // gap for "..."
+            if (k2FacadeShow > 0) x += 12;
+            (s2.mains || []).forEach(function (m) {
+                k2MainPositions.push({ x: x, reserve: m.reserve, dn: m.diameter || 100 });
+                x += m.reserve ? 28 : RISER_GAP;
+            });
+            if (k2Facade > 0 || k2Mains > 0) x += SECTION_GAP;
+        }
+        var k3StartX = x;
+        if (showK3 && k3Zones.length > 0) {
+            x += k3Zones.length * 60 + 10;
+        }
+
+        var svgW = Math.max(x + PAD, 400);
+        svg.setAttribute('width', svgW);
+        svg.setAttribute('height', svgH);
+
+        // ── Building outline ──
+        var bldX = PAD + LABEL_W - 10;
+        var bldY = PAD - 5;
+        var bldW = x - bldX + 10;
+        svgEl('rect', { x: bldX, y: bldY, width: bldW, height: totalH + 10, 'class': 'viz-building-outline' }, svg);
+        svgText(bldX + 6, bldY - 6, escHtml(b.name || 'Корпус ' + b.num) + ' · ' + nF + ' эт. · ' + bH + ' м', 'viz-building-title', svg);
+
+        // ── Ground line ──
+        var groundY = PAD + totalH;
+        svgEl('line', { x1: PAD - 10, y1: groundY, x2: svgW - PAD + 10, y2: groundY, 'class': 'viz-ground-line' }, svg);
+
+        // ── Floor lines & labels ──
+        for (var fi = 0; fi <= nF; fi++) {
+            var fy = PAD + fi * FLOOR_H;
+            if (fi < nF) {
+                svgEl('line', { x1: PAD + LABEL_W - 10, y1: fy, x2: x + 5, y2: fy, 'class': 'viz-floor-line' }, svg);
+                var floorNum = nF - fi;
+                svgText(PAD + 4, fy + FLOOR_H / 2 + 3, floorNum + ' эт', 'viz-floor-label', svg);
+            }
+        }
+
+        var isPlastic = (s1.pipeType === 'pp' || s1.pipeType === 'pp_silent');
+        var riserClass = isPlastic ? 'viz-riser-k1-pp' : 'viz-riser-k1-sml';
+
+        // ── K1 risers ──
+        if (showK1) {
+            var topY = PAD;
+            var botY = groundY;
+            var rIdx = 0;
+
+            // Bath risers
+            for (var i = 0; i < bathR && rIdx < k1Positions.length; i++, rIdx++) {
+                var rx = k1Positions[rIdx];
+                svgEl('line', { x1: rx, y1: topY, x2: rx, y2: botY, 'class': riserClass }, svg);
+                // Fire collars on plastic
+                if (isPlastic) {
+                    for (var fi = 1; fi < nF; fi++) {
+                        var fy = PAD + fi * FLOOR_H;
+                        svgIcon(rx, fy, 'bi-shield-check', '#E04000', 12,
+                            'Противопожарная муфта DN' + s1.riserDiameter, svg);
+                    }
+                }
+                svgText(rx, topY - 4, 'C/У', 'viz-label', svg);
+            }
+
+            // Kitchen risers
+            for (var i = 0; i < kitR && rIdx < k1Positions.length; i++, rIdx++) {
+                var rx = k1Positions[rIdx];
+                svgEl('line', { x1: rx, y1: topY, x2: rx, y2: botY, 'class': riserClass }, svg);
+                if (isPlastic) {
+                    for (var fi = 1; fi < nF; fi++) {
+                        svgIcon(rx, PAD + fi * FLOOR_H, 'bi-shield-check', '#E04000', 12,
+                            'Противопожарная муфта DN' + s1.kitchenDiameter, svg);
+                    }
+                }
+                svgText(rx, topY - 4, 'Кух', 'viz-label', svg);
+            }
+
+            // PUI riser
+            if (puiR && rIdx < k1Positions.length) {
+                var rx = k1Positions[rIdx]; rIdx++;
+                svgEl('line', { x1: rx, y1: topY, x2: rx, y2: botY, 'class': riserClass }, svg);
+                svgText(rx, topY - 4, 'ПУИ', 'viz-label', svg);
+                for (var fi = 0; fi < nF; fi++) {
+                    svgIcon(rx + 7, PAD + fi * FLOOR_H + FLOOR_H / 2, 'bi-droplet-half', '#0066CC', 10,
+                        'Трап DN50 (ПУИ), эт. ' + (nF - fi), svg);
+                }
+            }
+
+            // Trash room riser
+            if (trashR && rIdx < k1Positions.length) {
+                var rx = k1Positions[rIdx]; rIdx++;
+                svgEl('line', { x1: rx, y1: PAD + (nF - 1) * FLOOR_H, x2: rx, y2: botY, 'class': riserClass }, svg);
+                svgText(rx, PAD + (nF - 1) * FLOOR_H - 4, 'МК', 'viz-label', svg);
+                svgIcon(rx, botY - 6, 'bi-trash3', '#8B4513', 12, 'Трап мусорокамеры DN50', svg);
+            }
+
+            // Section label
+            if (k1Risers > 0)
+                svgText((k1StartX + k1Positions[k1Positions.length - 1]) / 2, svgH - 12, 'К1 (' + k1Risers + ' ст.)', 'viz-label', svg);
+        }
+
+        // ── K2 facade risers ──
+        if (showK2) {
+            var topY = PAD;
+            var botY = groundY;
+            var facadeShow = Math.min(k2Facade, 8);
+
+            for (var i = 0; i < facadeShow; i++) {
+                var rx = k2FacadePositions[i];
+                svgEl('line', { x1: rx, y1: topY, x2: rx, y2: botY, 'class': 'viz-riser-k2' }, svg);
+                // Traps on floors
+                for (var fi = 0; fi < nF; fi++) {
+                    var fy = PAD + fi * FLOOR_H + FLOOR_H / 2;
+                    svgIcon(rx + 7, fy, 'bi-water', '#0066CC', 9,
+                        'Трап балкона/фасада HL90.2 DN50', svg);
+                }
+            }
+            if (k2Facade > 8) {
+                svgText(k2FacadePositions[facadeShow - 1] + 14, PAD + totalH / 2, '…+' + (k2Facade - 8), 'viz-floor-label', svg);
+            }
+            if (facadeShow > 0)
+                svgText(k2FacadePositions[Math.floor(facadeShow / 2)], topY - 4, 'Фасад ×' + k2Facade, 'viz-label', svg);
+
+            // K2 magistral risers
+            k2MainPositions.forEach(function (mp, mi) {
+                var m = (s2.mains || [])[mi];
+                svgEl('line', { x1: mp.x, y1: topY, x2: mp.x, y2: botY, 'class': 'viz-riser-k2-main' }, svg);
+                // Funnel at top
+                svgIcon(mp.x, topY + 4, 'bi-funnel-fill', '#0066CC', 14,
+                    'Воронка кровельная HL62 DN' + mp.dn, svg);
+                svgText(mp.x, topY - 4, 'М' + (mi + 1), 'viz-label', svg);
+
+                if (mp.reserve) {
+                    var rx2 = mp.x + 14;
+                    svgEl('line', { x1: rx2, y1: topY, x2: rx2, y2: botY, 'class': 'viz-riser-k2-main' }, svg);
+                    svgIcon(rx2, topY + 4, 'bi-funnel-fill', '#0066CC', 14,
+                        'Воронка кровельная HL62 (резерв) DN' + mp.dn, svg);
+                    // Jumper lines
+                    var nJumpers = Math.floor(nF / 5);
+                    for (var ji = 0; ji < nJumpers; ji++) {
+                        var jy = PAD + (ji + 1) * 5 * FLOOR_H;
+                        if (jy < botY) {
+                            svgEl('line', { x1: mp.x, y1: jy, x2: rx2, y2: jy,
+                                stroke: '#0066CC', 'stroke-width': 2, 'stroke-dasharray': '3 2' }, svg);
+                        }
+                    }
+                }
+            });
+
+            var k2LabelX = k2FacadePositions.length ? k2FacadePositions[0] : (k2MainPositions.length ? k2MainPositions[0].x : k2StartX);
+            var k2EndX   = k2MainPositions.length ? k2MainPositions[k2MainPositions.length - 1].x + 14 : (k2FacadePositions.length ? k2FacadePositions[k2FacadePositions.length - 1] : k2StartX);
+            if (k2Facade > 0 || k2Mains > 0)
+                svgText((k2LabelX + k2EndX) / 2, svgH - 12, 'К2', 'viz-label', svg);
+        }
+
+        // ── K3 zones ──
+        if (showK3 && k3Zones.length > 0) {
+            var zoneW = 52, zoneH = FLOOR_H * 1.5;
+            var zoneY = groundY - zoneH;
+            k3Zones.forEach(function (z, zi) {
+                var zx = k3StartX + zi * 60;
+                svgEl('rect', { x: zx, y: zoneY, width: zoneW, height: zoneH, 'class': 'viz-zone-k3' }, svg);
+
+                var typeLabel = z.type === 'restaurant' ? 'Рест.' : 'Торг.';
+                svgText(zx + zoneW / 2, zoneY - 4, typeLabel, 'viz-label', svg);
+
+                if (z.type === 'restaurant') {
+                    svgIcon(zx + 14, zoneY + zoneH / 3, 'bi-gear', '#E04000', 14,
+                        'Насос Wilo N-Lift', svg);
+                    svgIcon(zx + zoneW - 14, zoneY + zoneH / 3, 'bi-funnel', '#E04000', 12,
+                        'Жироуловитель', svg);
+                }
+                svgIcon(zx + zoneW / 2, zoneY + zoneH * 0.75, 'bi-droplet-half', '#E04000', 10,
+                    'Воронка с разрывом струи 20мм', svg);
+
+                // Vent riser line above zone
+                var vt = z.ventType || 'none';
+                if (vt !== 'none') {
+                    var ventX = zx + zoneW / 2;
+                    var ventTopY = vt === 'riser' ? PAD : (zoneY - 30);
+                    svgEl('line', { x1: ventX, y1: zoneY, x2: ventX, y2: ventTopY,
+                        stroke: '#E04000', 'stroke-width': 2, 'stroke-dasharray': '4 2' }, svg);
+                    var ventIcon = vt === 'riser' ? 'bi-arrow-up-circle' : 'bi-wind';
+                    var ventTip  = vt === 'riser' ? 'Вытяжной стояк DN110 на кровлю' : 'Воздушный клапан HL905 DN110';
+                    svgIcon(ventX, ventTopY, ventIcon, '#E04000', 14, ventTip, svg);
+                }
+            });
+            svgText(k3StartX + (k3Zones.length * 60) / 2, svgH - 12, 'К3 (' + k3Zones.length + ' зон)', 'viz-label', svg);
+        }
+
+        // ── Roof line (dashed) at top ──
+        svgEl('line', { x1: bldX, y1: PAD, x2: bldX + bldW, y2: PAD,
+            stroke: '#999', 'stroke-width': 1.5, 'stroke-dasharray': '6 3' }, svg);
+        svgText(bldX + bldW + 6, PAD + 3, 'Кровля', 'viz-floor-label', svg);
+    }
 
     /* ─── Первый рендер ──────────────────────────────────────────────────── */
     renderResultsTable();
