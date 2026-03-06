@@ -1510,6 +1510,23 @@
                     'Гильза аварийная (стальная труба DN\u00a050–100, l\u00a0=\u00a00,3\u00a0м)', 'шт',
                     s.balconies);
 
+            // Аварийные гильзы выпуска с балкона — risers × floors
+            var nFloors = b.floors ? b.floors.length : 0;
+            var nSleeves = (s.risers || 0) * nFloors;
+            if (nSleeves > 0) {
+                addItem('storm_sleeve',
+                    'Аварийная гильза выпуска с балкона DN\u00a050 (L\u00a0=\u00a0500\u00a0мм)', 'шт',
+                    nSleeves,
+                    'Стальная оцинкованная труба DN50, l=0.5 м');
+                addItem('storm_sleeve_sealant',
+                    'Герметик для гильз (огнестойкий)', 'шт',
+                    nSleeves);
+                addItem('storm_sleeve_cable',
+                    'Саморегулирующийся греющий кабель (обогрев гильз)', 'м.п.',
+                    Math.round(nSleeves * 0.5 * 10) / 10,
+                    '0,5 м на каждую гильзу');
+            }
+
             // Изоляция вспененный каучук — метраж = длине труб
             if (stormInsulation && len > 0)
                 addItem('storm_insulation',
@@ -1521,6 +1538,7 @@
         var ORDER = [
             'storm_rapid_50', 'storm_khomuty',
             'storm_trap_hl902', 'storm_gilza',
+            'storm_sleeve', 'storm_sleeve_sealant', 'storm_sleeve_cable',
             'storm_insulation'
         ];
         var result = [];
@@ -1581,6 +1599,20 @@
                 'Длина стояков К2 (стояков\u00a0×\u00a0высота корпуса):' +
                 '<strong>\u2009' + len + '\u00a0м</strong>' +
                 '</div>' +
+
+                (function () {
+                    var nF = b.floors ? b.floors.length : 0;
+                    var nS = (s.risers || 0) * nF;
+                    if (nS > 0) {
+                        return '<div class="k3-vent-info" style="margin-top:8px">' +
+                            '<i class="bi bi-exclamation-triangle"></i> ' +
+                            'Аварийный сброс: автоматически рассчитано <strong>' + nS + '</strong>\u00a0гильз DN50 ' +
+                            '(' + (s.risers || 0) + '\u00a0ст.\u00a0×\u00a0' + nF + '\u00a0эт.) ' +
+                            '+ <strong>' + (Math.round(nS * 0.5 * 10) / 10) + '\u00a0м</strong> греющего кабеля' +
+                            '</div>';
+                    }
+                    return '';
+                })() +
 
                 '</div>' + // /accordion-content
                 '</details>';
