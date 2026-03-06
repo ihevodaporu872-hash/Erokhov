@@ -1046,7 +1046,8 @@
             var len      = calcRiserLengthM(b, activeScenario);
             var isPlastic = (s.pipeType === 'pp' || s.pipeType === 'pp_silent');
             var isSML    = (s.pipeType === 'sml');
-            var revPer   = floorsN > 0 ? Math.ceil(floorsN / 3) : 0;
+            var revPer   = floorsN > 0 ? Math.floor(floorsN / 3) : 0;
+            var SG = 'service'; // группа для подгруппы обслуживания
 
             // ── Противопожарные муфты (только пластик) ───────────────────
             if (isPlastic && floorsN > 0) {
@@ -1062,14 +1063,27 @@
 
             // ── Ревизии (все типы труб) ───────────────────────────────────
             if (revPer > 0) {
-                if (bathR > 0)
+                var matLabel = isPlastic ? (s.pipeType === 'pp_silent' ? 'ПП Бесшумный' : 'ПП') : 'SML';
+                if (bathR > 0) {
+                    var revBath = bathR * revPer;
                     addItem('rev_' + s.riserDiameter,
-                        'Ревизия DN\u00a0' + s.riserDiameter, 'шт',
-                        bathR * revPer);
-                if (showKitchen && kitR > 0)
+                        'Ревизия ' + matLabel + ' DN\u00a0' + s.riserDiameter, 'шт',
+                        revBath, 'Каждый 3-й этаж', SG);
+                    if (isSML)
+                        addItem('rapid_rev_' + s.riserDiameter,
+                            'Муфта Rapid DN\u00a0' + s.riserDiameter + ' (ревизии)', 'шт',
+                            revBath * 2, '+2 муфты на SML-ревизию', SG);
+                }
+                if (showKitchen && kitR > 0) {
+                    var revKit = kitR * revPer;
                     addItem('rev_' + s.kitchenDiameter,
-                        'Ревизия DN\u00a0' + s.kitchenDiameter, 'шт',
-                        kitR * revPer);
+                        'Ревизия ' + matLabel + ' DN\u00a0' + s.kitchenDiameter, 'шт',
+                        revKit, 'Каждый 3-й этаж', SG);
+                    if (isSML)
+                        addItem('rapid_rev_' + s.kitchenDiameter,
+                            'Муфта Rapid DN\u00a0' + s.kitchenDiameter + ' (ревизии)', 'шт',
+                            revKit * 2, '+2 муфты на SML-ревизию', SG);
+                }
             }
 
             // ── Компенсационные патрубки (только пластик) ────────────────
@@ -1119,11 +1133,16 @@
                     addItem('mufta_' + s.riserDiameter,
                         'Муфта противопожарная DN\u00a0' + s.riserDiameter, 'шт',
                         floorsN);
-                // Ревизии
-                if (revPer > 0)
+                // Ревизии (ПУИ)
+                if (revPer > 0) {
                     addItem('rev_' + s.riserDiameter,
-                        'Ревизия DN\u00a0' + s.riserDiameter, 'шт',
-                        revPer);
+                        'Ревизия ' + (isPlastic ? (s.pipeType === 'pp_silent' ? 'ПП Бесшумный' : 'ПП') : 'SML') + ' DN\u00a0' + s.riserDiameter, 'шт',
+                        revPer, 'Каждый 3-й этаж (ПУИ)', SG);
+                    if (isSML)
+                        addItem('rapid_rev_' + s.riserDiameter,
+                            'Муфта Rapid DN\u00a0' + s.riserDiameter + ' (ревизии)', 'шт',
+                            revPer * 2, '+2 муфты на SML-ревизию', SG);
+                }
                 // Компенсационные патрубки (пластик)
                 if (isPlastic && revPer > 0)
                     addItem('kompens_' + s.riserDiameter,
@@ -1281,6 +1300,13 @@
                     addItem('k1c_air_valve',
                         'Воздушный клапан DN\u00a0110 (К1С)', 'шт', n1c,
                         'Канализационный воздушный клапан', K1C);
+                // Прочистка К1С — 1 шт на каждый стояк (перед выпуском)
+                addItem('k1c_cleanout',
+                    'Прочистка SML DN\u00a0110 (К1С)', 'шт', n1c,
+                    'Перед выпуском горизонтального участка', SG);
+                addItem('rapid_cleanout_k1c',
+                    'Муфта Rapid DN\u00a0110 (прочистки К1С)', 'шт', n1c * 2,
+                    '+2 муфты на SML-прочистку', SG);
             }
 
             // ── Дюбель-гвозди для крепления противопожарных муфт ────────
@@ -1306,6 +1332,7 @@
         var ORDER = [
             'mufta_50','mufta_110','mufta_160',
             'rev_50','rev_110','rev_160',
+            'rapid_rev_50','rapid_rev_110','rapid_rev_160',
             'kompens_50','kompens_110','kompens_160',
             'dubel_fire',
             'khomuty',
@@ -1318,6 +1345,7 @@
             'otvod_sml_110_45','otvod_sml_50_45',
             'rapid_fit_110','rapid_fit_50',
             'k1c_sml_pipe','k1c_tee_110','k1c_plug_110','k1c_rapid_110','k1c_air_valve',
+            'k1c_cleanout','rapid_cleanout_k1c',
             'voronka_condensate',
             'trap_dn50_pui','trap_dn50_trash'
         ];
@@ -1687,6 +1715,14 @@
                 rows += itemRow(item.name, item.unit, item.qty, '', item.qty, item.note);
             });
         }
+        var k1Service = k1Fittings.filter(function (i) { return i.group === 'service'; });
+        if (k1Service.length) {
+            rows += '<tr class="spec-group-row"><td colspan="7">Элементы обслуживания и прочистки</td></tr>';
+            k1Service.forEach(function (item) {
+                k1EqCount += item.qty;
+                rows += itemRow(item.name, item.unit, item.qty, '', item.qty, item.note);
+            });
+        }
         rows += subtotalRow(k1PipeM, k1EqCount);
 
         // ══════════════════ СИСТЕМА К2 ══════════════════
@@ -1713,12 +1749,22 @@
         }
 
         var k2Fittings = collectStormFittings();
-        if (k2Fittings.length) {
+        var k2Base = k2Fittings.filter(function (i) { return !i.group; });
+        var k2Service = k2Fittings.filter(function (i) { return i.group === 'service'; });
+        if (k2Base.length) {
             rows += '<tr class="spec-group-row"><td colspan="7">Фасонные изделия, оборудование и материалы</td></tr>';
-            k2Fittings.forEach(function (item) {
+            k2Base.forEach(function (item) {
                 var q = typeof item.qty === 'number' ? (Math.round(item.qty * 10) / 10) : item.qty;
                 if (item.unit === 'шт') k2EqCount += (typeof item.qty === 'number' ? item.qty : 0);
                 else k2PipeM += (typeof item.qty === 'number' ? item.qty : 0);
+                rows += itemRow(item.name, item.unit, q, '', q, item.note);
+            });
+        }
+        if (k2Service.length) {
+            rows += '<tr class="spec-group-row"><td colspan="7">Элементы обслуживания и прочистки</td></tr>';
+            k2Service.forEach(function (item) {
+                var q = typeof item.qty === 'number' ? (Math.round(item.qty * 10) / 10) : item.qty;
+                k2EqCount += (typeof item.qty === 'number' ? item.qty : 0);
                 rows += itemRow(item.name, item.unit, q, '', q, item.note);
             });
         }
@@ -1730,12 +1776,22 @@
 
             var k3PipeM = 0, k3EqCount = 0;
             var k3Items = collectK3Fittings();
-            if (k3Items.length) {
+            var k3Base = k3Items.filter(function (i) { return !i.group; });
+            var k3Service = k3Items.filter(function (i) { return i.group === 'service'; });
+            if (k3Base.length) {
                 rows += '<tr class="spec-group-row"><td colspan="7">Оборудование и материалы</td></tr>';
-                k3Items.forEach(function (item) {
+                k3Base.forEach(function (item) {
                     var q = typeof item.qty === 'number' ? (Math.round(item.qty * 10) / 10) : item.qty;
                     if (item.unit === 'шт') k3EqCount += (typeof item.qty === 'number' ? item.qty : 0);
                     else k3PipeM += (typeof item.qty === 'number' ? item.qty : 0);
+                    rows += itemRow(item.name, item.unit, q, '', q, item.note);
+                });
+            }
+            if (k3Service.length) {
+                rows += '<tr class="spec-group-row"><td colspan="7">Элементы обслуживания и прочистки</td></tr>';
+                k3Service.forEach(function (item) {
+                    var q = typeof item.qty === 'number' ? (Math.round(item.qty * 10) / 10) : item.qty;
+                    k3EqCount += (typeof item.qty === 'number' ? item.qty : 0);
                     rows += itemRow(item.name, item.unit, q, '', q, item.note);
                 });
             }
@@ -1821,6 +1877,13 @@
                 lines.push([rowNum++, item.name, item.unit, item.qty, '—', item.qty, item.note || ''].join(sep));
             });
         }
+        var csvK1Service = csvK1Fittings.filter(function (i) { return i.group === 'service'; });
+        if (csvK1Service.length) {
+            lines.push(['','Элементы обслуживания и прочистки','','','','',''].join(sep));
+            csvK1Service.forEach(function (item) {
+                lines.push([rowNum++, item.name, item.unit, item.qty, '—', item.qty, item.note || ''].join(sep));
+            });
+        }
 
         // ══ СИСТЕМА К2 ══
         lines.push(['','СИСТЕМА К2 — Дождевая канализация','','','','',''].join(sep));
@@ -1835,9 +1898,18 @@
                 'м.п.', len2, '+3%', len2R, csvK2Note].join(sep));
         });
         var csvK2Fittings = collectStormFittings();
-        if (csvK2Fittings.length) {
+        var csvK2Base = csvK2Fittings.filter(function (i) { return !i.group; });
+        var csvK2Service = csvK2Fittings.filter(function (i) { return i.group === 'service'; });
+        if (csvK2Base.length) {
             lines.push(['','Фасонные изделия, оборудование и материалы','','','','',''].join(sep));
-            csvK2Fittings.forEach(function (item) {
+            csvK2Base.forEach(function (item) {
+                var q = typeof item.qty === 'number' ? (Math.round(item.qty * 10) / 10) : item.qty;
+                lines.push([rowNum++, item.name, item.unit, q, '—', q, item.note || ''].join(sep));
+            });
+        }
+        if (csvK2Service.length) {
+            lines.push(['','Элементы обслуживания и прочистки','','','','',''].join(sep));
+            csvK2Service.forEach(function (item) {
                 var q = typeof item.qty === 'number' ? (Math.round(item.qty * 10) / 10) : item.qty;
                 lines.push([rowNum++, item.name, item.unit, q, '—', q, item.note || ''].join(sep));
             });
@@ -1846,11 +1918,23 @@
         // ══ СИСТЕМА К3 ══
         if (hasAnyK3Zones()) {
             lines.push(['','СИСТЕМА К3 — Производственная канализация','','','','',''].join(sep));
-            lines.push(['','Оборудование и материалы','','','','',''].join(sep));
-            collectK3Fittings().forEach(function (item) {
-                var qty = typeof item.qty === 'number' ? (Math.round(item.qty * 10) / 10) : item.qty;
-                lines.push([rowNum++, item.name, item.unit, qty, '—', qty, item.note || ''].join(sep));
-            });
+            var csvK3Items = collectK3Fittings();
+            var csvK3Base = csvK3Items.filter(function (i) { return !i.group; });
+            var csvK3Service = csvK3Items.filter(function (i) { return i.group === 'service'; });
+            if (csvK3Base.length) {
+                lines.push(['','Оборудование и материалы','','','','',''].join(sep));
+                csvK3Base.forEach(function (item) {
+                    var qty = typeof item.qty === 'number' ? (Math.round(item.qty * 10) / 10) : item.qty;
+                    lines.push([rowNum++, item.name, item.unit, qty, '—', qty, item.note || ''].join(sep));
+                });
+            }
+            if (csvK3Service.length) {
+                lines.push(['','Элементы обслуживания и прочистки','','','','',''].join(sep));
+                csvK3Service.forEach(function (item) {
+                    var qty = typeof item.qty === 'number' ? (Math.round(item.qty * 10) / 10) : item.qty;
+                    lines.push([rowNum++, item.name, item.unit, qty, '—', qty, item.note || ''].join(sep));
+                });
+            }
         }
 
         var csv  = '\uFEFF' + lines.join('\r\n');
@@ -1890,10 +1974,10 @@
         if (!buildingStats || !buildingStats.length) return [];
         var acc = {};
 
-        function addItem(key, name, unit, qty, note) {
+        function addItem(key, name, unit, qty, note, group) {
             if (!qty || qty <= 0) return;
             if (acc[key]) { acc[key].qty += qty; }
-            else          { acc[key] = { name: name, unit: unit, qty: qty, note: note || '' }; }
+            else          { acc[key] = { name: name, unit: unit, qty: qty, note: note || '', group: group || '' }; }
         }
 
         buildingStats.forEach(function (b, idx) {
@@ -1985,6 +2069,32 @@
                 }
             });
 
+            // ── Ревизии стояков К2 (каждый 3-й этаж) ───────────────────
+            var k2RevPer = nFloors > 0 ? Math.floor(nFloors / 3) : 0;
+            if (k2RevPer > 0) {
+                // Фасадные стояки DN50
+                if ((s.risers || 0) > 0) {
+                    var k2FacadeRevs = s.risers * k2RevPer;
+                    addItem('storm_rev_50',
+                        'Ревизия SML DN\u00a050 (стояки К2)', 'шт', k2FacadeRevs,
+                        'Каждый 3-й этаж', 'service');
+                    addItem('storm_rapid_rev_50',
+                        'Муфта Rapid DN\u00a050 (ревизии К2)', 'шт', k2FacadeRevs * 2,
+                        '+2 муфты на SML-ревизию', 'service');
+                }
+                // Магистральные стояки
+                (s.mains || []).forEach(function (m) {
+                    var dn = m.diameter || 100;
+                    var mainRev = (m.reserve ? 2 : 1) * k2RevPer;
+                    addItem('storm_rev_' + dn,
+                        'Ревизия SML DN\u00a0' + dn + ' (магистр. К2)', 'шт', mainRev,
+                        'Каждый 3-й этаж', 'service');
+                    addItem('storm_rapid_rev_' + dn,
+                        'Муфта Rapid DN\u00a0' + dn + ' (ревизии К2)', 'шт', mainRev * 2,
+                        '+2 муфты на SML-ревизию', 'service');
+                });
+            }
+
             // Изоляция вспененный каучук — метраж = длине фасадных труб + магистралей
             var totalInsLen = len + mainInsLen;
             if (stormInsulation && totalInsLen > 0)
@@ -2006,6 +2116,9 @@
             'storm_main_funnel', 'storm_main_funnel_cable',
             'storm_main_jumper_elbow_100', 'storm_main_jumper_elbow_150',
             'storm_main_jumper_pipe_100', 'storm_main_jumper_pipe_150',
+            'storm_rev_50', 'storm_rapid_rev_50',
+            'storm_rev_100', 'storm_rev_150',
+            'storm_rapid_rev_100', 'storm_rapid_rev_150',
             'storm_insulation'
         ];
         var result = [];
@@ -2294,10 +2407,10 @@
         if (!buildingStats || !buildingStats.length) return [];
         var acc = {};
 
-        function addItem(key, name, unit, qty, note) {
+        function addItem(key, name, unit, qty, note, group) {
             if (!qty || qty <= 0) return;
             if (acc[key]) { acc[key].qty += qty; }
-            else          { acc[key] = { name: name, unit: unit, qty: qty, note: note || '' }; }
+            else          { acc[key] = { name: name, unit: unit, qty: qty, note: note || '', group: group || '' }; }
         }
 
         buildingStats.forEach(function (b, idx) {
@@ -2344,6 +2457,14 @@
                     addItem('k3_khomuty', 'Хомут стальной (крепление стояков К3)', 'шт',
                         Math.ceil(ventLen / 1.5) * n);
                 }
+
+                // Прочистка — 1 шт на каждую магистраль К3
+                addItem('k3_cleanout',
+                    'Прочистка SML DN\u00a0100 (магистраль К3)', 'шт', 1 * n,
+                    'Перед выпуском горизонтального участка', 'service');
+                addItem('k3_rapid_cleanout',
+                    'Муфта Rapid DN\u00a0100 (прочистки К3)', 'шт', 2 * n,
+                    '+2 муфты на SML-прочистку', 'service');
             });
         });
 
@@ -2366,7 +2487,8 @@
             'k3_grease_trap', 'k3_pump_wilo', 'k3_steel_pipe',
             'k3_sml_pipe', 'k3_voronka_20', 'k3_sifon_dry',
             'k3_vent_sml', 'k3_air_valve',
-            'k3_rapid_100', 'k3_rapid_110', 'k3_khomuty'
+            'k3_rapid_100', 'k3_rapid_110', 'k3_khomuty',
+            'k3_cleanout', 'k3_rapid_cleanout'
         ];
         var result = [];
         ORDER.forEach(function (k) { if (acc[k]) result.push(acc[k]); });
@@ -2893,6 +3015,12 @@
                     svgEl('line', { x1: rx, y1: fy2, x2: rx + 10, y2: fy2,
                         stroke: isPlastic ? '#8B4513' : '#666', 'stroke-width': 1.5, 'stroke-linecap': 'round' }, svg);
                 }
+                // Ревизии — каждый 3-й этаж (от низа)
+                for (var flr = 3; flr <= nF; flr += 3) {
+                    var rfi = nF - flr;
+                    svgIcon(rx - 7, PAD + rfi * FLOOR_H + FLOOR_H / 2, 'bi-square-half', '#556B2F', 10,
+                        'Ревизия DN' + s1.riserDiameter + ', эт. ' + flr, svg);
+                }
                 svgText(rx, topY - 4, 'C/У', 'viz-label', svg);
             }
 
@@ -2911,6 +3039,12 @@
                     var fy2 = PAD + fi * FLOOR_H + FLOOR_H / 2;
                     svgEl('line', { x1: rx, y1: fy2, x2: rx + 8, y2: fy2,
                         stroke: isPlastic ? '#8B4513' : '#666', 'stroke-width': 1.2, 'stroke-linecap': 'round' }, svg);
+                }
+                // Ревизии — каждый 3-й этаж (от низа)
+                for (var flr = 3; flr <= nF; flr += 3) {
+                    var rfi = nF - flr;
+                    svgIcon(rx - 7, PAD + rfi * FLOOR_H + FLOOR_H / 2, 'bi-square-half', '#556B2F', 10,
+                        'Ревизия DN' + s1.kitchenDiameter + ', эт. ' + flr, svg);
                 }
                 svgText(rx, topY - 4, 'Кух', 'viz-label', svg);
             }
@@ -2970,6 +3104,12 @@
                     var fy = PAD + fi * FLOOR_H + FLOOR_H / 2;
                     svgIcon(rx + 7, fy, 'bi-water', '#0066CC', 9,
                         'Трап балкона/фасада HL90.2 DN50', svg);
+                }
+                // Ревизии К2 — каждый 3-й этаж
+                for (var flr = 3; flr <= nF; flr += 3) {
+                    var rfi = nF - flr;
+                    svgIcon(rx - 7, PAD + rfi * FLOOR_H + FLOOR_H / 2, 'bi-square-half', '#556B2F', 10,
+                        'Ревизия SML DN50, эт. ' + flr, svg);
                 }
             }
             if (k2Facade > 8) {
