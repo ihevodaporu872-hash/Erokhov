@@ -965,7 +965,12 @@
 
     function calcRisers(building, idx) {
         var base = calcBathRisers(building) + calcKitchenRisers(building);
-        return base + (idx !== undefined && getSettings(idx).pui ? 1 : 0);
+        if (idx !== undefined) {
+            var ss = getSettings(idx);
+            if (ss.pui) base += 1;
+            if (ss.k1cCount > 0) base += ss.k1cCount;
+        }
+        return base;
     }
 
     /* ─── Настройки корпусов ─────────────────────────────────────────────── */
@@ -982,7 +987,11 @@
                 condensate:  false,   // воронки отвода конденсата
                 pui:         false,   // трапы ПУИ
                 trashRoom:   false,   // трап мусорокамеры
-                balconies:   0        // трапы балконов DN110
+                balconies:   0,       // трапы балконов DN110
+                // К1С — коммерческая канализация
+                k1cCount:    0,       // количество помещений (точек)
+                k1cCatering: false,   // общепит (переход в К3)
+                k1cValves:   false    // воздушные клапаны DN110
             };
         }
         return buildingSettings[idx];
@@ -1248,6 +1257,32 @@
                 }
             }
 
+            // ── К1С: Встроенные помещения (коммерческая канализация) ─────
+            if (s.k1cCount > 0) {
+                var K1C = 'k1c'; // группа для фильтрации в спецификации
+                var floorH1 = floorsN > 0 ? (b.height || 0) / floorsN : 3;
+                var k1cPipeLen = Math.round((floorH1 + 1) * 10) / 10; // высота 1-го этажа + 1м транзита
+                var n1c = s.k1cCount;
+
+                addItem('k1c_sml_pipe',
+                    'Труба SML DN\u00a0110 (К1С встроенные)', 'м.п.',
+                    Math.round(k1cPipeLen * n1c * 10) / 10,
+                    'Высота 1\u2011го этажа + 1\u00a0м транзита', K1C);
+                addItem('k1c_tee_110',
+                    'Тройник SML DN\u00a0110 (К1С)', 'шт', n1c,
+                    'Подключение встроенного помещения', K1C);
+                addItem('k1c_plug_110',
+                    'Заглушка SML DN\u00a0110 (К1С)', 'шт', n1c,
+                    'Заглушка стояка', K1C);
+                addItem('k1c_rapid_110',
+                    'Муфта соединительная Rapid DN\u00a0110 (К1С)', 'шт', n1c * 2,
+                    '2 муфты на точку подключения', K1C);
+                if (s.k1cValves)
+                    addItem('k1c_air_valve',
+                        'Воздушный клапан DN\u00a0110 (К1С)', 'шт', n1c,
+                        'Канализационный воздушный клапан', K1C);
+            }
+
             // ── Дюбель-гвозди для крепления противопожарных муфт ────────
             if (isPlastic && floorsN > 0) {
                 var totalCollars = 0;
@@ -1282,6 +1317,7 @@
             'otvod_110_45','otvod_50_45',
             'otvod_sml_110_45','otvod_sml_50_45',
             'rapid_fit_110','rapid_fit_50',
+            'k1c_sml_pipe','k1c_tee_110','k1c_plug_110','k1c_rapid_110','k1c_air_valve',
             'voronka_condensate',
             'trap_dn50_pui','trap_dn50_trash'
         ];
@@ -1388,6 +1424,29 @@
 
                 '</div>' +  // /equip-grid
 
+                // К1С — Встроенные помещения
+                '<div class="k1c-section" style="margin-top:12px;padding:10px 12px;border:1px solid var(--gray-200);border-radius:8px;background:var(--gray-50)">' +
+                '<p class="bld-equipment-title" style="margin:0 0 8px"><i class="bi bi-shop"></i> К1С: Встроенные помещения</p>' +
+                '<div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center">' +
+                '<div class="input-group" style="margin:0;flex:0 0 auto">' +
+                '<label style="font-size:12px">Количество помещений (точек):</label>' +
+                '<input type="number" min="0" max="50" value="' + (s.k1cCount || 0) + '" data-idx="' + idx + '" data-field="k1cCount" class="bld-num" style="width:64px">' +
+                '</div>' +
+                '<label class="k1c-check" style="font-size:12px;display:flex;align-items:center;gap:4px;cursor:pointer">' +
+                '<input type="checkbox"' + (s.k1cCatering ? ' checked' : '') + ' data-idx="' + idx + '" data-field="k1cCatering" class="k1c-checkbox"> Общепит (переход в К3)' +
+                '</label>' +
+                '<label class="k1c-check" style="font-size:12px;display:flex;align-items:center;gap:4px;cursor:pointer">' +
+                '<input type="checkbox"' + (s.k1cValves ? ' checked' : '') + ' data-idx="' + idx + '" data-field="k1cValves" class="k1c-checkbox"> Воздушные клапаны DN110' +
+                '</label>' +
+                '</div>' +
+                (s.k1cCount > 0 ? '<div class="k3-vent-info" style="margin-top:6px"><i class="bi bi-info-circle"></i> ' +
+                    s.k1cCount + '\u00a0точ. \u00d7 SML DN110: ' +
+                    'тройник + заглушка + 2\u00a0Rapid' +
+                    (s.k1cValves ? ' + клапан DN110' : '') +
+                    (s.k1cCatering ? ' · <strong>К3:</strong> жироулов. + 2\u00a0сифона/помещ.' : '') +
+                    '</div>' : '') +
+                '</div>' +
+
                 '</div>';  // /bld-equipment-section
 
             return '<details class="accordion" id="sewage-accord-' + idx + '"' + open + '>' +
@@ -1468,11 +1527,19 @@
             });
         });
 
-        // Обработчики: количество балконов
+        // Обработчики: количество (балконы, К1С)
         container.querySelectorAll('.bld-num').forEach(function (inp) {
             inp.addEventListener('input', function () {
                 getSettings(parseInt(inp.dataset.idx, 10))[inp.dataset.field] =
                     Math.max(0, parseInt(inp.value, 10) || 0);
+                renderResultsTable();
+            });
+        });
+
+        // Обработчики: чекбоксы К1С
+        container.querySelectorAll('.k1c-checkbox').forEach(function (cb) {
+            cb.addEventListener('change', function () {
+                getSettings(parseInt(cb.dataset.idx, 10))[cb.dataset.field] = cb.checked;
                 renderResultsTable();
             });
         });
@@ -1594,7 +1661,7 @@
 
         var k1EqCount = 0;
         var k1Fittings = collectFittings();
-        var k1Base = k1Fittings.filter(function (i) { return i.group !== 'fixture'; });
+        var k1Base = k1Fittings.filter(function (i) { return !i.group; });
         var k1Fixture = k1Fittings.filter(function (i) { return i.group === 'fixture'; });
         if (k1Base.length) {
             rows += '<tr class="spec-group-row"><td colspan="7">Фасонные изделия и оборудование</td></tr>';
@@ -1608,6 +1675,15 @@
             rows += '<tr class="spec-group-row"><td colspan="7">Фасонные изделия для подключения приборов</td></tr>';
             k1Fixture.forEach(function (item) {
                 k1EqCount += item.qty;
+                rows += itemRow(item.name, item.unit, item.qty, '', item.qty, item.note);
+            });
+        }
+        var k1c = k1Fittings.filter(function (i) { return i.group === 'k1c'; });
+        if (k1c.length) {
+            rows += '<tr class="spec-group-row"><td colspan="7">К1С — Встроенные помещения</td></tr>';
+            k1c.forEach(function (item) {
+                if (item.unit === 'шт') k1EqCount += item.qty;
+                else k1PipeM += item.qty;
                 rows += itemRow(item.name, item.unit, item.qty, '', item.qty, item.note);
             });
         }
@@ -1724,8 +1800,9 @@
                 'м.п.', len, '+3%', lenR, ''].join(sep));
         });
         var csvK1Fittings = collectFittings();
-        var csvK1Base = csvK1Fittings.filter(function (i) { return i.group !== 'fixture'; });
+        var csvK1Base = csvK1Fittings.filter(function (i) { return !i.group; });
         var csvK1Fixture = csvK1Fittings.filter(function (i) { return i.group === 'fixture'; });
+        var csvK1c = csvK1Fittings.filter(function (i) { return i.group === 'k1c'; });
         if (csvK1Base.length) {
             lines.push(['','Фасонные изделия и оборудование','','','','',''].join(sep));
             csvK1Base.forEach(function (item) {
@@ -1735,6 +1812,12 @@
         if (csvK1Fixture.length) {
             lines.push(['','Фасонные изделия для подключения приборов','','','','',''].join(sep));
             csvK1Fixture.forEach(function (item) {
+                lines.push([rowNum++, item.name, item.unit, item.qty, '—', item.qty, item.note || ''].join(sep));
+            });
+        }
+        if (csvK1c.length) {
+            lines.push(['','К1С — Встроенные помещения','','','','',''].join(sep));
+            csvK1c.forEach(function (item) {
                 lines.push([rowNum++, item.name, item.unit, item.qty, '—', item.qty, item.note || ''].join(sep));
             });
         }
@@ -2200,6 +2283,9 @@
         for (var i = 0; i < buildingStats.length; i++) {
             var s = getK3Settings(i);
             if (s.zones.length) return true;
+            // К1С общепит тоже генерирует позиции К3
+            var s1 = getSettings(i);
+            if (s1.k1cCount > 0 && s1.k1cCatering) return true;
         }
         return false;
     }
@@ -2261,9 +2347,24 @@
             });
         });
 
+        // К1С → К3: общепит (жироуловитель + сифоны)
+        buildingStats.forEach(function (b, idx) {
+            var s1 = getSettings(idx);
+            if (s1.k1cCount > 0 && s1.k1cCatering) {
+                // Жироуловитель — 1 шт на корпус (если ещё не добавлен зонами К3)
+                if (!acc['k3_grease_trap'])
+                    addItem('k3_grease_trap', 'Жироуловитель', 'шт', 1);
+                // Сифон с разрывом струи (сухой затвор) — 2 шт на каждое помещение
+                addItem('k3_sifon_dry',
+                    'Сифон с разрывом струи (сухой затвор)', 'шт',
+                    s1.k1cCount * 2,
+                    'Кондиционер + кухня на каждое помещение К1С');
+            }
+        });
+
         var ORDER = [
             'k3_grease_trap', 'k3_pump_wilo', 'k3_steel_pipe',
-            'k3_sml_pipe', 'k3_voronka_20',
+            'k3_sml_pipe', 'k3_voronka_20', 'k3_sifon_dry',
             'k3_vent_sml', 'k3_air_valve',
             'k3_rapid_100', 'k3_rapid_110', 'k3_khomuty'
         ];
@@ -2701,7 +2802,8 @@
         var kitR  = calcKitchenRisers(b);
         var puiR  = s1.pui ? 1 : 0;
         var trashR = s1.trashRoom ? 1 : 0;
-        var k1Risers = bathR + kitR + puiR + trashR;
+        var k1cN = s1.k1cCount || 0;
+        var k1Risers = bathR + kitR + puiR + trashR + k1cN;
         var k2Facade = s2.risers || 0;
         var k2Mains  = (s2.mains || []).length;
         var k2MainsReserve = 0;
@@ -2830,6 +2932,23 @@
                 svgEl('line', { x1: rx, y1: PAD + (nF - 1) * FLOOR_H, x2: rx, y2: botY, 'class': riserClass }, svg);
                 svgText(rx, PAD + (nF - 1) * FLOOR_H - 4, 'МК', 'viz-label', svg);
                 svgIcon(rx, botY - 6, 'bi-trash3', '#8B4513', 12, 'Трап мусорокамеры DN50', svg);
+            }
+
+            // K1C — встроенные помещения (короткие стояки на 1-м этаже)
+            for (var ci = 0; ci < k1cN && rIdx < k1Positions.length; ci++, rIdx++) {
+                var rx = k1Positions[rIdx];
+                var k1cTopY = PAD + (nF - 1) * FLOOR_H; // верх 1-го этажа
+                // Короткий серый стояк SML на уровне 1-го этажа
+                svgEl('line', { x1: rx, y1: k1cTopY, x2: rx, y2: botY,
+                    stroke: '#999', 'stroke-width': 2, 'stroke-linecap': 'round' }, svg);
+                // Заглушка (горизонтальная черта внизу)
+                svgEl('line', { x1: rx - 4, y1: botY - 2, x2: rx + 4, y2: botY - 2,
+                    stroke: '#666', 'stroke-width': 2.5, 'stroke-linecap': 'round' }, svg);
+                // Иконка магазина
+                svgIcon(rx, k1cTopY + FLOOR_H / 2 - 2, 'bi-shop', '#666', 12,
+                    'К1С: встроенное помещение ' + (ci + 1), svg);
+                if (ci === 0)
+                    svgText(rx, k1cTopY - 4, 'К1С', 'viz-label', svg);
             }
 
             // Section label
