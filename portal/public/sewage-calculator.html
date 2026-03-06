@@ -994,7 +994,8 @@
                 k1cValves:   false,   // воздушные клапаны DN110
                 // Отделка квартир
                 finishing:   false,   // включить расчёт отделки
-                finishGrade: 'standard' // standard | luxury
+                finishGrade: 'standard', // standard | luxury
+                finishReserve: 5      // запас на материалы, %
             };
         }
         return buildingSettings[idx];
@@ -1496,9 +1497,14 @@
                 '</select>' +
                 '</div>' +
                 '<span style="font-size:12px;color:var(--gray-500)">Квартир: <strong>' + (b.totalApts || 0) + '</strong></span>' +
+                '<div class="input-group" style="margin:0;flex:0 0 auto">' +
+                '<label style="font-size:12px">Запас на материалы (%):</label>' +
+                '<input type="number" min="0" max="30" value="' + (s.finishReserve || 5) + '" data-idx="' + idx + '" data-field="finishReserve" class="finish-reserve" style="width:56px;font-size:12px;padding:3px 6px">' +
+                '</div>' +
                 '</div>' +
                 '<div class="k3-vent-info" style="margin-top:6px"><i class="bi bi-info-circle"></i> ' +
                 'На квартиру: унитаз, ' + (s.finishGrade === 'luxury' ? 'душевая кабина' : 'ванна') + ', умывальник, мойка, 3\u00a0смесителя, трубная разводка ПП' +
+                (s.finishReserve > 0 ? ' · запас\u00a0+' + s.finishReserve + '%' : '') +
                 '</div>' +
                 '</div>' : '') +
 
@@ -1606,6 +1612,15 @@
                 renderResultsTable();
             });
         });
+
+        // Обработчики: запас отделки
+        container.querySelectorAll('.finish-reserve').forEach(function (inp) {
+            inp.addEventListener('input', function () {
+                getSettings(parseInt(inp.dataset.idx, 10)).finishReserve =
+                    Math.max(0, Math.min(30, parseInt(inp.value, 10) || 0));
+                renderResultsTable();
+            });
+        });
     }
 
     /* ─── Рендер таблицы трубопроводов ───────────────────────────────────── */
@@ -1686,63 +1701,65 @@
             if (!apts) return;
             totalApts += apts;
             var isLux = (s.finishGrade === 'luxury');
+            var reservePct = s.finishReserve || 0;
+            var k = 1 + reservePct / 100; // коэффициент запаса
 
-            // ── Приборы ──
+            // ── Приборы (штучное — запас применяется) ──
             addItem('fin_toilet',
-                'Унитаз-компакт' + (isLux ? ' (люкс)' : ''), 'шт', apts,
+                'Унитаз-компакт' + (isLux ? ' (люкс)' : ''), 'шт', Math.ceil(apts * k),
                 '', 'devices');
             if (isLux) {
                 addItem('fin_shower',
-                    'Душевая кабина (люкс)', 'шт', apts,
+                    'Душевая кабина (люкс)', 'шт', Math.ceil(apts * k),
                     '', 'devices');
             } else {
                 addItem('fin_bath',
-                    'Ванна стальная 1700×700', 'шт', apts,
+                    'Ванна стальная 1700×700', 'шт', Math.ceil(apts * k),
                     '', 'devices');
             }
             addItem('fin_washbasin',
-                'Умывальник' + (isLux ? ' (люкс)' : ''), 'шт', apts,
+                'Умывальник' + (isLux ? ' (люкс)' : ''), 'шт', Math.ceil(apts * k),
                 '', 'devices');
             addItem('fin_sink',
-                'Мойка кухонная' + (isLux ? ' (люкс)' : ''), 'шт', apts,
+                'Мойка кухонная' + (isLux ? ' (люкс)' : ''), 'шт', Math.ceil(apts * k),
                 '', 'devices');
 
-            // ── Смесители ──
+            // ── Смесители (штучное — запас применяется) ──
             addItem('fin_mixer_bath',
-                'Смеситель для ' + (isLux ? 'душа (люкс)' : 'ванны'), 'шт', apts,
+                'Смеситель для ' + (isLux ? 'душа (люкс)' : 'ванны'), 'шт', Math.ceil(apts * k),
                 '', 'mixers');
             addItem('fin_mixer_wash',
-                'Смеситель для умывальника' + (isLux ? ' (люкс)' : ''), 'шт', apts,
+                'Смеситель для умывальника' + (isLux ? ' (люкс)' : ''), 'шт', Math.ceil(apts * k),
                 '', 'mixers');
             addItem('fin_mixer_sink',
-                'Смеситель для мойки' + (isLux ? ' (люкс)' : ''), 'шт', apts,
+                'Смеситель для мойки' + (isLux ? ' (люкс)' : ''), 'шт', Math.ceil(apts * k),
                 '', 'mixers');
 
-            // ── Трубная разводка ПП ──
+            // ── Трубная разводка ПП (метраж — запас особенно важен) ──
             addItem('fin_pipe_50',
                 'Труба ПП DN\u00a050 (внутриквартирная разводка)', 'м.п.',
-                Math.round(apts * 3 * 10) / 10,
+                Math.round(Math.ceil(apts * 3 * k * 10) / 10 * 10) / 10,
                 '3 м на квартиру', 'pipes');
             addItem('fin_pipe_110',
                 'Труба ПП DN\u00a0110 (внутриквартирная разводка)', 'м.п.',
-                Math.round(apts * 1 * 10) / 10,
+                Math.round(Math.ceil(apts * 1 * k * 10) / 10 * 10) / 10,
                 '1 м на квартиру', 'pipes');
 
-            // ── Фасонина ──
+            // ── Фасонина (мелкая — запас важен) ──
             addItem('fin_tee_50',
-                'Тройник ПП 50×50 (разводка)', 'шт', apts * 2,
+                'Тройник ПП 50×50 (разводка)', 'шт', Math.ceil(apts * 2 * k),
                 '2 шт на квартиру', 'pipes');
             addItem('fin_tee_110_50',
-                'Тройник ПП 110×50 (разводка)', 'шт', apts * 1,
+                'Тройник ПП 110×50 (разводка)', 'шт', Math.ceil(apts * 1 * k),
                 '1 шт на квартиру', 'pipes');
             addItem('fin_elbow_50',
-                'Отвод ПП 50/45° (разводка)', 'шт', apts * 4,
+                'Отвод ПП 50/45° (разводка)', 'шт', Math.ceil(apts * 4 * k),
                 '4 шт на квартиру', 'pipes');
             addItem('fin_siphon',
-                'Сифон бутылочный' + (isLux ? ' (люкс)' : ''), 'шт', apts * 2,
+                'Сифон бутылочный' + (isLux ? ' (люкс)' : ''), 'шт', Math.ceil(apts * 2 * k),
                 'Ванна/душ + мойка', 'pipes');
             addItem('fin_flex',
-                'Гибкая подводка (комплект)', 'шт', apts * 2,
+                'Гибкая подводка (комплект)', 'шт', Math.ceil(apts * 2 * k),
                 '2 комплекта на квартиру', 'pipes');
         });
 
@@ -1940,7 +1957,20 @@
 
         // ══════════════════ ОТДЕЛКА КВАРТИР ══════════════════
         if (hasAnyFinishing()) {
-            rows += '<tr class="spec-system-row"><td colspan="7">ОТДЕЛКА КВАРТИР (Чистовое оборудование)</td></tr>';
+            var finReservePcts = [];
+            buildingStats.forEach(function (b, i) {
+                var ss = getSettings(i);
+                if (ss.finishing && (b.totalApts || 0) > 0)
+                    finReservePcts.push(ss.finishReserve || 0);
+            });
+            var finReserveLabel = '';
+            if (finReservePcts.length) {
+                var allSame = finReservePcts.every(function (v) { return v === finReservePcts[0]; });
+                finReserveLabel = allSame
+                    ? (finReservePcts[0] > 0 ? ' (с учётом запаса ' + finReservePcts[0] + '%)' : '')
+                    : ' (запас ' + Math.min.apply(null, finReservePcts) + '–' + Math.max.apply(null, finReservePcts) + '%)';
+            }
+            rows += '<tr class="spec-system-row"><td colspan="7">ОТДЕЛКА КВАРТИР (Чистовое оборудование)' + finReserveLabel + '</td></tr>';
 
             var finItems = collectFinishingItems();
             var finDevices = finItems.filter(function (i) { return i.group === 'devices'; });
@@ -2114,7 +2144,20 @@
 
         // ══ ОТДЕЛКА КВАРТИР ══
         if (hasAnyFinishing()) {
-            lines.push(['','ОТДЕЛКА КВАРТИР (Чистовое оборудование)','','','','',''].join(sep));
+            var csvFinReserves = [];
+            buildingStats.forEach(function (b, i) {
+                var ss = getSettings(i);
+                if (ss.finishing && (b.totalApts || 0) > 0)
+                    csvFinReserves.push(ss.finishReserve || 0);
+            });
+            var csvFinRL = '';
+            if (csvFinReserves.length) {
+                var allS = csvFinReserves.every(function (v) { return v === csvFinReserves[0]; });
+                csvFinRL = allS
+                    ? (csvFinReserves[0] > 0 ? ' (с учётом запаса ' + csvFinReserves[0] + '%)' : '')
+                    : ' (запас ' + Math.min.apply(null, csvFinReserves) + '-' + Math.max.apply(null, csvFinReserves) + '%)';
+            }
+            lines.push(['','ОТДЕЛКА КВАРТИР (Чистовое оборудование)' + csvFinRL,'','','','',''].join(sep));
             var csvFin = collectFinishingItems();
             var csvFinDevices = csvFin.filter(function (i) { return i.group === 'devices'; });
             var csvFinMixers  = csvFin.filter(function (i) { return i.group === 'mixers'; });
