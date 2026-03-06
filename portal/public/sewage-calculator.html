@@ -1051,6 +1051,29 @@
                     'Трап напольный DN\u00a050 (мусорокамера)', 'шт',
                     1);
 
+            // Противопожарная муфта для стояка мусорокамеры (пластик)
+            if (isPlastic && s.trashRoom && floorsN > 0)
+                addItem('mufta_' + s.riserDiameter,
+                    'Муфта противопожарная DN\u00a0' + s.riserDiameter, 'шт',
+                    floorsN);
+
+            // ── Дюбель-гвозди для крепления противопожарных муфт ────────
+            if (isPlastic && floorsN > 0) {
+                var totalCollars = 0;
+                // Квартирные стояки
+                totalCollars += bathR * floorsN;
+                if (showKitchen && kitR > 0) totalCollars += kitR * floorsN;
+                // ПУИ
+                if (s.pui) totalCollars += floorsN;
+                // Мусорокамера
+                if (s.trashRoom) totalCollars += floorsN;
+                if (totalCollars > 0)
+                    addItem('dubel_fire',
+                        'Дюбель-гвоздь металлический (крепление муфт)', 'шт',
+                        totalCollars * 3,
+                        '3 шт на каждую противопожарную муфту');
+            }
+
         });
 
         // Фиксированный порядок вывода
@@ -1058,6 +1081,7 @@
             'mufta_50','mufta_110','mufta_160',
             'rev_50','rev_110','rev_160',
             'kompens_50','kompens_110','kompens_160',
+            'dubel_fire',
             'khomuty',
             'rapid_50','rapid_110','rapid_160',
             'voronka_condensate',
@@ -1204,6 +1228,19 @@
                 'Расчётная длина стояков К1 (с учётом транзита):' +
                 '<strong>\u2009' + len + '\u00a0м</strong>' +
                 '</div>' +
+
+                (function () {
+                    if (s.pipeType !== 'pp' && s.pipeType !== 'pp_silent') return '';
+                    var totalR = rc + (s.trashRoom ? 1 : 0);
+                    var collars = totalR * floorsN;
+                    if (collars <= 0) return '';
+                    return '<div class="k3-vent-info" style="margin-top:8px">' +
+                        '<i class="bi bi-shield-check"></i> ' +
+                        'Пожарная безопасность: <strong>' + collars + '</strong>\u00a0противопожарных муфт DN' + s.riserDiameter +
+                        ' (' + totalR + '\u00a0ст.\u00a0\u00d7\u00a0' + floorsN + '\u00a0эт.)' +
+                        ' + <strong>' + (collars * 3) + '</strong>\u00a0дюбелей' +
+                        '</div>';
+                })() +
 
                 equipBlock +
 
