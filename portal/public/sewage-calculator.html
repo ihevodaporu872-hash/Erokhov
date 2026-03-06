@@ -1737,24 +1737,31 @@
             (s.mains || []).forEach(function (m) {
                 var dn = m.diameter || 100;
                 var reserve = m.reserve ? 2 : 1;
-                var pipeLen = bH * reserve;
+                var vertLen = bH * reserve;
+                var horizLen = 4;                     // горизонтальный лежак под кровлей
+                var pipeLen = vertLen + horizLen;
                 if (pipeLen > 0) {
                     addItem('storm_main_sml_' + dn,
                         'Труба SML DN\u00a0' + dn + ' (магистральный водосток)', 'м.п.', pipeLen);
                     addItem('storm_main_rapid_' + dn,
                         'Муфта соединительная Rapid DN\u00a0' + dn + ' (SML)', 'шт',
-                        Math.ceil(pipeLen / 3));
+                        Math.ceil(pipeLen / 3) + 3);  // +3 доп. муфты на узел сбора
                     addItem('storm_main_khomuty',
                         'Хомут стальной (крепление магистралей К2)', 'шт',
-                        Math.ceil(pipeLen / 1.5));
+                        Math.ceil(pipeLen / 1.5) + 3); // +3 доп. хомуты на лежак
                     mainInsLen += pipeLen;
                 }
-                // Воронки кровельные — по 1 на стояк (включая резервный)
+                // Узел сбора: тройник + 2 отвода 45°
+                addItem('storm_main_tee_' + dn,
+                    'Тройник SML DN\u00a0' + dn + ' (узел сбора)', 'шт', 1);
+                addItem('storm_main_elbow45_' + dn,
+                    'Отвод 45° SML DN\u00a0' + dn + ' (узел сбора)', 'шт', 2);
+                // Воронки кровельные — 2 шт на магистраль
                 addItem('storm_main_funnel',
-                    'Воронка кровельная HL62 с электроподогревом', 'шт', reserve);
+                    'Воронка кровельная HL62 с электроподогревом', 'шт', 2);
                 addItem('storm_main_funnel_cable',
                     'Саморегулирующийся греющий кабель (обогрев воронок)', 'м.п.',
-                    reserve * 2, '2 м на каждую воронку');
+                    4, '4 м на магистраль (2 воронки)');
                 // Перемычки — только при резервном стояке
                 if (m.reserve && nFloors > 0) {
                     var nJumpers = Math.floor(nFloors / 5);
@@ -1781,6 +1788,8 @@
             'storm_trap_hl902', 'storm_gilza',
             'storm_sleeve', 'storm_sleeve_sealant', 'storm_sleeve_cable',
             'storm_main_sml_100', 'storm_main_sml_150',
+            'storm_main_tee_100', 'storm_main_tee_150',
+            'storm_main_elbow45_100', 'storm_main_elbow45_150',
             'storm_main_rapid_100', 'storm_main_rapid_150',
             'storm_main_khomuty',
             'storm_main_funnel', 'storm_main_funnel_cable',
@@ -1875,13 +1884,14 @@
                     var mainsCards = (s.mains || []).map(function (m, mi) {
                         var dn = m.diameter || 100;
                         var reserve = m.reserve ? 2 : 1;
-                        var pipeLen = Math.round(bH * reserve * 10) / 10;
+                        var vertLen = Math.round(bH * reserve * 10) / 10;
+                        var totalLen = Math.round((vertLen + 4) * 10) / 10;
                         var nJumpers = m.reserve ? Math.floor(nF / 5) : 0;
                         var infoLine = '<div class="k3-vent-info" style="margin-top:6px">' +
-                            '<i class="bi bi-building-up"></i> Магистраль DN' + dn + ': <strong>' + pipeLen + '\u00a0м</strong>' +
+                            '<i class="bi bi-building-up"></i> Магистраль DN' + dn + ': <strong>' + totalLen + '\u00a0м</strong> SML' +
                             (m.reserve ? ' (основной + резервный)' : ' (основной)') +
+                            ' · Узел сбора: 2\u00a0воронки + 4\u00a0м лежак' +
                             (nJumpers > 0 ? ' · ' + nJumpers + '\u00a0перемычек' : '') +
-                            ' · ' + reserve + '\u00a0воронок HL62' +
                             '</div>';
                         return '<div class="k3-zone-card" style="margin-bottom:8px">' +
                             '<div class="k3-zone-header">' +
@@ -2709,21 +2719,32 @@
             if (facadeShow > 0)
                 svgText(k2FacadePositions[Math.floor(facadeShow / 2)], topY - 4, 'Фасад ×' + k2Facade, 'viz-label', svg);
 
-            // K2 magistral risers
+            // K2 magistral risers with collector bar
             k2MainPositions.forEach(function (mp, mi) {
                 var m = (s2.mains || [])[mi];
-                svgEl('line', { x1: mp.x, y1: topY, x2: mp.x, y2: botY, 'class': 'viz-riser-k2-main' }, svg);
-                // Funnel at top
-                svgIcon(mp.x, topY + 4, 'bi-funnel-fill', '#0066CC', 14,
-                    'Воронка кровельная HL62 DN' + mp.dn, svg);
-                svgText(mp.x, topY - 4, 'М' + (mi + 1), 'viz-label', svg);
+                var barW = 30; // ширина горизонтального лежака
+                var barY = topY + 6;
+                var cx = mp.x;
+
+                // Вертикальный стояк
+                svgEl('line', { x1: cx, y1: barY, x2: cx, y2: botY, 'class': 'viz-riser-k2-main' }, svg);
+
+                // Горизонтальный лежак (перекладина) наверху
+                svgEl('line', { x1: cx - barW / 2, y1: barY, x2: cx + barW / 2, y2: barY,
+                    stroke: '#0066CC', 'stroke-width': 3, 'stroke-linecap': 'round' }, svg);
+
+                // 2 воронки HL62 по краям лежака
+                svgIcon(cx - barW / 2, barY - 8, 'bi-funnel-fill', '#0066CC', 13,
+                    'Воронка кровельная HL62 DN' + mp.dn + ' (1/2)', svg);
+                svgIcon(cx + barW / 2, barY - 8, 'bi-funnel-fill', '#0066CC', 13,
+                    'Воронка кровельная HL62 DN' + mp.dn + ' (2/2)', svg);
+
+                svgText(cx, topY - 6, 'М' + (mi + 1) + ' DN' + mp.dn, 'viz-label', svg);
 
                 if (mp.reserve) {
                     var rx2 = mp.x + 14;
-                    svgEl('line', { x1: rx2, y1: topY, x2: rx2, y2: botY, 'class': 'viz-riser-k2-main' }, svg);
-                    svgIcon(rx2, topY + 4, 'bi-funnel-fill', '#0066CC', 14,
-                        'Воронка кровельная HL62 (резерв) DN' + mp.dn, svg);
-                    // Jumper lines
+                    svgEl('line', { x1: rx2, y1: barY, x2: rx2, y2: botY, 'class': 'viz-riser-k2-main' }, svg);
+                    // Перемычки
                     var nJumpers = Math.floor(nF / 5);
                     for (var ji = 0; ji < nJumpers; ji++) {
                         var jy = PAD + (ji + 1) * 5 * FLOOR_H;
