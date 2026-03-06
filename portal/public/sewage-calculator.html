@@ -162,16 +162,44 @@
         }
         .riser-count { font-weight: 700; color: var(--accent-blue); font-size: 14px; }
 
-        /* ── Строка-разделитель группы в спецификации ────────────────────── */
+        /* ── Заголовок системы в спецификации ──────────────────────────── */
+        .spec-system-row td {
+            background: var(--gray-200) !important;
+            color: var(--gray-900) !important;
+            font-weight: 800 !important; font-size: 12px !important;
+            text-transform: uppercase; letter-spacing: .6px;
+            padding: 9px 14px !important;
+            border-top: 2px solid var(--accent-blue) !important;
+            border-bottom: 1px solid var(--gray-300) !important;
+        }
+        /* ── Строка-разделитель подгруппы ──────────────────────────────── */
         .spec-group-row td {
-            background: rgba(0,122,255,.10) !important;
+            background: rgba(0,122,255,.06) !important;
             color: var(--accent-blue) !important;
             font-weight: 700 !important; font-size: 11px !important;
-            text-transform: uppercase; letter-spacing: .5px;
-            padding: 7px 14px !important;
-            border-bottom: 1px solid rgba(0,122,255,.2) !important;
+            letter-spacing: .3px;
+            padding: 6px 14px !important;
+            border-bottom: 1px solid rgba(0,122,255,.15) !important;
         }
-        .riser-table tbody .spec-group-row:hover td { background: rgba(0,122,255,.14) !important; }
+        .riser-table tbody .spec-group-row:hover td { background: rgba(0,122,255,.10) !important; }
+        /* ── Итого по разделу ──────────────────────────────────────────── */
+        .spec-subtotal-row td {
+            background: rgba(0,122,255,.05) !important;
+            font-weight: 700 !important; font-size: 12px !important;
+            color: var(--gray-900) !important;
+            border-top: 1px solid var(--gray-300) !important;
+            padding: 7px 14px !important;
+        }
+        /* ── Кнопка свернуть/развернуть ────────────────────────────────── */
+        .spec-toolbar {
+            display: flex; justify-content: flex-end; margin-bottom: 10px; gap: 8px;
+        }
+        .spec-toolbar button {
+            background: none; border: 1px solid var(--gray-300); border-radius: 6px;
+            padding: 4px 12px; font-size: 12px; color: var(--gray-600);
+            cursor: pointer; transition: all .15s;
+        }
+        .spec-toolbar button:hover { border-color: var(--accent-blue); color: var(--accent-blue); }
 
         /* ── Примечание в спецификации ───────────────────────────────────── */
         .spec-note-cell {
@@ -1288,90 +1316,117 @@
         var showKitchen = (activeScenario === 2 || activeScenario === 3);
         var rowNum = 1, rows = '';
 
-        // ── Группа: Трубопроводы ─────────────────────────────────────────
-        rows += '<tr class="spec-group-row"><td colspan="7">Трубопроводы стояков К1</td></tr>';
+        // Хелпер: строка материала
+        function itemRow(name, unit, qty, reserve, qtyR, note) {
+            return '<tr class="spec-item-row">' +
+                '<td>' + (rowNum++) + '</td>' +
+                '<td>' + escHtml(name) + '</td>' +
+                '<td>' + unit + '</td>' +
+                '<td>' + qty + '</td>' +
+                '<td>' + (reserve || '—') + '</td>' +
+                '<td>' + (qtyR || qty) + '</td>' +
+                '<td class="spec-note-cell">' + escHtml(note || '—') + '</td>' +
+                '</tr>';
+        }
+
+        // Хелпер: строка итого раздела
+        function subtotalRow(pipeM, eqCount) {
+            var parts = [];
+            if (pipeM > 0) parts.push('Труб: ' + (Math.round(pipeM * 10) / 10) + '\u00a0м.п.');
+            if (eqCount > 0) parts.push('Оборудование: ' + eqCount + '\u00a0шт');
+            if (!parts.length) return '';
+            return '<tr class="spec-subtotal-row">' +
+                '<td></td><td colspan="2">Итого по разделу</td>' +
+                '<td colspan="4">' + parts.join('\u2003·\u2003') + '</td></tr>';
+        }
+
+        // ══════════════════ СИСТЕМА К1 ══════════════════
+        rows += '<tr class="spec-system-row"><td colspan="7">Система К1 — Бытовая канализация</td></tr>';
+
+        var k1PipeM = 0;
+        rows += '<tr class="spec-group-row"><td colspan="7">Трубопроводы стояков</td></tr>';
         buildingStats.forEach(function (b, idx) {
             var s    = getSettings(idx);
             var len  = calcTotalLengthM(b, activeScenario, idx);
             var lenR = Math.round(len * 1.03 * 10) / 10;
+            k1PipeM += len;
             var mat  = matLabels[s.pipeType] || s.pipeType;
             var diam = 'DN\u00a0' + s.riserDiameter;
             if (showKitchen) diam += '\u00a0/\u00a0' + s.kitchenDiameter;
-            rows += '<tr>' +
-                '<td>' + (rowNum++) + '</td>' +
-                '<td>Трубопровод ' + mat + ' ' + diam + '\u00a0мм (' + escHtml(b.name || 'Корпус ' + b.num) + ')</td>' +
-                '<td>м.п.</td>' +
-                '<td>' + len + '</td>' +
-                '<td>+3%</td>' +
-                '<td>' + lenR + '</td>' +
-                '<td class="spec-note-cell">—</td>' +
-                '</tr>';
+            rows += itemRow('Трубопровод ' + mat + ' ' + diam + '\u00a0мм (' + (b.name || 'Корпус ' + b.num) + ')',
+                'м.п.', len, '+3%', lenR, '');
         });
 
-        // ── Группа: Фасонные изделия и оборудование ──────────────────────
-        rows += '<tr class="spec-group-row"><td colspan="7">Фасонные изделия и общедомовое оборудование</td></tr>';
-        collectFittings().forEach(function (item) {
-            rows += '<tr>' +
-                '<td>' + (rowNum++) + '</td>' +
-                '<td>' + escHtml(item.name) + '</td>' +
-                '<td>' + item.unit + '</td>' +
-                '<td>' + item.qty + '</td>' +
-                '<td>—</td>' +
-                '<td>' + item.qty + '</td>' +
-                '<td class="spec-note-cell">' + escHtml(item.note || '—') + '</td>' +
-                '</tr>';
-        });
+        var k1EqCount = 0;
+        var k1Fittings = collectFittings();
+        if (k1Fittings.length) {
+            rows += '<tr class="spec-group-row"><td colspan="7">Фасонные изделия и оборудование</td></tr>';
+            k1Fittings.forEach(function (item) {
+                if (item.unit === 'шт') k1EqCount += item.qty;
+                else k1PipeM += item.qty;
+                rows += itemRow(item.name, item.unit, item.qty, '', item.qty, item.note);
+            });
+        }
+        rows += subtotalRow(k1PipeM, k1EqCount);
 
-        // ── Группа: Система К2 ───────────────────────────────────────────
-        if (buildingStats && buildingStats.length) {
-            rows += '<tr class="spec-group-row"><td colspan="7">Система К2 (Дождевая канализация)</td></tr>';
-            var k2Note = 'Трубопроводы изолировать вспененным каучуком. Предусмотреть электрообогрев стояков и трапов';
+        // ══════════════════ СИСТЕМА К2 ══════════════════
+        rows += '<tr class="spec-system-row"><td colspan="7">Система К2 — Дождевая канализация</td></tr>';
+
+        var k2PipeM = 0, k2EqCount = 0;
+        var k2Note = 'Изоляция + электрообогрев';
+
+        var hasK2Pipes = false;
+        buildingStats.forEach(function (b, idx) {
+            var len2 = calcStormPipeLength(b, idx);
+            if (len2 > 0) hasK2Pipes = true;
+        });
+        if (hasK2Pipes) {
+            rows += '<tr class="spec-group-row"><td colspan="7">Трубопроводы фасадных стояков</td></tr>';
             buildingStats.forEach(function (b, idx) {
                 var len2  = calcStormPipeLength(b, idx);
                 if (!len2) return;
                 var len2R = Math.round(len2 * 1.03 * 10) / 10;
-                rows += '<tr>' +
-                    '<td>' + (rowNum++) + '</td>' +
-                    '<td>Трубопровод SML DN\u00a050\u00a0мм (' + escHtml(b.name || 'Корпус ' + b.num) + ')</td>' +
-                    '<td>м.п.</td>' +
-                    '<td>' + len2 + '</td>' +
-                    '<td>+3%</td>' +
-                    '<td>' + len2R + '</td>' +
-                    '<td class="spec-note-cell">' + k2Note + '</td>' +
-                    '</tr>';
-            });
-            collectStormFittings().forEach(function (item) {
-                rows += '<tr>' +
-                    '<td>' + (rowNum++) + '</td>' +
-                    '<td>' + escHtml(item.name) + '</td>' +
-                    '<td>' + item.unit + '</td>' +
-                    '<td>' + item.qty + '</td>' +
-                    '<td>—</td>' +
-                    '<td>' + item.qty + '</td>' +
-                    '<td class="spec-note-cell">' + escHtml(item.note || '—') + '</td>' +
-                    '</tr>';
+                k2PipeM += len2;
+                rows += itemRow('Трубопровод SML DN\u00a050\u00a0мм (' + (b.name || 'Корпус ' + b.num) + ')',
+                    'м.п.', len2, '+3%', len2R, k2Note);
             });
         }
 
-        // ── Группа: Система К3 ───────────────────────────────────────────
-        if (hasAnyK3Zones()) {
-            rows += '<tr class="spec-group-row"><td colspan="7">Система К3 (Производственная канализация)</td></tr>';
-            collectK3Fittings().forEach(function (item) {
-                var qty = typeof item.qty === 'number' ? (Math.round(item.qty * 10) / 10) : item.qty;
-                rows += '<tr>' +
-                    '<td>' + (rowNum++) + '</td>' +
-                    '<td>' + escHtml(item.name) + '</td>' +
-                    '<td>' + item.unit + '</td>' +
-                    '<td>' + qty + '</td>' +
-                    '<td>—</td>' +
-                    '<td>' + qty + '</td>' +
-                    '<td class="spec-note-cell">' + escHtml(item.note || '—') + '</td>' +
-                    '</tr>';
+        var k2Fittings = collectStormFittings();
+        if (k2Fittings.length) {
+            rows += '<tr class="spec-group-row"><td colspan="7">Фасонные изделия, оборудование и материалы</td></tr>';
+            k2Fittings.forEach(function (item) {
+                var q = typeof item.qty === 'number' ? (Math.round(item.qty * 10) / 10) : item.qty;
+                if (item.unit === 'шт') k2EqCount += (typeof item.qty === 'number' ? item.qty : 0);
+                else k2PipeM += (typeof item.qty === 'number' ? item.qty : 0);
+                rows += itemRow(item.name, item.unit, q, '', q, item.note);
             });
+        }
+        rows += subtotalRow(k2PipeM, k2EqCount);
+
+        // ══════════════════ СИСТЕМА К3 ══════════════════
+        if (hasAnyK3Zones()) {
+            rows += '<tr class="spec-system-row"><td colspan="7">Система К3 — Производственная канализация</td></tr>';
+
+            var k3PipeM = 0, k3EqCount = 0;
+            var k3Items = collectK3Fittings();
+            if (k3Items.length) {
+                rows += '<tr class="spec-group-row"><td colspan="7">Оборудование и материалы</td></tr>';
+                k3Items.forEach(function (item) {
+                    var q = typeof item.qty === 'number' ? (Math.round(item.qty * 10) / 10) : item.qty;
+                    if (item.unit === 'шт') k3EqCount += (typeof item.qty === 'number' ? item.qty : 0);
+                    else k3PipeM += (typeof item.qty === 'number' ? item.qty : 0);
+                    rows += itemRow(item.name, item.unit, q, '', q, item.note);
+                });
+            }
+            rows += subtotalRow(k3PipeM, k3EqCount);
         }
 
         el.innerHTML =
-            '<div class="riser-table-wrap"><table class="riser-table">' +
+            '<div class="spec-toolbar">' +
+            '<button id="specToggleAll"><i class="bi bi-arrows-expand"></i> Развернуть всё</button>' +
+            '</div>' +
+            '<div class="riser-table-wrap"><table class="riser-table" id="specTable">' +
             '<thead><tr>' +
             '<th style="width:36px">№</th>' +
             '<th>Наименование</th>' +
@@ -1383,6 +1438,20 @@
             '</tr></thead>' +
             '<tbody>' + rows + '</tbody>' +
             '</table></div>';
+
+        // Toggle: свернуть/развернуть строки внутри систем
+        var toggleBtn = document.getElementById('specToggleAll');
+        if (toggleBtn) {
+            var collapsed = false;
+            toggleBtn.addEventListener('click', function () {
+                collapsed = !collapsed;
+                var itemRows = document.querySelectorAll('#specTable .spec-item-row');
+                itemRows.forEach(function (r) { r.style.display = collapsed ? 'none' : ''; });
+                toggleBtn.innerHTML = collapsed
+                    ? '<i class="bi bi-arrows-expand"></i> Развернуть всё'
+                    : '<i class="bi bi-arrows-collapse"></i> Свернуть всё';
+            });
+        }
     }
 
     /* ─── Экспорт в CSV (UTF-8 BOM для Excel) ────────────────────────────── */
@@ -1397,8 +1466,9 @@
 
         lines.push(['№','Наименование','Ед.','Кол-во','Запас','С учётом запаса','Примечание'].join(sep));
 
-        // Трубопроводы
-        lines.push([sep + 'Трубопроводы стояков К1','','','','',''].join(sep));
+        // ══ СИСТЕМА К1 ══
+        lines.push(['','СИСТЕМА К1 — Бытовая канализация','','','','',''].join(sep));
+        lines.push(['','Трубопроводы стояков','','','','',''].join(sep));
         buildingStats.forEach(function (b, idx) {
             var s    = getSettings(idx);
             var len  = calcTotalLengthM(b, activeScenario, idx);
@@ -1409,31 +1479,39 @@
                 'Трубопровод ' + mat + ' ' + diam + ' (' + (b.name || 'Корпус ' + b.num) + ')',
                 'м.п.', len, '+3%', lenR, ''].join(sep));
         });
+        var csvK1Fittings = collectFittings();
+        if (csvK1Fittings.length) {
+            lines.push(['','Фасонные изделия и оборудование','','','','',''].join(sep));
+            csvK1Fittings.forEach(function (item) {
+                lines.push([rowNum++, item.name, item.unit, item.qty, '—', item.qty, item.note || ''].join(sep));
+            });
+        }
 
-        // Фасонные изделия и оборудование
-        lines.push([sep + 'Фасонные изделия и общедомовое оборудование','','','','',''].join(sep));
-        collectFittings().forEach(function (item) {
-            lines.push([rowNum++, item.name, item.unit, item.qty, '—', item.qty, item.note || ''].join(sep));
-        });
-
-        // К2: Ливневая канализация
-        lines.push([sep + 'Система К2 (Дождевая канализация)','','','','',''].join(sep));
-        var k2Note = 'Трубопроводы изолировать вспененным каучуком. Предусмотреть электрообогрев стояков и трапов';
+        // ══ СИСТЕМА К2 ══
+        lines.push(['','СИСТЕМА К2 — Дождевая канализация','','','','',''].join(sep));
+        lines.push(['','Трубопроводы фасадных стояков','','','','',''].join(sep));
+        var csvK2Note = 'Изоляция + электрообогрев';
         buildingStats.forEach(function (b, idx) {
             var len2  = calcStormPipeLength(b, idx);
             if (!len2) return;
             var len2R = Math.round(len2 * 1.03 * 10) / 10;
             lines.push([rowNum++,
                 'Трубопровод SML DN 50 мм (' + (b.name || 'Корпус ' + b.num) + ')',
-                'м.п.', len2, '+3%', len2R, k2Note].join(sep));
+                'м.п.', len2, '+3%', len2R, csvK2Note].join(sep));
         });
-        collectStormFittings().forEach(function (item) {
-            lines.push([rowNum++, item.name, item.unit, item.qty, '—', item.qty, item.note || ''].join(sep));
-        });
+        var csvK2Fittings = collectStormFittings();
+        if (csvK2Fittings.length) {
+            lines.push(['','Фасонные изделия, оборудование и материалы','','','','',''].join(sep));
+            csvK2Fittings.forEach(function (item) {
+                var q = typeof item.qty === 'number' ? (Math.round(item.qty * 10) / 10) : item.qty;
+                lines.push([rowNum++, item.name, item.unit, q, '—', q, item.note || ''].join(sep));
+            });
+        }
 
-        // К3: Производственная канализация
+        // ══ СИСТЕМА К3 ══
         if (hasAnyK3Zones()) {
-            lines.push([sep + 'Система К3 (Производственная канализация)','','','','',''].join(sep));
+            lines.push(['','СИСТЕМА К3 — Производственная канализация','','','','',''].join(sep));
+            lines.push(['','Оборудование и материалы','','','','',''].join(sep));
             collectK3Fittings().forEach(function (item) {
                 var qty = typeof item.qty === 'number' ? (Math.round(item.qty * 10) / 10) : item.qty;
                 lines.push([rowNum++, item.name, item.unit, qty, '—', qty, item.note || ''].join(sep));
