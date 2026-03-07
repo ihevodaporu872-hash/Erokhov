@@ -447,7 +447,7 @@
             var z1F     = zone1Floors(b);
             var z2F     = zone2Floors(b);
 
-            // SHPKs: 2 per section per floor
+            // ШПК: 2 шт на секцию на этаж
             var shpkZ1 = 2 * sec * z1F;
             var shpkZ2 = z2 ? 2 * sec * z2F : 0;
 
@@ -457,14 +457,21 @@
                 addItem('vpv_shpk_z2', 'ШПК-320 (шкаф пожарного крана)', 'шт', shpkZ2,
                     'Зона II: 2 шт на секцию на этаж', 'zone2');
 
-            // Fire hose DN65 per SHPKs
+            // ДППК: 1 датчик на каждый ШПК
+            addItem('vpv_dppk_z1', 'Датчик ДППК (датчик положения пожарного крана)', 'шт', shpkZ1,
+                '1 шт на каждый ШПК (Зона I)', 'zone1');
+            if (shpkZ2 > 0)
+                addItem('vpv_dppk_z2', 'Датчик ДППК (датчик положения пожарного крана)', 'шт', shpkZ2,
+                    '1 шт на каждый ШПК (Зона II)', 'zone2');
+
+            // Рукав DN65 — по 1 на каждый ШПК
             addItem('vpv_hose_z1', 'Рукав пожарный DN\u00a065, 20 м', 'шт', shpkZ1,
                 'По 1 на каждый ШПК (Зона I)', 'zone1');
             if (shpkZ2 > 0)
                 addItem('vpv_hose_z2', 'Рукав пожарный DN\u00a065, 20 м', 'шт', shpkZ2,
                     'По 1 на каждый ШПК (Зона II)', 'zone2');
 
-            // Risers: steel DN65, 1 per section
+            // Стояки DN65: 1 стояк на секцию (высота × этажей)
             var riserLenZ1 = Math.round(floorH * z1F * sec * 10) / 10;
             var riserLenZ2 = z2 ? Math.round(floorH * z2F * sec * 10) / 10 : 0;
 
@@ -474,30 +481,49 @@
                 addItem('vpv_pipe_z2', 'Труба стальная ВГП DN\u00a065 (стояки ВПВ)', 'м.п.',
                     riserLenZ2, 'Зона II: 1 стояк на секцию', 'zone2');
 
-            // Zone II transit through floors 1-11
+            // Этажные ветки DN50: от стояка до ШПК, ~3 м на этаж на секцию
+            var branchZ1 = Math.round(3 * z1F * sec * 10) / 10;
+            var branchZ2 = z2 ? Math.round(3 * z2F * sec * 10) / 10 : 0;
+
+            addItem('vpv_branch_z1', 'Труба стальная ВГП DN\u00a050 (этажные ветки ВПВ)', 'м.п.',
+                branchZ1, '~3 м на этаж на секцию (Зона I)', 'zone1');
+            if (branchZ2 > 0)
+                addItem('vpv_branch_z2', 'Труба стальная ВГП DN\u00a050 (этажные ветки ВПВ)', 'м.п.',
+                    branchZ2, '~3 м на этаж на секцию (Зона II)', 'zone2');
+
+            // Транзит Зоны II через эт. 1-11 (только труба)
             if (z2) {
                 var transitLen = Math.round(floorH * 11 * sec * 10) / 10;
                 addItem('vpv_transit_z2', 'Труба стальная ВГП DN\u00a065 (транзит Зона II, эт. 1-11)', 'м.п.',
                     transitLen, 'Транзитный стояк через Зону I', 'zone2');
             }
 
-            // Clamps: every 1.5m
-            var totalPipeZ1 = riserLenZ1;
-            var totalPipeZ2 = riserLenZ2 + (z2 ? Math.round(floorH * 11 * sec * 10) / 10 : 0);
-            addItem('vpv_clamp_z1', 'Хомут стальной (крепление стояков ВПВ)', 'шт',
+            // Муфты грувлок DN65: 2 на стык (1 стык на этаж на стояк)
+            var gruvZ1 = z1F * sec * 2;
+            var gruvZ2 = z2 ? (z2F + 11) * sec * 2 : 0; // z2F активных + 11 транзитных
+            addItem('vpv_gruvlok_z1', 'Муфта грувлок DN\u00a065', 'шт', gruvZ1,
+                '2 шт на стык, 1 стык/этаж/стояк (Зона I)', 'zone1');
+            if (gruvZ2 > 0)
+                addItem('vpv_gruvlok_z2', 'Муфта грувлок DN\u00a065', 'шт', gruvZ2,
+                    '2 шт на стык, 1 стык/этаж/стояк (Зона II)', 'zone2');
+
+            // Хомуты: через 1,5 м по всем трубам
+            var totalPipeZ1 = riserLenZ1 + branchZ1;
+            var totalPipeZ2 = riserLenZ2 + branchZ2 + (z2 ? Math.round(floorH * 11 * sec * 10) / 10 : 0);
+            addItem('vpv_clamp_z1', 'Хомут стальной (крепление труб ВПВ)', 'шт',
                 Math.ceil(totalPipeZ1 / 1.5), 'Через 1,5 м (Зона I)', 'zone1');
             if (totalPipeZ2 > 0)
-                addItem('vpv_clamp_z2', 'Хомут стальной (крепление стояков ВПВ)', 'шт',
+                addItem('vpv_clamp_z2', 'Хомут стальной (крепление труб ВПВ)', 'шт',
                     Math.ceil(totalPipeZ2 / 1.5), 'Через 1,5 м (Зона II)', 'zone2');
 
-            // Ball valves DN65: 1 per riser bottom + 1 per riser top
+            // Кран шаровой DN65: верх/низ стояка
             addItem('vpv_valve_z1', 'Кран шаровой DN\u00a065 (стояки ВПВ)', 'шт',
                 sec * 2, '2 шт на стояк (верх/низ, Зона I)', 'zone1');
             if (z2)
                 addItem('vpv_valve_z2', 'Кран шаровой DN\u00a065 (стояки ВПВ)', 'шт',
                     sec * 2, '2 шт на стояк (верх/низ, Зона II)', 'zone2');
 
-            // Check valve: 1 per riser
+            // Клапан обратный DN65: 1 на стояк
             addItem('vpv_check_z1', 'Клапан обратный DN\u00a065', 'шт',
                 sec, '1 шт на стояк (Зона I)', 'zone1');
             if (z2)
@@ -506,8 +532,12 @@
         });
 
         var ORDER = [
-            'vpv_shpk_z1', 'vpv_hose_z1', 'vpv_pipe_z1', 'vpv_clamp_z1', 'vpv_valve_z1', 'vpv_check_z1',
-            'vpv_shpk_z2', 'vpv_hose_z2', 'vpv_pipe_z2', 'vpv_transit_z2', 'vpv_clamp_z2', 'vpv_valve_z2', 'vpv_check_z2'
+            'vpv_shpk_z1', 'vpv_dppk_z1', 'vpv_hose_z1',
+            'vpv_pipe_z1', 'vpv_branch_z1', 'vpv_gruvlok_z1', 'vpv_clamp_z1',
+            'vpv_valve_z1', 'vpv_check_z1',
+            'vpv_shpk_z2', 'vpv_dppk_z2', 'vpv_hose_z2',
+            'vpv_pipe_z2', 'vpv_branch_z2', 'vpv_transit_z2', 'vpv_gruvlok_z2', 'vpv_clamp_z2',
+            'vpv_valve_z2', 'vpv_check_z2'
         ];
         var result = [];
         ORDER.forEach(function (k) { if (acc[k]) result.push(acc[k]); });
@@ -540,8 +570,9 @@
             var z1F     = zone1Floors(b);
             var z2F     = zone2Floors(b);
 
-            // Sprinklers: every 3.5m along corridor, per section per floor
-            var sprPerFloor = Math.ceil(corrLen / 3.5) * sec;
+            // Спринклеры: через 3,5 м в коридоре
+            var sprPerSection = Math.ceil(corrLen / 3.5);
+            var sprPerFloor = sprPerSection * sec;
             var sprZ1 = sprPerFloor * z1F;
             var sprZ2 = z2 ? sprPerFloor * z2F : 0;
 
@@ -551,7 +582,7 @@
                 addItem('aupt_spr_z2', 'Спринклер СВН-12 (розеткой вниз)', 'шт', sprZ2,
                     'Через 3,5 м в коридоре (Зона II)', 'zone2');
 
-            // SPZh (fire sensor): 1 per floor per section
+            // СПЖ: 1 шт на этаж на секцию
             var spzhZ1 = sec * z1F;
             var spzhZ2 = z2 ? sec * z2F : 0;
 
@@ -561,7 +592,21 @@
                 addItem('aupt_spzh_z2', 'Сигнализатор потока жидкости (СПЖ)', 'шт', spzhZ2,
                     '1 шт на этаж на секцию (Зона II)', 'zone2');
 
-            // Horizontal corridor pipe DN25 (to sprinklers)
+            // Затвор с датчиком положения: 1 шт на этаж на секцию
+            addItem('aupt_damper_z1', 'Затвор дисковый с датчиком положения', 'шт', spzhZ1,
+                '1 шт на этаж на секцию (Зона I)', 'zone1');
+            if (spzhZ2 > 0)
+                addItem('aupt_damper_z2', 'Затвор дисковый с датчиком положения', 'шт', spzhZ2,
+                    '1 шт на этаж на секцию (Зона II)', 'zone2');
+
+            // Промывочный кран DN25: 1 шт на этаж на секцию
+            addItem('aupt_flush_z1', 'Кран промывочный DN\u00a025', 'шт', spzhZ1,
+                '1 шт на этаж на секцию (Зона I)', 'zone1');
+            if (spzhZ2 > 0)
+                addItem('aupt_flush_z2', 'Кран промывочный DN\u00a025', 'шт', spzhZ2,
+                    '1 шт на этаж на секцию (Зона II)', 'zone2');
+
+            // Разводка коридора DN25
             var corrPipePerFloor = Math.round(corrLen * sec * 10) / 10;
             addItem('aupt_corr_pipe_z1', 'Труба стальная ВГП DN\u00a025 (разводка коридор)', 'м.п.',
                 Math.round(corrPipePerFloor * z1F * 10) / 10,
@@ -571,7 +616,7 @@
                     Math.round(corrPipePerFloor * z2F * 10) / 10,
                     'Горизонтальная разводка коридора (Зона II)', 'zone2');
 
-            // Risers: steel DN80, 1 per section
+            // Стояки DN80: 1 стояк на секцию
             var riserLenZ1 = Math.round(floorH * z1F * sec * 10) / 10;
             var riserLenZ2 = z2 ? Math.round(floorH * z2F * sec * 10) / 10 : 0;
 
@@ -581,30 +626,40 @@
                 addItem('aupt_pipe_z2', 'Труба стальная ВГП DN\u00a080 (стояки АУПТ)', 'м.п.',
                     riserLenZ2, 'Зона II: 1 стояк на секцию', 'zone2');
 
-            // Zone II transit through floors 1-11
+            // Транзит Зоны II через эт. 1-11 (только труба)
             if (z2) {
                 var transitLen = Math.round(floorH * 11 * sec * 10) / 10;
                 addItem('aupt_transit_z2', 'Труба стальная ВГП DN\u00a080 (транзит Зона II, эт. 1-11)', 'м.п.',
                     transitLen, 'Транзитный стояк через Зону I', 'zone2');
             }
 
-            // Clamps: every 1.5m
-            var totalPipeZ1 = riserLenZ1;
-            var totalPipeZ2 = riserLenZ2 + (z2 ? Math.round(floorH * 11 * sec * 10) / 10 : 0);
-            addItem('aupt_clamp_z1', 'Хомут стальной (крепление стояков АУПТ)', 'шт',
+            // Муфты грувлок DN80: 2 на стык (1 стык на этаж на стояк)
+            var gruvZ1 = z1F * sec * 2;
+            var gruvZ2 = z2 ? (z2F + 11) * sec * 2 : 0;
+            addItem('aupt_gruvlok_z1', 'Муфта грувлок DN\u00a080', 'шт', gruvZ1,
+                '2 шт на стык, 1 стык/этаж/стояк (Зона I)', 'zone1');
+            if (gruvZ2 > 0)
+                addItem('aupt_gruvlok_z2', 'Муфта грувлок DN\u00a080', 'шт', gruvZ2,
+                    '2 шт на стык, 1 стык/этаж/стояк (Зона II)', 'zone2');
+
+            // Хомуты: через 1,5 м по стоякам + разводке
+            var totalPipeZ1 = riserLenZ1 + Math.round(corrPipePerFloor * z1F * 10) / 10;
+            var totalPipeZ2 = riserLenZ2 + (z2 ? Math.round(corrPipePerFloor * z2F * 10) / 10 : 0)
+                + (z2 ? Math.round(floorH * 11 * sec * 10) / 10 : 0);
+            addItem('aupt_clamp_z1', 'Хомут стальной (крепление труб АУПТ)', 'шт',
                 Math.ceil(totalPipeZ1 / 1.5), 'Через 1,5 м (Зона I)', 'zone1');
             if (totalPipeZ2 > 0)
-                addItem('aupt_clamp_z2', 'Хомут стальной (крепление стояков АУПТ)', 'шт',
+                addItem('aupt_clamp_z2', 'Хомут стальной (крепление труб АУПТ)', 'шт',
                     Math.ceil(totalPipeZ2 / 1.5), 'Через 1,5 м (Зона II)', 'zone2');
 
-            // Ball valves DN80: 1 per riser bottom + 1 per riser top
+            // Кран шаровой DN80: верх/низ стояка
             addItem('aupt_valve_z1', 'Кран шаровой DN\u00a080 (стояки АУПТ)', 'шт',
                 sec * 2, '2 шт на стояк (верх/низ, Зона I)', 'zone1');
             if (z2)
                 addItem('aupt_valve_z2', 'Кран шаровой DN\u00a080 (стояки АУПТ)', 'шт',
                     sec * 2, '2 шт на стояк (верх/низ, Зона II)', 'zone2');
 
-            // Alarm valve station: 1 per zone
+            // УУС: 1 на зону
             addItem('aupt_uzs_z1', 'Узел управления спринклерный (УУС)', 'шт',
                 1, 'Зона I', 'zone1');
             if (z2)
@@ -613,10 +668,12 @@
         });
 
         var ORDER = [
-            'aupt_spr_z1', 'aupt_spzh_z1', 'aupt_corr_pipe_z1', 'aupt_pipe_z1',
-            'aupt_clamp_z1', 'aupt_valve_z1', 'aupt_uzs_z1',
-            'aupt_spr_z2', 'aupt_spzh_z2', 'aupt_corr_pipe_z2', 'aupt_pipe_z2',
-            'aupt_transit_z2', 'aupt_clamp_z2', 'aupt_valve_z2', 'aupt_uzs_z2'
+            'aupt_spr_z1', 'aupt_spzh_z1', 'aupt_damper_z1', 'aupt_flush_z1',
+            'aupt_corr_pipe_z1', 'aupt_pipe_z1', 'aupt_gruvlok_z1', 'aupt_clamp_z1',
+            'aupt_valve_z1', 'aupt_uzs_z1',
+            'aupt_spr_z2', 'aupt_spzh_z2', 'aupt_damper_z2', 'aupt_flush_z2',
+            'aupt_corr_pipe_z2', 'aupt_pipe_z2', 'aupt_transit_z2', 'aupt_gruvlok_z2', 'aupt_clamp_z2',
+            'aupt_valve_z2', 'aupt_uzs_z2'
         ];
         var result = [];
         ORDER.forEach(function (k) { if (acc[k]) result.push(acc[k]); });
