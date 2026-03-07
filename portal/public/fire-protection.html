@@ -361,7 +361,11 @@
                 sections:       1,     // number of sections per building
                 corridorLength: 30,    // corridor length per section, m
                 vpvEnabled:     true,
-                auptEnabled:    true
+                auptEnabled:    true,
+                // 1-й этаж (отметка 0.000)
+                commercial:     false, // наличие коммерческих помещений (аренда)
+                commercialCount: 1,    // количество помещений аренды
+                lobbyArea:      0      // площадь вестибюля, м²
             };
         }
         return fireSettings[idx];
@@ -565,6 +569,43 @@
                 addItem('vpv_check80_z2', 'Клапан обратный DN\u00a080 (фасадный)', 'шт',
                     2, 'К фасадным патрубкам (Зона II)', 'zone2');
             }
+
+            // ── 1-й этаж (отметка 0.000) ──────────────────────────────────
+            var lobbyArea = s.lobbyArea || 0;
+
+            // Вестибюль: 4 ШПК (требование 4-х струй)
+            if (lobbyArea > 0) {
+                addItem('vpv_lobby_shpk', 'ШПК-320 (вестибюль, 1 этаж)', 'шт', 4,
+                    '4 струи — требование для вестибюля', 'zone1');
+                addItem('vpv_lobby_dppk', 'Датчик ДППК (вестибюль)', 'шт', 4,
+                    '1 шт на каждый ШПК вестибюля', 'zone1');
+                addItem('vpv_lobby_hose', 'Рукав пожарный DN\u00a065, 20 м (вестибюль)', 'шт', 4,
+                    'По 1 на каждый ШПК вестибюля', 'zone1');
+                addItem('vpv_lobby_diaphragm', 'Диафрагма Ду50 для снижения давления (вестибюль)', 'шт', 4,
+                    '1-й этаж, в каждый ШПК вестибюля', 'zone1');
+                // Магистральная разводка вестибюля DN65 (питающая)
+                var lobbyPipe = Math.round(Math.sqrt(lobbyArea) * 2 * 10) / 10;
+                addItem('vpv_lobby_pipe', 'Труба стальная э/с ГОСТ\u00a010704-91 DN\u00a065 (разводка вестибюль)', 'м.п.',
+                    lobbyPipe, 'Горизонтальная разводка вестибюля 1 эт.', 'zone1');
+            }
+
+            // Коммерческие помещения: 2 ШПК на каждое
+            if (s.commercial) {
+                var commN = s.commercialCount || 1;
+                var commShpk = 2 * commN;
+                addItem('vpv_comm_shpk', 'ШПК-320 (пом. аренды, 1 этаж)', 'шт', commShpk,
+                    '2 шт на помещение (\u00d7' + commN + ')', 'zone1');
+                addItem('vpv_comm_dppk', 'Датчик ДППК (пом. аренды)', 'шт', commShpk,
+                    '1 шт на каждый ШПК аренды', 'zone1');
+                addItem('vpv_comm_hose', 'Рукав пожарный DN\u00a065, 20 м (пом. аренды)', 'шт', commShpk,
+                    'По 1 на каждый ШПК аренды', 'zone1');
+                addItem('vpv_comm_diaphragm', 'Диафрагма Ду50 для снижения давления (пом. аренды)', 'шт', commShpk,
+                    '1-й этаж, в каждый ШПК аренды', 'zone1');
+                // Разводка к помещениям аренды DN65
+                var commPipe = Math.round(5 * commN * 10) / 10;
+                addItem('vpv_comm_pipe', 'Труба стальная э/с ГОСТ\u00a010704-91 DN\u00a065 (разводка аренда)', 'м.п.',
+                    commPipe, '~5 м на помещение аренды', 'zone1');
+            }
         });
 
         // Затворы обслуживания: 1 шт на каждые 5 стояков (если > 5)
@@ -579,6 +620,8 @@
             'vpv_pipe_z1', 'vpv_branch_z1', 'vpv_gruvlok_z1', 'vpv_clamp_z1',
             'vpv_valve_z1', 'vpv_check_z1',
             'vpv_facade_z1', 'vpv_gm80_z1', 'vpv_check80_z1',
+            'vpv_lobby_shpk', 'vpv_lobby_dppk', 'vpv_lobby_hose', 'vpv_lobby_diaphragm', 'vpv_lobby_pipe',
+            'vpv_comm_shpk', 'vpv_comm_dppk', 'vpv_comm_hose', 'vpv_comm_diaphragm', 'vpv_comm_pipe',
             'vpv_service_damper',
             'vpv_shpk_z2', 'vpv_dppk_z2', 'vpv_diaphragm_z2', 'vpv_hose_z2',
             'vpv_pipe_z2', 'vpv_branch_z2', 'vpv_transit_z2', 'vpv_gruvlok_z2', 'vpv_clamp_z2',
@@ -616,47 +659,69 @@
             var z1F     = zone1Floors(b);
             var z2F     = zone2Floors(b);
 
-            // Спринклеры: через 3,5 м в коридоре
+            // Если коммерция на 1 эт. — исключаем 1-й этаж из стандартного расчёта коридоров
+            var hasComm = s.commercial;
+            var corrZ1F = hasComm ? Math.max(z1F - 1, 0) : z1F;
+            var lobbyArea = s.lobbyArea || 0;
+
+            // Спринклеры коридоров: через 3,5 м (эт. 2+ при аренде, иначе эт. 1+)
             var sprPerSection = Math.ceil(corrLen / 3.5);
             var sprPerFloor = sprPerSection * sec;
-            var sprZ1 = sprPerFloor * z1F;
+            var sprZ1 = sprPerFloor * corrZ1F;
             var sprZ2 = z2 ? sprPerFloor * z2F : 0;
 
             addItem('aupt_spr_z1', 'Спринклер СВН-12 (розеткой вниз)', 'шт', sprZ1,
-                'Через 3,5 м в коридоре (Зона I)', 'zone1');
+                'Через 3,5 м в коридоре (Зона I' + (hasComm ? ', без 1 эт.' : '') + ')', 'zone1');
             if (sprZ2 > 0)
                 addItem('aupt_spr_z2', 'Спринклер СВН-12 (розеткой вниз)', 'шт', sprZ2,
                     'Через 3,5 м в коридоре (Зона II)', 'zone2');
 
-            // СПЖ: 1 шт на этаж на секцию
-            var spzhZ1 = sec * z1F;
+            // Вестибюль: спринклеры Стандарт-К80Н по площади (шаг 3.5 м = ~12.25 м²/шт)
+            if (lobbyArea > 0) {
+                var lobbySpr = Math.ceil(lobbyArea / 12.25);
+                addItem('aupt_lobby_spr', 'Спринклер Стандарт-К80Н (вестибюль)', 'шт', lobbySpr,
+                    'По площади вестибюля ' + lobbyArea + '\u00a0м\u00b2, шаг 3,5 м', 'zone1');
+                addItem('aupt_lobby_spzh', 'Сигнализатор потока жидкости СПЖ (вестибюль)', 'шт', 1,
+                    '1 шт на зону вестибюля', 'zone1');
+                addItem('aupt_lobby_damper', 'Затвор дисковый с датчиком положения (вестибюль)', 'шт', 1,
+                    '1 шт на зону вестибюля', 'zone1');
+                addItem('aupt_lobby_flush', 'Кран промывочный DN\u00a025 (вестибюль)', 'шт', 1,
+                    '1 шт на зону вестибюля', 'zone1');
+                // Разводка вестибюля DN80
+                var lobbyPipeLen = Math.round(Math.sqrt(lobbyArea) * 2 * 10) / 10;
+                addItem('aupt_lobby_pipe', 'Труба стальная э/с ГОСТ\u00a010704-91 DN\u00a080 (разводка вестибюль)', 'м.п.',
+                    lobbyPipeLen, 'Горизонтальная разводка вестибюля 1 эт.', 'zone1');
+            }
+
+            // СПЖ: 1 шт на этаж на секцию (без 1 эт. при аренде)
+            var spzhZ1 = sec * corrZ1F;
             var spzhZ2 = z2 ? sec * z2F : 0;
 
             addItem('aupt_spzh_z1', 'Сигнализатор потока жидкости (СПЖ)', 'шт', spzhZ1,
-                '1 шт на этаж на секцию (Зона I)', 'zone1');
+                '1 шт на этаж на секцию (Зона I' + (hasComm ? ', без 1 эт.' : '') + ')', 'zone1');
             if (spzhZ2 > 0)
                 addItem('aupt_spzh_z2', 'Сигнализатор потока жидкости (СПЖ)', 'шт', spzhZ2,
                     '1 шт на этаж на секцию (Зона II)', 'zone2');
 
             // Затвор с датчиком положения: 1 шт на этаж на секцию
             addItem('aupt_damper_z1', 'Затвор дисковый с датчиком положения', 'шт', spzhZ1,
-                '1 шт на этаж на секцию (Зона I)', 'zone1');
+                '1 шт на этаж на секцию (Зона I' + (hasComm ? ', без 1 эт.' : '') + ')', 'zone1');
             if (spzhZ2 > 0)
                 addItem('aupt_damper_z2', 'Затвор дисковый с датчиком положения', 'шт', spzhZ2,
                     '1 шт на этаж на секцию (Зона II)', 'zone2');
 
             // Промывочный кран DN25: 1 шт на этаж на секцию
             addItem('aupt_flush_z1', 'Кран промывочный DN\u00a025', 'шт', spzhZ1,
-                '1 шт на этаж на секцию (Зона I)', 'zone1');
+                '1 шт на этаж на секцию (Зона I' + (hasComm ? ', без 1 эт.' : '') + ')', 'zone1');
             if (spzhZ2 > 0)
                 addItem('aupt_flush_z2', 'Кран промывочный DN\u00a025', 'шт', spzhZ2,
                     '1 шт на этаж на секцию (Зона II)', 'zone2');
 
-            // Разводка коридора DN25
+            // Разводка коридора DN25 (без 1 эт. при аренде)
             var corrPipePerFloor = Math.round(corrLen * sec * 10) / 10;
             addItem('aupt_corr_pipe_z1', 'Труба стальная ВГП ГОСТ\u00a03262-75 DN\u00a025 (разводка коридор)', 'м.п.',
-                Math.round(corrPipePerFloor * z1F * 10) / 10,
-                'Горизонтальная разводка коридора (Зона I)', 'zone1');
+                Math.round(corrPipePerFloor * corrZ1F * 10) / 10,
+                'Горизонтальная разводка коридора (Зона I' + (hasComm ? ', без 1 эт.' : '') + ')', 'zone1');
             if (z2)
                 addItem('aupt_corr_pipe_z2', 'Труба стальная ВГП ГОСТ\u00a03262-75 DN\u00a025 (разводка коридор)', 'м.п.',
                     Math.round(corrPipePerFloor * z2F * 10) / 10,
@@ -717,6 +782,7 @@
             'aupt_spr_z1', 'aupt_spzh_z1', 'aupt_damper_z1', 'aupt_flush_z1',
             'aupt_corr_pipe_z1', 'aupt_pipe_z1', 'aupt_gruvlok_z1', 'aupt_clamp_z1',
             'aupt_valve_z1', 'aupt_uzs_z1',
+            'aupt_lobby_spr', 'aupt_lobby_spzh', 'aupt_lobby_damper', 'aupt_lobby_flush', 'aupt_lobby_pipe',
             'aupt_spr_z2', 'aupt_spzh_z2', 'aupt_damper_z2', 'aupt_flush_z2',
             'aupt_corr_pipe_z2', 'aupt_pipe_z2', 'aupt_transit_z2', 'aupt_gruvlok_z2', 'aupt_clamp_z2',
             'aupt_valve_z2', 'aupt_uzs_z2'
@@ -807,6 +873,33 @@
                     '</div>'
                 : '') +
 
+                '<div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--gray-200)">' +
+                '<div style="font-size:12px;font-weight:700;color:var(--gray-700);margin-bottom:8px">' +
+                '<i class="bi bi-shop"></i> Первый этаж (отм. 0.000)</div>' +
+
+                '<div class="bld-num-row">' +
+                '<label><i class="bi bi-door-open"></i> Площадь вестибюля, м\u00b2:</label>' +
+                '<input type="number" min="0" max="2000" step="1" value="' + (s.lobbyArea || 0) + '" ' +
+                'class="fire-lobby bld-num" data-idx="' + idx + '" style="width:80px">' +
+                '</div>' +
+
+                '<div class="fire-toggle" style="margin-top:6px">' +
+                '<input type="checkbox" id="' + systemPrefix + '-comm-' + idx + '" ' +
+                    'class="fire-commercial" data-idx="' + idx + '"' +
+                    (s.commercial ? ' checked' : '') + '>' +
+                '<label for="' + systemPrefix + '-comm-' + idx + '">Наличие коммерческих помещений (Аренда) на 1 эт.</label>' +
+                '</div>' +
+
+                (s.commercial ?
+                    '<div class="bld-num-row" style="margin-top:6px">' +
+                    '<label><i class="bi bi-hash"></i> Кол-во помещений аренды:</label>' +
+                    '<input type="number" min="1" max="50" step="1" value="' + (s.commercialCount || 1) + '" ' +
+                    'class="fire-comm-count bld-num" data-idx="' + idx + '" style="width:64px">' +
+                    '</div>'
+                : '') +
+
+                '</div>' +
+
                 zoneInfo +
 
                 '</div></details>';
@@ -835,6 +928,28 @@
             el.addEventListener('input', function () {
                 var idx = parseInt(el.dataset.idx, 10);
                 getSettings(idx).corridorLength = Math.max(1, parseFloat(el.value) || 30);
+                renderResults();
+            });
+        });
+        container.querySelectorAll('.fire-lobby').forEach(function (el) {
+            el.addEventListener('input', function () {
+                var idx = parseInt(el.dataset.idx, 10);
+                getSettings(idx).lobbyArea = Math.max(0, parseFloat(el.value) || 0);
+                renderResults();
+            });
+        });
+        container.querySelectorAll('.fire-commercial').forEach(function (el) {
+            el.addEventListener('change', function () {
+                var idx = parseInt(el.dataset.idx, 10);
+                getSettings(idx).commercial = el.checked;
+                renderAllAccordions();
+                renderResults();
+            });
+        });
+        container.querySelectorAll('.fire-comm-count').forEach(function (el) {
+            el.addEventListener('input', function () {
+                var idx = parseInt(el.dataset.idx, 10);
+                getSettings(idx).commercialCount = Math.max(1, parseInt(el.value, 10) || 1);
                 renderResults();
             });
         });
@@ -1310,6 +1425,30 @@
                     svgText(rx, topY - 4, 'ВПВ-II', 'viz-label', svg);
                 }
             }
+
+            // Lobby ШПК icons on 1st floor (4 шт)
+            var lobbyArea = s.lobbyArea || 0;
+            if (lobbyArea > 0 && sec > 0) {
+                var floor1Y = PAD + (nF - 1) * FLOOR_H + FLOOR_H / 2;
+                var rx0 = vpvPositions[0];
+                for (var li = 0; li < 4; li++) {
+                    svgIcon(rx0 - 12 + li * 7, floor1Y + 10, 'bi-fire', '#B71C1C', 8,
+                        'ШПК-320 (вестибюль), эт. 1', svg);
+                }
+                svgText(rx0, PAD + (nF - 1) * FLOOR_H + FLOOR_H - 2, 'Вест.', 'viz-label', svg);
+            }
+
+            // Commercial ШПК icons on 1st floor (2 per unit, VPV only — no AUPT)
+            if (s.commercial && sec > 0) {
+                var floor1Y = PAD + (nF - 1) * FLOOR_H + FLOOR_H / 2;
+                var rx0 = vpvPositions[0];
+                var commN = s.commercialCount || 1;
+                var commShpk = Math.min(2 * commN, 6); // show max 6
+                for (var ci = 0; ci < commShpk; ci++) {
+                    svgIcon(rx0 + 16 + ci * 7, floor1Y + 10, 'bi-fire', '#E65100', 8,
+                        'ШПК-320 (аренда), эт. 1', svg);
+                }
+            }
         }
 
         // ── AUPT risers ──
@@ -1324,7 +1463,10 @@
                 svgEl('line', { x1: rx, y1: z1TopY, x2: rx, y2: botY, 'class': 'viz-riser-aupt' }, svg);
 
                 // Sprinkler dots + SPZh on each floor
+                var hasComm = s.commercial;
                 for (var fi = 0; fi < z1F; fi++) {
+                    // Skip floor 1 if commercial (no AUPT in commercial premises)
+                    if (hasComm && fi === 0) continue;
                     var floorY = PAD + (nF - 1 - fi) * FLOOR_H + FLOOR_H / 2;
                     // Sprinkler dots (show max 3)
                     var showSpr = Math.min(sprPerFloor, 3);
@@ -1340,6 +1482,25 @@
                     // SPZh sensor
                     svgIcon(rx - 7, floorY, 'bi-thermometer-half', '#FF6F00', 9,
                         'СПЖ, эт. ' + (fi + 1), svg);
+                }
+
+                // Lobby sprinklers on floor 1 (different type — Стандарт-К80Н)
+                var lobbyArea = s.lobbyArea || 0;
+                if (lobbyArea > 0) {
+                    var floor1Y = PAD + (nF - 1) * FLOOR_H + FLOOR_H / 2;
+                    var lobbySpr = Math.ceil(lobbyArea / 12.25);
+                    var showLobby = Math.min(lobbySpr, 4);
+                    for (var si = 0; si < showLobby; si++) {
+                        svgEl('circle', {
+                            cx: rx + 8 + si * 5, cy: floor1Y,
+                            r: 2.5, fill: '#E65100', stroke: '#FFF', 'stroke-width': 0.5
+                        }, svg);
+                    }
+                    if (lobbySpr > 4) {
+                        svgText(rx + 8 + showLobby * 5 + 2, floor1Y + 3, '+' + (lobbySpr - 4), 'viz-label', svg);
+                    }
+                    svgIcon(rx - 7, floor1Y, 'bi-thermometer-half', '#E65100', 9,
+                        'СПЖ (вестибюль), эт. 1', svg);
                 }
                 svgText(rx, topY - 4, 'АУПТ', 'viz-label', svg);
             }
