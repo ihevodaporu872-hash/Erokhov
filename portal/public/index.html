@@ -1269,11 +1269,11 @@
                     </div>
                 </div>
 
-                <div class="alert alert-secondary text-center py-5" role="alert">
-                    <i class="bi bi-hourglass-split" style="font-size: 4rem; opacity: 0.6;"></i>
-                    <h4 class="mt-3 mb-2">Функционал будет доступен в ближайших обновлениях</h4>
-                    <p class="text-muted mb-0">Мы работаем над этим разделом</p>
-                </div>
+                <iframe
+                    src="air-conditioning.html"
+                    style="width: 100%; min-height: 1200px; height: 100vh; border: none; border-radius: 8px;"
+                    id="condCalcFrame">
+                </iframe>
             </div>
         </main>
     </div>
@@ -1350,6 +1350,16 @@
             });
         }
 
+        const condCalcFrame = document.getElementById('condCalcFrame');
+        if (condCalcFrame) {
+            condCalcFrame.addEventListener('load', function () {
+                const currentTheme = body.classList.contains('dark-theme') ? 'dark' : 'light';
+                condCalcFrame.contentWindow.postMessage({ type: 'theme-change', theme: currentTheme }, '*');
+                const condProjectId = getSystemProjectId('conditioning');
+                if (condProjectId) sendBuildingStatsToCondIframe(condProjectId);
+            });
+        }
+
         const waterCalcFrame = document.getElementById('waterCalcFrame');
         if (waterCalcFrame) {
             waterCalcFrame.addEventListener('load', function() {
@@ -1387,6 +1397,10 @@
             const fireFrame = document.getElementById('fireCalcFrame');
             if (fireFrame && fireFrame.contentWindow) {
                 fireFrame.contentWindow.postMessage({ type: 'theme-change', theme: theme }, '*');
+            }
+            const condFrame = document.getElementById('condCalcFrame');
+            if (condFrame && condFrame.contentWindow) {
+                condFrame.contentWindow.postMessage({ type: 'theme-change', theme: theme }, '*');
             }
         });
 
@@ -2188,6 +2202,20 @@
             }, '*');
         }
 
+        // Отправляет building_stats в iframe кондиционирования
+        function sendBuildingStatsToCondIframe(projectId) {
+            if (!projectId) return;
+            const project = portalProjects.find(p => p.id === projectId);
+            const iframe = document.getElementById('condCalcFrame');
+            if (!iframe || !iframe.contentWindow) return;
+            iframe.contentWindow.postMessage({
+                type: 'load-project-data',
+                projectId: projectId,
+                projectName: project ? project.name : '',
+                buildingStats: project ? (project.building_stats || null) : null
+            }, '*');
+        }
+
         // Отправляет building_stats в iframe пожаротушения
         function sendBuildingStatsToFireIframe(projectId) {
             if (!projectId) return;
@@ -2278,6 +2306,10 @@
                 if (systemType === 'fire-safety' && projectId) {
                     sendBuildingStatsToFireIframe(+projectId);
                 }
+                // Для conditioning — отправляем building_stats в iframe
+                if (systemType === 'conditioning' && projectId) {
+                    sendBuildingStatsToCondIframe(+projectId);
+                }
             });
         });
 
@@ -2359,6 +2391,8 @@
             if (swProjectId) sendBuildingStatsToSewageIframe(swProjectId);
             const fpProjectId = getSystemProjectId('fire-safety');
             if (fpProjectId) sendBuildingStatsToFireIframe(fpProjectId);
+            const condProjectId = getSystemProjectId('conditioning');
+            if (condProjectId) sendBuildingStatsToCondIframe(condProjectId);
 
             // Бейдж стартует пустым (на dashboard)
             updateNavbarProjectName(null);

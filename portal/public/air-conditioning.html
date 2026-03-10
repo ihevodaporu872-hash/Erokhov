@@ -1,0 +1,1061 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Кондиционирование (VRF)</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="css/water-styles.css">
+    <style>
+        /* -- Adaptation for portal embedding -- */
+        body           { margin: 0; padding: 0; background: transparent; }
+        .app-layout    { display: block; height: auto; min-height: auto; }
+        .sidebar       { display: none !important; }
+        .main-content  { width: 100%; max-width: 100%; padding: 0; margin: 0; }
+        .main-container {
+            max-width: 100% !important;
+            width: 100%;
+            padding: 1.5rem;
+            margin: 0;
+        }
+        .control-panel { padding: 20px !important; }
+        .header        { margin-bottom: 1.5rem; }
+        select         { border-radius: 8px !important; }
+
+        /* -- Tab icons -- */
+        .tab-btn i { font-size: 14px; margin-right: 5px; opacity: 0.75; vertical-align: -1px; }
+        .tab-btn.active i { opacity: 1; }
+
+        /* -- Tab panels -- */
+        .tab-panel        { display: none; }
+        .tab-panel.active { display: block; }
+
+        /* -- Corridor / input row -- */
+        .bld-num-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+        .bld-num-row label { font-size: 13px; color: var(--gray-700); }
+        .bld-num {
+            width: 90px; padding: 7px 10px;
+            border: 1px solid var(--gray-200); border-radius: 8px;
+            font-size: 13px; font-family: inherit;
+            background: var(--bg-card); color: var(--gray-900);
+        }
+        .bld-num:focus { outline: none; border-color: #0277BD; box-shadow: 0 0 0 3px rgba(2,119,189,.12); }
+
+        .bld-select {
+            padding: 7px 10px;
+            border: 1px solid var(--gray-200); border-radius: 8px;
+            font-size: 13px; font-family: inherit;
+            background: var(--bg-card); color: var(--gray-900);
+        }
+        .bld-select:focus { outline: none; border-color: #0277BD; box-shadow: 0 0 0 3px rgba(2,119,189,.12); }
+
+        /* -- Stats row -- */
+        .bld-stats-row {
+            display: flex; gap: 18px; flex-wrap: wrap;
+            font-size: 13px; color: var(--gray-700);
+            margin-bottom: 12px;
+        }
+        .bld-stats-row i { color: var(--gray-400); margin-right: 4px; }
+        .bld-stats-row strong { color: var(--gray-900); }
+
+        /* -- Info banner -- */
+        .vrf-info {
+            display: flex; align-items: center; gap: 6px;
+            font-size: 12px; color: #0277BD;
+            padding: 6px 10px; margin-top: 4px;
+            background: rgba(2,119,189,.06); border-radius: 6px;
+        }
+        .vrf-info i { font-size: 14px; }
+
+        /* -- Checkbox toggle -- */
+        .vrf-toggle { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+        .vrf-toggle label { font-size: 13px; color: var(--gray-700); cursor: pointer; }
+
+        /* -- Zone label -- */
+        .zone-label {
+            display: inline-block; font-size: 11px; font-weight: 600;
+            padding: 2px 8px; border-radius: 10px; margin-right: 6px;
+        }
+        .zone-label-dev  { color: #0277BD; background: rgba(2,119,189,.1); }
+        .zone-label-comm { color: #E65100; background: rgba(230,81,0,.1); }
+
+        /* -- Export button -- */
+        .btn-export-excel {
+            display: inline-flex; align-items: center; gap: 9px;
+            padding: 12px 28px; background: #1a7a3f; color: #fff;
+            border: none; border-radius: 10px;
+            font-size: 14px; font-weight: 600; font-family: inherit; cursor: pointer;
+            transition: background .15s, transform .1s, box-shadow .15s;
+            box-shadow: 0 2px 8px rgba(26,122,63,.25);
+        }
+        .btn-export-excel:hover { background: #15693a; transform: translateY(-1px); box-shadow: 0 4px 14px rgba(26,122,63,.35); }
+        .btn-export-excel:active { transform: translateY(0); }
+        .btn-export-excel i { font-size: 18px; }
+        .spec-export-bar { margin-top: 24px; display: flex; justify-content: center; }
+
+        /* -- Visualization -- */
+        .viz-riser-vrf {
+            stroke: #0277BD; stroke-width: 2.5; stroke-linecap: round;
+        }
+        .viz-riser-restaurant {
+            stroke: #E65100; stroke-width: 2; stroke-linecap: round;
+            stroke-dasharray: 6 3;
+        }
+        .viz-building-outline {
+            fill: none; stroke: var(--gray-300); stroke-width: 1;
+            stroke-dasharray: 4 2; rx: 4;
+        }
+        .viz-floor-line { stroke: var(--gray-200); stroke-width: 0.5; }
+        .viz-ground-line { stroke: var(--gray-400); stroke-width: 2; }
+        .viz-floor-label { font-size: 10px; fill: var(--gray-500); text-anchor: start; font-family: 'DM Sans', sans-serif; }
+        .viz-label { font-size: 9px; fill: var(--gray-500); text-anchor: middle; font-family: 'DM Sans', sans-serif; }
+        .viz-building-title { font-size: 11px; fill: var(--gray-700); font-weight: 600; font-family: 'DM Sans', sans-serif; }
+        .viz-outdoor-unit {
+            fill: var(--bg-card, #fff); stroke: #0277BD; stroke-width: 1.5; rx: 3;
+        }
+        .viz-bs-block {
+            fill: #0277BD; rx: 2;
+        }
+        .viz-branch-line {
+            stroke: #0277BD; stroke-width: 1; stroke-dasharray: 4 2;
+        }
+        .viz-buffer-block {
+            fill: #7B1FA2; rx: 2;
+        }
+    </style>
+</head>
+<body>
+<div class="app-layout">
+    <main class="main-content">
+        <div class="main-container">
+            <div class="header">
+                <div class="header-left">
+                    <h1>Кондиционирование (VRF 3-труб.)</h1>
+                </div>
+            </div>
+
+            <!-- ===== Tabs ===== -->
+            <div class="tabs-container">
+                <div class="tabs-nav" id="vrfTabs">
+                    <button class="tab-btn active" data-tab="residential"><i class="bi bi-building"></i>Параметры</button>
+                    <button class="tab-btn" data-tab="specification"><i class="bi bi-list-ul"></i>Спецификация</button>
+                    <button class="tab-btn" data-tab="visualization"><i class="bi bi-diagram-3"></i>Визуализация</button>
+                </div>
+            </div>
+
+            <!-- ===== Tab content ===== -->
+            <div class="tab-content" id="vrfTabContent">
+
+                <!-- ========== PARAMETERS ========== -->
+                <div class="tab-panel active" id="tab-residential">
+                    <div class="control-panel">
+                        <div class="panel-section panel-section-input">
+                            <h3 class="panel-section-title">
+                                <span class="panel-section-icon panel-section-icon-input"></span>
+                                Настройки корпусов (VRF)
+                            </h3>
+                            <div id="vrfBuildingAccordions">
+                                <div class="no-data-banner"><i class="bi bi-info-circle-fill"></i>
+                                <span>Загрузите данные проекта из <strong>Квартирографии</strong>.</span></div>
+                            </div>
+                        </div>
+
+                        <div class="panel-section panel-section-result">
+                            <h3 class="panel-section-title">
+                                <span class="panel-section-icon panel-section-icon-result"></span>
+                                Результат расчёта VRF
+                            </h3>
+                            <div id="vrfResults">
+                                <div class="no-data-banner"><i class="bi bi-info-circle-fill"></i>
+                                <span>Загрузите данные и задайте параметры.</span></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ========== SPECIFICATION ========== -->
+                <div class="tab-panel" id="tab-specification">
+                    <div class="control-panel">
+                        <div class="panel-section">
+                            <h3 class="panel-section-title">
+                                <span class="panel-section-icon panel-section-icon-result"></span>
+                                Сводная спецификация VRF
+                            </h3>
+                            <div id="specContent">
+                                <div class="no-data-banner"><i class="bi bi-info-circle-fill"></i>
+                                <span>Загрузите данные проекта и задайте параметры для формирования спецификации.</span></div>
+                            </div>
+                            <div class="spec-export-bar">
+                                <button class="btn-export-excel" id="btnExportExcel">
+                                    <i class="bi bi-file-earmark-spreadsheet"></i> Экспорт в CSV
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ========== VISUALIZATION ========== -->
+                <div class="tab-panel" id="tab-visualization">
+                    <div class="control-panel">
+                        <div class="panel-section">
+                            <h3 class="panel-section-title">
+                                <span class="panel-section-icon panel-section-icon-result"></span>
+                                Расчётная схема VRF (вертикальный разрез)
+                            </h3>
+
+                            <!-- Toolbar -->
+                            <div class="viz-toolbar">
+                                <div class="viz-toolbar-group" id="vizBuildingBtns"></div>
+                                <div class="viz-toolbar-group">
+                                    <button class="viz-zoom-btn" id="vizZoomIn" title="+"><i class="bi bi-zoom-in"></i></button>
+                                    <button class="viz-zoom-btn" id="vizZoomOut" title="-"><i class="bi bi-zoom-out"></i></button>
+                                    <button class="viz-zoom-btn" id="vizZoomReset" title="Reset"><i class="bi bi-arrows-angle-expand"></i></button>
+                                </div>
+                            </div>
+
+                            <!-- Viewport -->
+                            <div class="viz-viewport" id="vizViewport">
+                                <svg id="vizSvg" xmlns="http://www.w3.org/2000/svg"></svg>
+                            </div>
+
+                            <!-- Tooltip -->
+                            <div class="viz-tooltip" id="vizTooltip"></div>
+
+                            <!-- Legend -->
+                            <div class="viz-legend">
+                                <span class="viz-legend-title">Условные обозначения:</span>
+                                <span class="viz-leg-item"><span class="viz-leg-line" style="background:#0277BD"></span>Магистраль VRF (3 трубы)</span>
+                                <span class="viz-leg-item"><span class="viz-leg-line" style="background:#0277BD;background-image:repeating-linear-gradient(90deg,#0277BD 0 4px,transparent 4px 6px)"></span>Ответвление к квартире</span>
+                                <span class="viz-leg-item"><span style="display:inline-block;width:8px;height:8px;background:#0277BD;border-radius:2px;margin-right:3px;vertical-align:middle"></span> BS-блок</span>
+                                <span class="viz-leg-item"><span style="display:inline-block;width:8px;height:8px;background:#7B1FA2;border-radius:2px;margin-right:3px;vertical-align:middle"></span> Буферный блок</span>
+                                <span class="viz-leg-item"><i class="bi bi-box-seam" style="color:#455A64"></i> Наружный блок</span>
+                                <span class="viz-leg-item"><span class="viz-leg-line" style="background:#E65100;background-image:repeating-linear-gradient(90deg,#E65100 0 6px,transparent 6px 9px)"></span>Трасса ресторана</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </main>
+</div>
+
+<script>
+(function () {
+    'use strict';
+
+    /* --- State --- */
+    var buildingStats = null;
+    var vrfSettings   = {};
+    var accordionOpenState = {};
+
+    function getSettings(idx) {
+        if (!vrfSettings[idx]) {
+            vrfSettings[idx] = {
+                sections:       1,
+                floorHeight:    3.0,
+                roofGap:        1.5,   // расстояние кровля → верхний этаж
+                aptsPerFloor:   4,     // квартир на типовом этаже секции
+                penthouses:     false, // пентхаусы (mini-VRF) на последнем этаже
+                restaurant:     false, // ресторан на 1 этаже
+                commercial:     false, // коммерция (аренда) на 1 этаже
+                commercialCount: 1,    // количество помещений аренды
+                bufferFloors:   true   // буферные блоки на эт. 2–7
+            };
+        }
+        return vrfSettings[idx];
+    }
+
+    /* --- Helpers --- */
+    function escHtml(str) {
+        return String(str)
+            .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+            .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    function getFloorCount(b) {
+        return b.floors ? b.floors.length : 0;
+    }
+
+    function getAptsOnFloor(b, floorIdx) {
+        if (b.floors && b.floors[floorIdx]) return b.floors[floorIdx].apts || 0;
+        return 0;
+    }
+
+    function getTotalApts(b) {
+        if (!b.floors) return 0;
+        var total = 0;
+        for (var i = 0; i < b.floors.length; i++) total += (b.floors[i].apts || 0);
+        return total;
+    }
+
+    /* --- Tab switching --- */
+    var tabBtns   = document.querySelectorAll('#vrfTabs .tab-btn');
+    var tabPanels = document.querySelectorAll('#vrfTabContent .tab-panel');
+
+    tabBtns.forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var targetId = 'tab-' + btn.dataset.tab;
+            tabBtns.forEach(function (t)  { t.classList.remove('active'); });
+            tabPanels.forEach(function (p) { p.classList.remove('active'); });
+            btn.classList.add('active');
+            var panel = document.getElementById(targetId);
+            if (panel) panel.classList.add('active');
+            if (btn.dataset.tab === 'specification') renderFullSpecification();
+            if (btn.dataset.tab === 'visualization') renderVisualization();
+        });
+    });
+
+    /* ===================================================================
+       VRF calculation — зона ответственности застройщика
+    =================================================================== */
+    function collectVRFItems() {
+        if (!buildingStats || !buildingStats.length) return [];
+        var acc = {};
+        function addItem(key, name, unit, qty, note, group) {
+            if (!qty || qty <= 0) return;
+            if (acc[key]) { acc[key].qty += qty; }
+            else          { acc[key] = { name: name, unit: unit, qty: qty, note: note || '', group: group || '' }; }
+        }
+
+        buildingStats.forEach(function (b, idx) {
+            var s      = getSettings(idx);
+            var nF     = getFloorCount(b);
+            if (nF === 0) return;
+            var sec    = s.sections || 1;
+            var fH     = s.floorHeight || 3.0;
+            var roofG  = s.roofGap || 1.5;
+            var aptsF  = s.aptsPerFloor || 4;
+            var hasComm  = s.commercial;
+            var hasRest  = s.restaurant;
+            var hasPent  = s.penthouses;
+
+            // Этажи, участвующие в жилой VRF (исключаем 1 этаж если коммерция)
+            var residStart = hasComm ? 1 : 0; // индекс первого жилого этажа (0-based)
+            var residFloors = nF - residStart;
+            // Последний этаж = пентхаусы (mini-VRF), исключаем из общей VRF
+            var vrfFloors = hasPent ? residFloors - 1 : residFloors;
+            if (vrfFloors < 0) vrfFloors = 0;
+
+            // ════════════════ МАГИСТРАЛИ (Вертикаль) ════════════════
+            // 3 медные трубы: жидкость, газ высокого давления, газ низкого давления
+            // Длина стояка = roofGap + vrfFloors * floorHeight
+            var riserLen = roofG + vrfFloors * fH;
+            var riserTotal = riserLen * sec; // на каждую секцию — свой стояк
+
+            addItem('vrf_pipe_liquid', 'Труба медная в НГ-изоляции Ø12.7 (жидкость)', 'м.п.',
+                Math.round(riserTotal * 10) / 10,
+                sec + ' секц. × ' + riserLen.toFixed(1) + ' м (кровля → 1 эт.)', 'dev');
+            addItem('vrf_pipe_gas_hp', 'Труба медная в НГ-изоляции Ø28.6 (газ ВД)', 'м.п.',
+                Math.round(riserTotal * 10) / 10,
+                sec + ' секц. × ' + riserLen.toFixed(1) + ' м', 'dev');
+            addItem('vrf_pipe_gas_lp', 'Труба медная в НГ-изоляции Ø15.9 (газ НД)', 'м.п.',
+                Math.round(riserTotal * 10) / 10,
+                sec + ' секц. × ' + riserLen.toFixed(1) + ' м', 'dev');
+
+            // ════════════════ РАЗВОДКА МОП (Горизонталь) ════════════════
+            // 3 трубы от стояка до входа в каждую квартиру (потолок коридора)
+            // Средняя длина ответвления ≈ 4 м на квартиру
+            var avgBranch = 4; // м
+            var totalBranches = aptsF * vrfFloors * sec;
+            var branchPipe = totalBranches * avgBranch;
+
+            addItem('vrf_branch_liquid', 'Труба медная в НГ-изоляции Ø9.52 (ответвление, жидкость)', 'м.п.',
+                Math.round(branchPipe * 10) / 10,
+                totalBranches + ' ответвлений × ' + avgBranch + ' м', 'dev');
+            addItem('vrf_branch_gas_hp', 'Труба медная в НГ-изоляции Ø15.9 (ответвление, газ ВД)', 'м.п.',
+                Math.round(branchPipe * 10) / 10,
+                totalBranches + ' ответвлений × ' + avgBranch + ' м', 'dev');
+            addItem('vrf_branch_gas_lp', 'Труба медная в НГ-изоляции Ø12.7 (ответвление, газ НД)', 'м.п.',
+                Math.round(branchPipe * 10) / 10,
+                totalBranches + ' ответвлений × ' + avgBranch + ' м', 'dev');
+
+            // ════════════════ BS-блоки (распределители) ════════════════
+            // Строго 1 шт. на каждую квартиру
+            var totalBS = aptsF * vrfFloors * sec;
+            addItem('vrf_bs_block', 'BS-блок (распределитель VRF)', 'шт', totalBS,
+                '1 шт на квартиру, ' + vrfFloors + ' жилых эт. × ' + sec + ' секц. × ' + aptsF + ' кв.', 'dev');
+
+            // ════════════════ Наружные блоки VRF ════════════════
+            // 1 блок на ~8 квартир (стандартное деление)
+            var outdoorCount = Math.ceil(totalBS / 8) || 1;
+            addItem('vrf_outdoor', 'Наружный блок VRF (кровля)', 'шт', outdoorCount,
+                '1 блок на ~8 квартир', 'dev');
+
+            // ════════════════ Буферные блоки (эт. 2–7) ════════════════
+            if (s.bufferFloors) {
+                var bufStart = hasComm ? 1 : 1; // 2-й этаж = индекс 1 (0-based)
+                var bufEnd   = Math.min(6, nF - 1); // до 7-го этажа включительно = индекс 6
+                var bufCount = 0;
+                for (var fi = bufStart; fi <= bufEnd; fi++) {
+                    bufCount += sec;
+                }
+                if (bufCount > 0) {
+                    addItem('vrf_buffer', 'Буферный блок VRF', 'шт', bufCount,
+                        'По 1 шт. на секцию, эт. 2–' + Math.min(7, nF) + ' (' + sec + ' секц.)', 'dev');
+                }
+            }
+
+            // ════════════════ Датчики утечки фреона ════════════════
+            // 2 шт на квартиру (под установку собственником)
+            var leakSensors = 2 * totalBS;
+            addItem('vrf_leak_sensor', 'Датчик утечки фреона', 'шт', leakSensors,
+                '2 шт на квартиру (под установку собственником)', 'dev');
+
+            // ════════════════ Огнестойкие короба (ПБЗ) ════════════════
+            // Проходки через перекрытия: 1 комплект на секцию на этаж
+            var fireBoxes = sec * vrfFloors;
+            addItem('vrf_fire_box', 'Огнестойкий короб (проходка перекрытия)', 'шт', fireBoxes,
+                '1 комплект на секцию на этаж', 'dev');
+
+            // ════════════════ ИЗОЛЯЦИЯ НГ (дополнительно на стояки) ════════════════
+            // Негорючая изоляция K-FLEX ST/HT на магистраль (3 трубы, включена в трубу)
+            // Отдельно учитываем изоляцию на горизонтальных участках МОП
+            addItem('vrf_insulation', 'Изоляция НГ K-FLEX (дополнит., горизонт. МОП)', 'м.п.',
+                Math.round(branchPipe * 3 * 10) / 10,
+                '3 трубы × ' + branchPipe.toFixed(0) + ' м ответвлений', 'dev');
+
+            // ════════════════ КОММЕРЦИЯ (1 этаж) ════════════════
+            if (hasComm) {
+                var commN = s.commercialCount || 1;
+                // Кронштейны для мульти-сплит в техзоне
+                addItem('vrf_comm_bracket', 'Комплект кронштейнов для мульти-сплит систем (аренда, техзона)', 'компл.',
+                    commN * sec,
+                    commN + ' пом. × ' + sec + ' секц., установка арендатором', 'comm');
+            }
+
+            // ════════════════ РЕСТОРАН (1 этаж) ════════════════
+            if (hasRest) {
+                // Отдельная трасса (3 трубы) от кровли 1-го этажа до помещения
+                var restRiser = fH + roofG; // одна высота этажа + зазор до кровли 1 этажа
+                addItem('vrf_rest_pipe_liquid', 'Труба медная Ø12.7 (ресторан, жидкость)', 'м.п.',
+                    Math.round(restRiser * sec * 10) / 10,
+                    'Отдельная трасса от кровли 1 эт.', 'comm');
+                addItem('vrf_rest_pipe_gas_hp', 'Труба медная Ø28.6 (ресторан, газ ВД)', 'м.п.',
+                    Math.round(restRiser * sec * 10) / 10,
+                    'Отдельная трасса от кровли 1 эт.', 'comm');
+                addItem('vrf_rest_pipe_gas_lp', 'Труба медная Ø15.9 (ресторан, газ НД)', 'м.п.',
+                    Math.round(restRiser * sec * 10) / 10,
+                    'Отдельная трасса от кровли 1 эт.', 'comm');
+                addItem('vrf_rest_outdoor', 'Наружный блок VRF (ресторан, кровля 1 эт.)', 'шт', sec,
+                    '1 блок на секцию', 'comm');
+            }
+
+            // ════════════════ ПЕНТХАУСЫ (последний этаж) ════════════════
+            if (hasPent) {
+                var pentApts = getAptsOnFloor(b, nF - 1) || aptsF;
+                var pentBS   = pentApts * sec;
+                addItem('vrf_pent_mini', 'Mini-VRF блок (пентхаус)', 'шт', pentBS,
+                    '1 блок на квартиру, последний этаж', 'dev');
+                addItem('vrf_pent_outdoor', 'Наружный блок mini-VRF (пентхаус, кровля)', 'шт', pentBS,
+                    '1 блок на квартиру (индивидуальный)', 'dev');
+            }
+        });
+
+        // Сортировка
+        var ORDER = [
+            'vrf_pipe_liquid', 'vrf_pipe_gas_hp', 'vrf_pipe_gas_lp',
+            'vrf_branch_liquid', 'vrf_branch_gas_hp', 'vrf_branch_gas_lp',
+            'vrf_insulation',
+            'vrf_bs_block', 'vrf_outdoor', 'vrf_buffer',
+            'vrf_leak_sensor', 'vrf_fire_box',
+            'vrf_pent_mini', 'vrf_pent_outdoor',
+            'vrf_comm_bracket',
+            'vrf_rest_pipe_liquid', 'vrf_rest_pipe_gas_hp', 'vrf_rest_pipe_gas_lp', 'vrf_rest_outdoor'
+        ];
+        var result = [];
+        ORDER.forEach(function (k) { if (acc[k]) result.push(acc[k]); });
+        Object.keys(acc).forEach(function (k) { if (ORDER.indexOf(k) === -1) result.push(acc[k]); });
+        return result;
+    }
+
+    /* ===================================================================
+       Render building accordions
+    =================================================================== */
+    function renderBuildingAccordions() {
+        var container = document.getElementById('vrfBuildingAccordions');
+        if (!container) return;
+
+        if (!buildingStats || !buildingStats.length) {
+            container.innerHTML =
+                '<div class="no-data-banner"><i class="bi bi-info-circle-fill"></i>' +
+                '<span>Загрузите данные проекта из <strong>Квартирографии</strong> — здесь появятся настройки по каждому корпусу.</span></div>';
+            return;
+        }
+
+        // Save open state
+        container.querySelectorAll('details[id^="vrf-accord-"]').forEach(function (det) {
+            var key = parseInt(det.id.replace('vrf-accord-', ''), 10);
+            accordionOpenState[key] = det.open;
+        });
+
+        var html = '';
+        buildingStats.forEach(function (b, idx) {
+            var s  = getSettings(idx);
+            var nF = getFloorCount(b);
+            var totalApts = getTotalApts(b);
+            var isOpen = accordionOpenState[idx] !== undefined ? accordionOpenState[idx] : (idx === 0);
+
+            html += '<details id="vrf-accord-' + idx + '" class="accordion-card"' + (isOpen ? ' open' : '') + '>' +
+                '<summary class="accordion-header">' +
+                '<span class="accordion-arrow"><i class="bi bi-chevron-right"></i></span>' +
+                '<span class="accordion-title">' + escHtml(b.name || 'Корпус ' + b.num) + '</span>' +
+                '</summary>' +
+                '<div class="accordion-body">';
+
+            // Stats
+            html += '<div class="bld-stats-row">' +
+                '<span><i class="bi bi-layers"></i> Этажей: <strong>' + nF + '</strong></span>' +
+                '<span><i class="bi bi-door-open"></i> Квартир: <strong>' + totalApts + '</strong></span>' +
+                '<span><i class="bi bi-rulers"></i> Высота: <strong>' + (b.height || '—') + ' м</strong></span>' +
+                '</div>';
+
+            // Sections
+            html += '<div class="bld-num-row">' +
+                '<label>Секций:</label>' +
+                '<input type="number" class="bld-num vrf-sections" data-idx="' + idx + '" min="1" max="10" value="' + s.sections + '">' +
+                '</div>';
+
+            // Floor height
+            html += '<div class="bld-num-row" style="margin-top:8px">' +
+                '<label>Высота этажа (м):</label>' +
+                '<input type="number" class="bld-num vrf-floor-height" data-idx="' + idx + '" min="2.5" max="5" step="0.1" value="' + s.floorHeight + '">' +
+                '</div>';
+
+            // Roof gap
+            html += '<div class="bld-num-row" style="margin-top:8px">' +
+                '<label>Расстояние кровля → верхний этаж (м):</label>' +
+                '<input type="number" class="bld-num vrf-roof-gap" data-idx="' + idx + '" min="0.5" max="10" step="0.5" value="' + s.roofGap + '">' +
+                '</div>';
+
+            // Apts per floor per section
+            html += '<div class="bld-num-row" style="margin-top:8px">' +
+                '<label>Квартир на этаже секции:</label>' +
+                '<input type="number" class="bld-num vrf-apts-floor" data-idx="' + idx + '" min="1" max="20" value="' + s.aptsPerFloor + '">' +
+                '</div>';
+
+            // Checkboxes
+            html += '<div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--gray-200)">';
+
+            // Penthouses
+            html += '<div class="vrf-toggle">' +
+                '<input type="checkbox" id="vrf-pent-' + idx + '" class="vrf-penthouses" data-idx="' + idx + '"' + (s.penthouses ? ' checked' : '') + '>' +
+                '<label for="vrf-pent-' + idx + '"><i class="bi bi-stars"></i> Пентхаусы (mini-VRF) на последнем этаже</label>' +
+                '</div>';
+
+            // Buffer floors
+            html += '<div class="vrf-toggle">' +
+                '<input type="checkbox" id="vrf-buf-' + idx + '" class="vrf-buffer" data-idx="' + idx + '"' + (s.bufferFloors ? ' checked' : '') + '>' +
+                '<label for="vrf-buf-' + idx + '"><i class="bi bi-box-seam"></i> Буферные блоки (эт. 2–7)</label>' +
+                '</div>';
+
+            // 1st floor section
+            html += '<div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--gray-200)">' +
+                '<div style="font-size:12px;font-weight:700;color:var(--gray-700);margin-bottom:8px">' +
+                '<i class="bi bi-shop"></i> Первый этаж (отм. 0.000)</div>';
+
+            // Commercial
+            html += '<div class="vrf-toggle">' +
+                '<input type="checkbox" id="vrf-comm-' + idx + '" class="vrf-commercial" data-idx="' + idx + '"' + (s.commercial ? ' checked' : '') + '>' +
+                '<label for="vrf-comm-' + idx + '">Коммерческие помещения (аренда)</label>' +
+                '</div>';
+
+            // Commercial count (conditional)
+            html += '<div class="bld-num-row vrf-comm-count-row-' + idx + '" style="margin-top:6px;margin-left:24px;' + (s.commercial ? '' : 'display:none') + '">' +
+                '<label>Количество помещений:</label>' +
+                '<input type="number" class="bld-num vrf-comm-count" data-idx="' + idx + '" min="1" max="20" value="' + s.commercialCount + '">' +
+                '</div>';
+
+            // Restaurant
+            html += '<div class="vrf-toggle" style="margin-top:4px">' +
+                '<input type="checkbox" id="vrf-rest-' + idx + '" class="vrf-restaurant" data-idx="' + idx + '"' + (s.restaurant ? ' checked' : '') + '>' +
+                '<label for="vrf-rest-' + idx + '"><i class="bi bi-cup-hot"></i> Ресторан на 1 этаже (отдельная VRF)</label>' +
+                '</div>';
+
+            if (s.commercial) {
+                html += '<div class="vrf-info"><i class="bi bi-info-circle"></i> ' +
+                    'VRF-трассы исключены из 1 этажа. Кронштейны для мульти-сплит в техзоне.</div>';
+            }
+            if (s.restaurant) {
+                html += '<div class="vrf-info"><i class="bi bi-info-circle"></i> ' +
+                    'Ресторан: отдельная трасса 3 трубы от кровли 1 этажа.</div>';
+            }
+
+            html += '</div>'; // 1st floor section
+            html += '</div>'; // checkboxes border-top
+            html += '</div></details>';
+        });
+
+        container.innerHTML = html;
+
+        // Bind events
+        container.querySelectorAll('.vrf-sections').forEach(function (inp) {
+            inp.addEventListener('input', function () {
+                getSettings(+inp.dataset.idx).sections = Math.max(1, +inp.value || 1);
+                renderResults();
+            });
+        });
+        container.querySelectorAll('.vrf-floor-height').forEach(function (inp) {
+            inp.addEventListener('input', function () {
+                getSettings(+inp.dataset.idx).floorHeight = Math.max(2.5, +inp.value || 3);
+                renderResults();
+            });
+        });
+        container.querySelectorAll('.vrf-roof-gap').forEach(function (inp) {
+            inp.addEventListener('input', function () {
+                getSettings(+inp.dataset.idx).roofGap = Math.max(0.5, +inp.value || 1.5);
+                renderResults();
+            });
+        });
+        container.querySelectorAll('.vrf-apts-floor').forEach(function (inp) {
+            inp.addEventListener('input', function () {
+                getSettings(+inp.dataset.idx).aptsPerFloor = Math.max(1, +inp.value || 4);
+                renderResults();
+            });
+        });
+        container.querySelectorAll('.vrf-penthouses').forEach(function (inp) {
+            inp.addEventListener('change', function () {
+                getSettings(+inp.dataset.idx).penthouses = inp.checked;
+                renderResults();
+            });
+        });
+        container.querySelectorAll('.vrf-buffer').forEach(function (inp) {
+            inp.addEventListener('change', function () {
+                getSettings(+inp.dataset.idx).bufferFloors = inp.checked;
+                renderResults();
+            });
+        });
+        container.querySelectorAll('.vrf-commercial').forEach(function (inp) {
+            inp.addEventListener('change', function () {
+                var idx = +inp.dataset.idx;
+                getSettings(idx).commercial = inp.checked;
+                var row = container.querySelector('.vrf-comm-count-row-' + idx);
+                if (row) row.style.display = inp.checked ? '' : 'none';
+                renderBuildingAccordions();
+                renderResults();
+            });
+        });
+        container.querySelectorAll('.vrf-comm-count').forEach(function (inp) {
+            inp.addEventListener('input', function () {
+                getSettings(+inp.dataset.idx).commercialCount = Math.max(1, +inp.value || 1);
+                renderResults();
+            });
+        });
+        container.querySelectorAll('.vrf-restaurant').forEach(function (inp) {
+            inp.addEventListener('change', function () {
+                getSettings(+inp.dataset.idx).restaurant = inp.checked;
+                renderBuildingAccordions();
+                renderResults();
+            });
+        });
+    }
+
+    /* ===================================================================
+       Render results
+    =================================================================== */
+    function renderResults() {
+        var container = document.getElementById('vrfResults');
+        if (!container) return;
+
+        var items = collectVRFItems();
+
+        if (!items.length) {
+            container.innerHTML =
+                '<div class="no-data-banner"><i class="bi bi-info-circle-fill"></i>' +
+                '<span>Загрузите данные и задайте параметры.</span></div>';
+            return;
+        }
+
+        var html = '<table class="result-table"><thead><tr>' +
+            '<th>Наименование</th><th>Ед.</th><th>Кол-во</th><th>Примечание</th></tr></thead><tbody>';
+
+        var currentGroup = '';
+        items.forEach(function (it) {
+            if (it.group && it.group !== currentGroup) {
+                currentGroup = it.group;
+                var groupLabel = currentGroup === 'dev'
+                    ? '<span class="zone-label zone-label-dev">Зона застройщика</span>'
+                    : '<span class="zone-label zone-label-comm">Коммерция / Ресторан</span>';
+                html += '<tr><td colspan="4" style="padding:10px 0 4px;border:none">' + groupLabel + '</td></tr>';
+            }
+            var qtyStr = it.unit === 'м.п.' ? it.qty.toFixed(1) : it.qty;
+            html += '<tr><td>' + escHtml(it.name) + '</td><td>' + escHtml(it.unit) +
+                '</td><td>' + qtyStr + '</td><td style="font-size:12px;color:var(--gray-500)">' +
+                escHtml(it.note) + '</td></tr>';
+        });
+
+        html += '</tbody></table>';
+        container.innerHTML = html;
+    }
+
+    /* ===================================================================
+       Full specification (tab 2)
+    =================================================================== */
+    function renderFullSpecification() {
+        var container = document.getElementById('specContent');
+        if (!container) return;
+
+        var items = collectVRFItems();
+        if (!items.length) {
+            container.innerHTML =
+                '<div class="no-data-banner"><i class="bi bi-info-circle-fill"></i>' +
+                '<span>Загрузите данные проекта и задайте параметры.</span></div>';
+            return;
+        }
+
+        var html = '<table class="result-table"><thead><tr>' +
+            '<th style="width:40px">№</th><th>Наименование</th><th>Ед.</th><th>Кол-во</th><th>Примечание</th>' +
+            '</tr></thead><tbody>';
+
+        items.forEach(function (it, i) {
+            var qtyStr = it.unit === 'м.п.' ? it.qty.toFixed(1) : it.qty;
+            html += '<tr><td>' + (i + 1) + '</td><td>' + escHtml(it.name) + '</td><td>' +
+                escHtml(it.unit) + '</td><td>' + qtyStr + '</td><td style="font-size:12px;color:var(--gray-500)">' +
+                escHtml(it.note) + '</td></tr>';
+        });
+
+        html += '</tbody></table>';
+        container.innerHTML = html;
+    }
+
+    /* --- CSV Export --- */
+    document.getElementById('btnExportExcel').addEventListener('click', function () {
+        var items = collectVRFItems();
+        if (!items.length) return;
+
+        var rows = [['№', 'Наименование', 'Ед.', 'Кол-во', 'Примечание']];
+        items.forEach(function (it, i) {
+            var qtyStr = it.unit === 'м.п.' ? it.qty.toFixed(1) : String(it.qty);
+            rows.push([(i + 1).toString(), it.name, it.unit, qtyStr, it.note]);
+        });
+
+        var csvContent = '\uFEFF'; // BOM for UTF-8
+        rows.forEach(function (row) {
+            csvContent += row.map(function (cell) {
+                return '"' + String(cell).replace(/"/g, '""') + '"';
+            }).join(';') + '\r\n';
+        });
+
+        var blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        var link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = 'VRF_specification.csv';
+        link.click();
+        URL.revokeObjectURL(link.href);
+    });
+
+    /* ===================================================================
+       SVG Visualization
+    =================================================================== */
+    var vizBldIdx = 0;
+    var vizScale  = 1;
+    var vizPanX   = 0;
+    var vizPanY   = 0;
+    var vizDragging = false;
+    var vizDragX = 0;
+    var vizDragY = 0;
+
+    function svgEl(tag, attrs, parent) {
+        var el = document.createElementNS('http://www.w3.org/2000/svg', tag);
+        if (attrs) Object.keys(attrs).forEach(function (k) { el.setAttribute(k, attrs[k]); });
+        if (parent) parent.appendChild(el);
+        return el;
+    }
+    function svgText(x, y, text, cls, parent) {
+        var t = svgEl('text', { x: x, y: y, 'class': cls }, parent);
+        t.textContent = text;
+        return t;
+    }
+    function svgIcon(x, y, icon, color, size, tooltip, parent) {
+        var g = svgEl('g', { 'class': 'viz-icon', transform: 'translate(' + x + ',' + y + ')' }, parent);
+        g.dataset.vizTip = tooltip || '';
+        var fo = svgEl('foreignObject', { x: -(size/2), y: -(size/2), width: size, height: size }, g);
+        var div = document.createElement('div');
+        div.style.cssText = 'display:flex;align-items:center;justify-content:center;width:100%;height:100%;color:' + color + ';font-size:' + (size * 0.7) + 'px';
+        div.innerHTML = '<i class="bi ' + icon + '"></i>';
+        fo.appendChild(div);
+        return g;
+    }
+
+    // Tooltip
+    function setupTooltip() {
+        var tip = document.getElementById('vizTooltip');
+        var svg = document.getElementById('vizSvg');
+        if (!tip || !svg) return;
+        svg.addEventListener('mouseover', function (e) {
+            var el = e.target.closest('.viz-icon');
+            if (el && el.dataset.vizTip) {
+                tip.textContent = el.dataset.vizTip;
+                tip.style.display = 'block';
+            }
+        });
+        svg.addEventListener('mousemove', function (e) {
+            if (tip.style.display === 'block') {
+                tip.style.left = (e.clientX + 12) + 'px';
+                tip.style.top  = (e.clientY - 8) + 'px';
+            }
+        });
+        svg.addEventListener('mouseout', function (e) {
+            var el = e.target.closest('.viz-icon');
+            if (el) tip.style.display = 'none';
+        });
+    }
+
+    // Pan & Zoom
+    function applyTransform() {
+        var svg = document.getElementById('vizSvg');
+        if (svg) svg.style.transform = 'translate(' + vizPanX + 'px,' + vizPanY + 'px) scale(' + vizScale + ')';
+    }
+    function setupPanZoom() {
+        var vp = document.getElementById('vizViewport');
+        if (!vp) return;
+        vp.addEventListener('mousedown', function (e) {
+            if (e.button !== 0) return;
+            vizDragging = true; vizDragX = e.clientX - vizPanX; vizDragY = e.clientY - vizPanY;
+        });
+        window.addEventListener('mousemove', function (e) {
+            if (!vizDragging) return;
+            vizPanX = e.clientX - vizDragX; vizPanY = e.clientY - vizDragY;
+            applyTransform();
+        });
+        window.addEventListener('mouseup', function () { vizDragging = false; });
+        vp.addEventListener('wheel', function (e) {
+            e.preventDefault();
+            var d = e.deltaY > 0 ? -0.1 : 0.1;
+            vizScale = Math.max(0.3, Math.min(3, vizScale + d));
+            applyTransform();
+        }, { passive: false });
+    }
+
+    document.getElementById('vizZoomIn').addEventListener('click', function () {
+        vizScale = Math.min(3, vizScale + 0.2); applyTransform();
+    });
+    document.getElementById('vizZoomOut').addEventListener('click', function () {
+        vizScale = Math.max(0.3, vizScale - 0.2); applyTransform();
+    });
+    document.getElementById('vizZoomReset').addEventListener('click', function () {
+        vizScale = 1; vizPanX = 0; vizPanY = 0; applyTransform();
+    });
+
+    setupTooltip();
+    setupPanZoom();
+
+    // Main render
+    function renderVisualization() {
+        var svg = document.getElementById('vizSvg');
+        if (!svg) return;
+        svg.innerHTML = '';
+
+        if (!buildingStats || !buildingStats.length) {
+            svgText(20, 30, 'Загрузите данные проекта для визуализации.', 'viz-floor-label', svg);
+            svg.setAttribute('width', 400); svg.setAttribute('height', 60);
+            return;
+        }
+
+        // Building selector
+        var btnsDiv = document.getElementById('vizBuildingBtns');
+        if (btnsDiv) {
+            btnsDiv.innerHTML = buildingStats.map(function (b, i) {
+                return '<button class="' + (i === vizBldIdx ? 'active' : '') + '" data-viz-bld="' + i + '">' +
+                    escHtml(b.name || 'Корпус ' + b.num) + '</button>';
+            }).join('');
+            btnsDiv.querySelectorAll('button').forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    vizBldIdx = parseInt(btn.dataset.vizBld, 10);
+                    renderVisualization();
+                });
+            });
+        }
+
+        var b   = buildingStats[vizBldIdx] || buildingStats[0];
+        var s   = getSettings(vizBldIdx);
+        var nF  = getFloorCount(b);
+        var bH  = b.height || 0;
+        var sec = s.sections || 1;
+        var fH  = s.floorHeight || 3.0;
+        var hasComm = s.commercial;
+        var hasRest = s.restaurant;
+        var hasPent = s.penthouses;
+
+        var PAD     = 40;
+        var LABEL_W = 36;
+        var FLOOR_H = 36;
+        var ROOF_H  = 50; // space for outdoor units on roof
+        var totalH  = nF * FLOOR_H;
+        var svgH    = totalH + PAD * 2 + ROOF_H + 30;
+
+        // X positions
+        var RISER_GAP   = 30;
+        var SECTION_GAP = 50;
+        var x = PAD + LABEL_W;
+
+        // VRF riser positions (per section)
+        var vrfPositions = [];
+        for (var i = 0; i < sec; i++) { vrfPositions.push(x); x += RISER_GAP; }
+        x += SECTION_GAP;
+
+        // Restaurant riser (if enabled)
+        var restRiserX = 0;
+        if (hasRest) {
+            restRiserX = x;
+            x += RISER_GAP + 20;
+        }
+
+        var svgW = Math.max(x + PAD + 60, 400);
+        svg.setAttribute('width', svgW);
+        svg.setAttribute('height', svgH);
+
+        var roofY   = PAD + ROOF_H;
+        var topY    = roofY;
+        var botY    = roofY + totalH;
+
+        // Building outline
+        var bldX = PAD + LABEL_W - 10;
+        var bldY = roofY - 5;
+        var bldW = x - bldX + 10;
+        svgEl('rect', { x: bldX, y: bldY, width: bldW, height: totalH + 10, 'class': 'viz-building-outline' }, svg);
+        svgText(bldX + 6, bldY - 6,
+            escHtml(b.name || 'Корпус ' + b.num) + ' · ' + nF + ' эт. · ' + bH + ' м',
+            'viz-building-title', svg);
+
+        // Roof line
+        svgEl('line', { x1: bldX - 10, y1: roofY, x2: bldX + bldW + 10, y2: roofY,
+            stroke: '#455A64', 'stroke-width': 2.5 }, svg);
+        svgText(bldX + bldW / 2, roofY - 8, 'КРОВЛЯ', 'viz-label', svg);
+
+        // Ground line
+        svgEl('line', { x1: PAD - 10, y1: botY, x2: svgW - PAD + 10, y2: botY, 'class': 'viz-ground-line' }, svg);
+
+        // Floor lines & labels
+        for (var fi = 0; fi <= nF; fi++) {
+            var fy = roofY + fi * FLOOR_H;
+            if (fi < nF) {
+                svgEl('line', { x1: PAD + LABEL_W - 10, y1: fy, x2: x + 5, y2: fy, 'class': 'viz-floor-line' }, svg);
+                var floorNum = nF - fi;
+                var floorLabel = floorNum + ' эт';
+                if (floorNum === 1 && hasComm) floorLabel += ' (комм.)';
+                if (floorNum === nF && hasPent) floorLabel += ' (пент.)';
+                svgText(PAD + 4, fy + FLOOR_H / 2 + 3, floorLabel, 'viz-floor-label', svg);
+            }
+        }
+
+        // ── VRF risers ──
+        for (var si = 0; si < sec; si++) {
+            var rx = vrfPositions[si];
+
+            // Outdoor unit on roof
+            var ouW = 20, ouH = 14;
+            svgEl('rect', { x: rx - ouW/2, y: roofY - ouH - 8, width: ouW, height: ouH, 'class': 'viz-outdoor-unit' }, svg);
+            svgIcon(rx, roofY - ouH/2 - 8, 'bi-box-seam', '#455A64', 10, 'Наружный блок VRF, секц. ' + (si+1), svg);
+
+            // Riser (3 lines close together to show 3 pipes)
+            var residStart = hasComm ? 1 : 0;
+            var riserTopY  = roofY;
+            var riserBotY  = roofY + (nF - residStart) * FLOOR_H;
+            if (hasPent) riserBotY = roofY + (nF - residStart - 1) * FLOOR_H;
+
+            // 3 copper pipes
+            svgEl('line', { x1: rx - 3, y1: riserTopY, x2: rx - 3, y2: riserBotY, 'class': 'viz-riser-vrf' }, svg);
+            svgEl('line', { x1: rx,     y1: riserTopY, x2: rx,     y2: riserBotY, 'class': 'viz-riser-vrf', opacity: 0.6 }, svg);
+            svgEl('line', { x1: rx + 3, y1: riserTopY, x2: rx + 3, y2: riserBotY, 'class': 'viz-riser-vrf', opacity: 0.4 }, svg);
+
+            // Per-floor equipment
+            for (var fi = 0; fi < nF; fi++) {
+                var floorNum = nF - fi;
+                var floorY = roofY + fi * FLOOR_H + FLOOR_H / 2;
+
+                // Skip 1st floor if commercial (no VRF branches)
+                if (hasComm && floorNum === 1) continue;
+                // Skip last floor if penthouses (separate mini-VRF)
+                if (hasPent && floorNum === nF) continue;
+
+                var aptsF = s.aptsPerFloor || 4;
+
+                // Branch lines to apartments (show up to 4)
+                var showApts = Math.min(aptsF, 4);
+                for (var ai = 0; ai < showApts; ai++) {
+                    var branchEndX = rx + 18 + ai * 14;
+                    svgEl('line', { x1: rx + 5, y1: floorY, x2: branchEndX, y2: floorY, 'class': 'viz-branch-line' }, svg);
+                    // BS-block at end of branch
+                    svgEl('rect', { x: branchEndX - 3, y: floorY - 3, width: 6, height: 6, 'class': 'viz-bs-block' }, svg);
+                }
+                if (aptsF > 4) {
+                    svgText(rx + 18 + showApts * 14, floorY + 3, '+' + (aptsF - 4), 'viz-label', svg);
+                }
+
+                // Buffer block (floors 2-7)
+                if (s.bufferFloors && floorNum >= 2 && floorNum <= 7) {
+                    svgEl('rect', { x: rx - 10, y: floorY - 4, width: 8, height: 8, 'class': 'viz-buffer-block' }, svg);
+                }
+            }
+
+            // Penthouses on last floor
+            if (hasPent) {
+                var pentY = roofY + FLOOR_H / 2;
+                svgIcon(rx + 16, pentY, 'bi-stars', '#7B1FA2', 10, 'Mini-VRF (пентхаус), эт. ' + nF, svg);
+                // Mini outdoor unit
+                svgEl('rect', { x: rx + 22, y: roofY - ouH - 8, width: 12, height: 10,
+                    fill: '#7B1FA2', stroke: '#7B1FA2', 'stroke-width': 1, rx: 2, opacity: 0.3 }, svg);
+            }
+
+            svgText(rx, roofY - ouH - 20, 'VRF-' + (si+1), 'viz-label', svg);
+        }
+
+        // ── Commercial zone (floor 1) ──
+        if (hasComm) {
+            var floor1Y = roofY + (nF - 1) * FLOOR_H + FLOOR_H / 2;
+            var commX = vrfPositions[0];
+            // Bracket icons
+            var commN = s.commercialCount || 1;
+            var showComm = Math.min(commN, 4);
+            for (var ci = 0; ci < showComm; ci++) {
+                svgIcon(commX + 18 + ci * 14, floor1Y, 'bi-wrench', '#E65100', 9,
+                    'Кронштейн мульти-сплит (аренда)', svg);
+            }
+            svgText(commX + 18 + showComm * 14 + 10, floor1Y + 3, 'аренда', 'viz-label', svg);
+        }
+
+        // ── Restaurant riser (separate) ──
+        if (hasRest) {
+            var floor1Y = roofY + (nF - 1) * FLOOR_H + FLOOR_H / 2;
+            // Restaurant outdoor unit on roof of 1st floor (= ground level concept)
+            // Simplified: riser from roof down to floor 1
+            svgEl('line', { x1: restRiserX - 2, y1: roofY, x2: restRiserX - 2, y2: botY, 'class': 'viz-riser-restaurant' }, svg);
+            svgEl('line', { x1: restRiserX + 2, y1: roofY, x2: restRiserX + 2, y2: botY, 'class': 'viz-riser-restaurant', opacity: 0.5 }, svg);
+
+            // Outdoor unit on main roof
+            svgEl('rect', { x: restRiserX - 10, y: roofY - ouH - 8, width: ouW, height: ouH,
+                fill: 'none', stroke: '#E65100', 'stroke-width': 1.5, rx: 3 }, svg);
+            svgIcon(restRiserX, roofY - ouH/2 - 8, 'bi-cup-hot', '#E65100', 10, 'Наружный блок (ресторан)', svg);
+
+            // Restaurant icon on floor 1
+            svgIcon(restRiserX + 14, floor1Y, 'bi-cup-hot', '#E65100', 10, 'Ресторан, 1 эт.', svg);
+            svgText(restRiserX, roofY - ouH - 20, 'Рест.', 'viz-label', svg);
+        }
+    }
+
+    /* --- postMessage from portal --- */
+    window.addEventListener('message', function (event) {
+        var msg = event.data;
+        if (!msg) return;
+        if (msg.type === 'load-project-data') {
+            buildingStats = msg.buildingStats || null;
+            renderBuildingAccordions();
+            renderResults();
+        }
+        if (msg.type === 'theme-change') {
+            document.body.classList.toggle('dark-theme', msg.theme === 'dark');
+        }
+    });
+
+    /* --- Initial render --- */
+    renderBuildingAccordions();
+    renderResults();
+
+})();
+</script>
+</body>
+</html>
