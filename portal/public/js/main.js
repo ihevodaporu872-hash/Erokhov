@@ -25,6 +25,7 @@ import {
   setMopLength as stateSetMopLength,
   setMopPosition as stateSetMopPosition,
   setMopDiameter as stateSetMopDiameter,
+  toggleSectionIvpt,
   estimatePrices,
   setEstimatePrices
 } from './state.js';
@@ -250,7 +251,7 @@ function calculateWaterSupply() {
   buildWaterSupplyHead();
 
   const { h1, hn } = getHeights();
-  const ivptEnabled = document.getElementById('ivptEnabled')?.checked === true;
+  const ivptEnabled = sections.some(s => s.ivptEnabled);
 
   // Расчёт данных по этажам
   const { floorsData, warnings } = computeFloorsData(sections, h1, hn);
@@ -313,7 +314,7 @@ function recalcAll() {
 // Рендеринг вкладки "Спецификация"
 function renderSpecification() {
   const { h1, hn } = getHeights();
-  const ivptEnabled = document.getElementById('ivptEnabled')?.checked === true;
+  const ivptEnabled = sections.some(s => s.ivptEnabled);
   const { zonesData } = computeZonesData(sections, h1, hn, ivptEnabled);
   renderSpecificationContent(zonesData, sections);
 }
@@ -952,6 +953,11 @@ window.app = {
     recalcAll();
   },
 
+  toggleIvpt(si) {
+    toggleSectionIvpt(si);
+    recalcAll();
+  },
+
   // Квартиры
   setApt(si, f, val) {
     stateSetApt(si, f, val);
@@ -1081,7 +1087,7 @@ window.updatePumpEmail = function(selectElement) {
  */
 function collectCalculationSummary() {
   const { h1, hn } = getHeights();
-  const ivptEnabled = document.getElementById('ivptEnabled')?.checked === true;
+  const ivptEnabled = sections.some(s => s.ivptEnabled);
 
   // Получаем данные расчёта
   const { zonesData, grandTotalRisersLen, byDiameter, byAlbum } = computeZonesData(sections, h1, hn, ivptEnabled);
@@ -2257,10 +2263,7 @@ window.onload = () => {
   // Навешивание обработчиков на элементы калькулятора
   document.getElementById('numSections')?.addEventListener('change', onSectionsCountChange);
 
-  document.getElementById('ivptEnabled')?.addEventListener('change', () => {
-    calculateWaterSupply();
-    saveCurrentProject();
-  });
+  // ivptEnabled теперь per-section — управляется через кнопку в карточке корпуса
 
   // Обработчик расчета стоимости подземной части
   document.getElementById('undergroundArea')?.addEventListener('input', calculateUndergroundCost);

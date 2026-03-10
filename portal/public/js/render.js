@@ -448,6 +448,16 @@ export function renderSectionsBlocks() {
     const mopResult = computeMopPexLengthsForSection(sec);
     const mopLabel = mopResult.lengthV1 > 0 ? ` (В1: ${mopResult.lengthV1.toFixed(1)} м, Т3: ${mopResult.lengthT3.toFixed(1)} м)` : '';
 
+    // УВП: проверяем наличие квартир для предупреждения
+    const uvpHasApts = totalApts > 0;
+    const uvpActive = !!sec.ivptEnabled;
+    const uvpBtnClass = uvpActive ? 'uvp-toggle active' : 'uvp-toggle';
+    const uvpLabel = uvpActive ? 'УВП включено' : 'Добавить УВП';
+    const uvpDisabled = (!uvpActive && !uvpHasApts) ? 'disabled' : '';
+    const uvpWarning = (!uvpHasApts && !uvpActive)
+      ? `<div class="uvp-warning"><i class="bi bi-exclamation-triangle-fill"></i>Заполните квартиры для активации</div>`
+      : '';
+
     return `
     <div class="sec-card">
       <div class="sec-title">Корпус ${si + 1}</div>
@@ -467,6 +477,14 @@ export function renderSectionsBlocks() {
           </div>
           <div class="lock-hint">При закреплении поле этажности блокируется и не позволит случайно изменить значение.</div>
         </div>
+      </div>
+
+      <div style="margin-bottom:8px">
+        <button class="${uvpBtnClass}" data-building-id="${si}" ${uvpDisabled}
+                onclick="window.app.toggleIvpt(${si})">
+          <i class="bi bi-fire"></i> ${uvpLabel}
+        </button>
+        ${uvpWarning}
       </div>
 
       <details>
@@ -1825,11 +1843,22 @@ export function renderFittingsBlock(totalApartments, ivptEnabled, zonesData, tot
   }
 
   // === Устройство внутриквартирного пожаротушения (с детализацией по корпусам) ===
-  if (ivptEnabled && totalApartments > 0) {
+  const anyIvpt = sections.some(s => s.ivptEnabled);
+  let ivptTotalApts = 0;
+  if (anyIvpt) {
+    sections.forEach(sec => {
+      if (!sec.ivptEnabled) return;
+      Object.keys(sec.apts).forEach(f => {
+        if (+f >= 2) ivptTotalApts += sec.apts[f] || 0;
+      });
+    });
+  }
+  if (anyIvpt && ivptTotalApts > 0) {
     hasData = true;
 
     let ivptSectionsHtml = '';
     sections.forEach((sec, si) => {
+      if (!sec.ivptEnabled) return;
       let secApts = 0;
       Object.keys(sec.apts).forEach(f => {
         if (+f >= 2) secApts += sec.apts[f] || 0;
@@ -1842,7 +1871,7 @@ export function renderFittingsBlock(totalApartments, ivptEnabled, zonesData, tot
           <table class="results-table">
             <thead><tr><th>Система</th><th class="name-col">Наименование</th><th class="unit-col">Ед. изм.</th><th class="qty-col">Количество</th></tr></thead>
             <tbody>
-              <tr><td class="sys-cell sys-cell--V1">В1</td><td class="name-col">Устройство внутриквартирного пожаротушения</td><td class="unit-col">шт</td><td class="col-qty num-col">${secApts}</td></tr>
+              <tr><td class="sys-cell sys-cell--V1">В1</td><td class="name-col">Устройство внутриквартирного пожаротушения (УВП) в чехле/кейсе</td><td class="unit-col">шт</td><td class="col-qty num-col">${secApts}</td></tr>
               <tr><td class="sys-cell sys-cell--V1">В1</td><td class="name-col">Кран шаровый Ду 15 (для ВКП)</td><td class="unit-col">шт</td><td class="col-qty num-col">${secApts}</td></tr>
             </tbody>
             <tfoot><tr class="total-row"><td colspan="3"><strong>Итого по корпусу ${si + 1}</strong></td><td class="qty-col"><strong>${secApts * 2}</strong></td></tr></tfoot>
@@ -1854,7 +1883,7 @@ export function renderFittingsBlock(totalApartments, ivptEnabled, zonesData, tot
     html += `
       <div class="fittings-section">
         <details class="fittings-details">
-          <summary>Внутриквартирное пожаротушение (итого: ${totalApartments} кв.)</summary>
+          <summary>Внутриквартирное пожаротушение (итого: ${ivptTotalApts} кв.)</summary>
           <div class="fittings-subsections" style="padding: 12px;">
             ${ivptSectionsHtml}
             <div class="pipeline-summary" style="margin-top: 12px;">
@@ -1862,10 +1891,10 @@ export function renderFittingsBlock(totalApartments, ivptEnabled, zonesData, tot
               <table class="results-table summary-table">
                 <thead><tr><th>Система</th><th class="name-col">Наименование</th><th class="unit-col">Ед. изм.</th><th class="qty-col">Количество</th></tr></thead>
                 <tbody>
-                  <tr><td class="sys-cell sys-cell--V1">В1</td><td class="name-col">Устройство внутриквартирного пожаротушения</td><td class="unit-col">шт</td><td class="col-qty num-col">${totalApartments}</td></tr>
-                  <tr><td class="sys-cell sys-cell--V1">В1</td><td class="name-col">Кран шаровый Ду 15 (для ВКП)</td><td class="unit-col">шт</td><td class="col-qty num-col">${totalApartments}</td></tr>
+                  <tr><td class="sys-cell sys-cell--V1">В1</td><td class="name-col">Устройство внутриквартирного пожаротушения в чехле/кейсе</td><td class="unit-col">шт</td><td class="col-qty num-col">${ivptTotalApts}</td></tr>
+                  <tr><td class="sys-cell sys-cell--V1">В1</td><td class="name-col">Кран шаровый Ду 15 (для ВКП)</td><td class="unit-col">шт</td><td class="col-qty num-col">${ivptTotalApts}</td></tr>
                 </tbody>
-                <tfoot><tr class="total-row"><td colspan="3"><strong>Итого по зданию</strong></td><td class="qty-col"><strong>${totalApartments * 2}</strong></td></tr></tfoot>
+                <tfoot><tr class="total-row"><td colspan="3"><strong>Итого по зданию</strong></td><td class="qty-col"><strong>${ivptTotalApts * 2}</strong></td></tr></tfoot>
               </table>
             </div>
           </div>

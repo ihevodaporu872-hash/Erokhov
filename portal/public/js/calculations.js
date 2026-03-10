@@ -174,7 +174,7 @@ export function materializeKuuBom(albumKey, apartmentsCount, params) {
   const ivpt = !!params?.ivptEnabled;
   if (ivpt && apartmentsCount > 0) {
     bom.push(
-      { name: 'устройство внутриквартирного пожаротушения', unit: 'шт', qty: apartmentsCount },
+      { name: 'устройство внутриквартирного пожаротушения (УВП) в чехле/кейсе', unit: 'шт', qty: apartmentsCount },
       { name: 'кран шаровый Ду 15', unit: 'шт', qty: apartmentsCount }
     );
   }
@@ -305,7 +305,8 @@ export function computeZonesData(sections, h1, hn, ivptEnabled) {
 
       // Автоподбор n с учётом диапазона этажей зоны
       const nAuto = computeAutoNForZoneRange(sec, z, zoneFrom, zoneTo);
-      const bom = materializeKuuBom(aKey, aptsInZone, { n: nAuto, ivptEnabled });
+      const secIvpt = !!(sections[si] && sections[si].ivptEnabled);
+      const bom = materializeKuuBom(aKey, aptsInZone, { n: nAuto, ivptEnabled: secIvpt });
 
       // Распределение коллекторов по количеству выходов для зоны
       const collectorsDistribution = computeCollectorsDistribution(sec, z, zoneFrom, zoneTo);
@@ -439,7 +440,8 @@ export function computeSpecsAggregates(sections, ivptEnabled) {
 
       const aKey = z.albumType || 'collector';
       const nAuto = computeAutoNForZoneRange(sec, z, zoneFrom, zoneTo);
-      const bom = materializeKuuBom(aKey, aptsInZone, { n: nAuto, ivptEnabled });
+      const secIvpt = !!(sections[si] && sections[si].ivptEnabled);
+      const bom = materializeKuuBom(aKey, aptsInZone, { n: nAuto, ivptEnabled: secIvpt });
       bom.forEach(item => {
         const key = `${item.name}||${item.unit || 'шт'}`;
         secMap.set(key, (secMap.get(key) || 0) + (item.qty || 0));
@@ -491,7 +493,8 @@ export function computeBomData(sections, ivptEnabled) {
 
       const aKey = z.albumType || 'collector';
       const nAuto = computeAutoNForZoneRange(sec, z, zoneFrom, zoneTo);
-      const bom = materializeKuuBom(aKey, aptsInZone, { n: nAuto, ivptEnabled });
+      const secIvpt = !!(sections[si] && sections[si].ivptEnabled);
+      const bom = materializeKuuBom(aKey, aptsInZone, { n: nAuto, ivptEnabled: secIvpt });
 
       if (bom.length === 0) {
         bomData.push({

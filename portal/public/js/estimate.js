@@ -1102,50 +1102,49 @@ export function aggregateEstimateData({ zonesData, risersByDiameter, sections, h
     });
   }
 
-  // === 8. ИВПТ ===
-  if (ivptEnabled) {
-    sections.forEach((section, sectionIndex) => {
-      let apts = 0;
-      for (let fl = 2; fl <= section.floors; fl++) {
-        apts += section.apts[fl] || 0;
-      }
+  // === 8. ИВПТ (per-section) ===
+  sections.forEach((section, sectionIndex) => {
+    if (!section.ivptEnabled) return;
+    let apts = 0;
+    for (let fl = 2; fl <= section.floors; fl++) {
+      apts += section.apts[fl] || 0;
+    }
 
-      if (apts > 0) {
-        estimateData[sectionIndex].cold.items.push({
-          type: 'работа',
-          name: 'Установка устройств внутриквартирного пожаротушения',
-          unit: 'шт',
-          quantity: apts,
-          sortKey: 'ivpt',
-          sortOrder: 1,
-        });
-        estimateData[sectionIndex].cold.items.push({
-          type: 'материал',
-          name: 'Устройство внутриквартирного пожаротушения',
-          unit: 'шт',
-          quantity: apts,
-          sortKey: 'ivpt',
-          sortOrder: 2,
-        });
-        estimateData[sectionIndex].cold.items.push({
-          type: 'работа',
-          name: 'Установка кранов шаровых Ду 15 (ИВПТ)',
-          unit: 'шт',
-          quantity: apts,
-          sortKey: 'ivpt-valve',
-          sortOrder: 1,
-        });
-        estimateData[sectionIndex].cold.items.push({
-          type: 'материал',
-          name: 'Кран шаровой Ду 15 (ИВПТ)',
-          unit: 'шт',
-          quantity: apts,
-          sortKey: 'ivpt-valve',
-          sortOrder: 2,
-        });
-      }
-    });
-  }
+    if (apts > 0) {
+      estimateData[sectionIndex].cold.items.push({
+        type: 'работа',
+        name: 'Установка устройств внутриквартирного пожаротушения',
+        unit: 'шт',
+        quantity: apts,
+        sortKey: 'ivpt',
+        sortOrder: 1,
+      });
+      estimateData[sectionIndex].cold.items.push({
+        type: 'материал',
+        name: 'Устройство внутриквартирного пожаротушения в чехле/кейсе',
+        unit: 'шт',
+        quantity: apts,
+        sortKey: 'ivpt',
+        sortOrder: 2,
+      });
+      estimateData[sectionIndex].cold.items.push({
+        type: 'работа',
+        name: 'Установка кранов шаровых Ду 15 (ИВПТ)',
+        unit: 'шт',
+        quantity: apts,
+        sortKey: 'ivpt-valve',
+        sortOrder: 1,
+      });
+      estimateData[sectionIndex].cold.items.push({
+        type: 'материал',
+        name: 'Кран шаровой Ду 15 (ИВПТ)',
+        unit: 'шт',
+        quantity: apts,
+        sortKey: 'ivpt-valve',
+        sortOrder: 2,
+      });
+    }
+  });
 
   // === 9. Монтаж коллектора (распределительной гребенки) ===
   // Логика зависит от выбранного производителя:

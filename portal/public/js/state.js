@@ -40,6 +40,7 @@ export function makeDefaultSection() {
     floors: 12,
     floorsLocked: false,
     apts: {},
+    ivptEnabled: false,
     rent: { enabled: false, qty: 1 },
     zones: [
       { id: uid(), name: 'Зона 1', to: 6, risers: 2, fixedD: { V1: 32, T3: 32, T4: 32 }, albumType: 'collector', locked: false },
@@ -95,6 +96,10 @@ export function loadCalculatorState(data) {
       } else if (sec.mop.dn === undefined) {
         sec.mop.dn = 20;
       }
+      // Миграция: ivptEnabled из глобального параметра в per-section
+      if (sec.ivptEnabled === undefined) {
+        sec.ivptEnabled = !!(data.params && data.params.ivptEnabled);
+      }
     });
   } else {
     sections = [makeDefaultSection(), makeDefaultSection()];
@@ -129,12 +134,10 @@ export function loadCalculatorState(data) {
 export function applyStateToDOM() {
   const h1El = document.getElementById('h1');
   const hnEl = document.getElementById('hn');
-  const ivptEl = document.getElementById('ivptEnabled');
   const numSecEl = document.getElementById('numSections');
 
   if (h1El) h1El.value = calculatorParams.h1;
   if (hnEl) hnEl.value = calculatorParams.hn;
-  if (ivptEl) ivptEl.checked = calculatorParams.ivptEnabled;
   if (numSecEl) numSecEl.value = calculatorParams.numSections;
 }
 
@@ -142,13 +145,21 @@ export function applyStateToDOM() {
 export function readParamsFromDOM() {
   const h1El = document.getElementById('h1');
   const hnEl = document.getElementById('hn');
-  const ivptEl = document.getElementById('ivptEnabled');
   const numSecEl = document.getElementById('numSections');
 
   calculatorParams.h1 = h1El ? +h1El.value || 4.0 : 4.0;
   calculatorParams.hn = hnEl ? +hnEl.value || 3.3 : 3.3;
-  calculatorParams.ivptEnabled = ivptEl ? ivptEl.checked : false;
+  // ivptEnabled теперь per-section — вычисляем из секций для обратной совместимости
+  calculatorParams.ivptEnabled = sections.some(s => s.ivptEnabled);
   calculatorParams.numSections = numSecEl ? +numSecEl.value || 2 : 2;
+}
+
+// Переключение УВП для конкретного корпуса
+export function toggleSectionIvpt(si) {
+  if (!sections[si]) return;
+  sections[si].ivptEnabled = !sections[si].ivptEnabled;
+  calculatorParams.ivptEnabled = sections.some(s => s.ivptEnabled);
+  notifyStateChange();
 }
 
 // Обновление параметров

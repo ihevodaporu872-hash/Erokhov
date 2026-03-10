@@ -94,7 +94,7 @@ export function exportToExcel(calculateFn, getHeights, projectName) {
     calculateFn();
 
     const { h1, hn } = getHeights();
-    const ivptEnabled = document.getElementById('ivptEnabled')?.checked === true;
+    const ivptEnabled = sections.some(s => s.ivptEnabled);
 
     const wb = XLSX.utils.book_new();
 
