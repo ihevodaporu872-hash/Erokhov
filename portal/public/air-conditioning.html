@@ -132,6 +132,12 @@
         .viz-fire-duct {
             stroke: #FF9800; stroke-width: 4; stroke-linecap: round; opacity: 0.35;
         }
+        .viz-roof-trace {
+            stroke: #90A4AE; stroke-width: 3; stroke-linecap: round;
+        }
+        .viz-roof-frame {
+            fill: none; stroke: #546E7A; stroke-width: 1.5; rx: 2;
+        }
 
         /* -- Linked (synced from project) input -- */
         .bld-num.linked {
@@ -278,9 +284,11 @@
                                 <span class="viz-leg-item"><span class="viz-leg-line" style="background:#0277BD;background-image:repeating-linear-gradient(90deg,#0277BD 0 4px,transparent 4px 6px)"></span>Ответвление к квартире</span>
                                 <span class="viz-leg-item"><span style="display:inline-block;width:8px;height:8px;background:#0277BD;border-radius:2px;margin-right:3px;vertical-align:middle"></span> BS-блок</span>
                                 <span class="viz-leg-item"><span style="display:inline-block;width:8px;height:8px;background:#7B1FA2;border-radius:2px;margin-right:3px;vertical-align:middle"></span> Буферный блок</span>
-                                <span class="viz-leg-item"><i class="bi bi-box-seam" style="color:#455A64"></i> Наружный блок</span>
+                                <span class="viz-leg-item"><i class="bi bi-box-seam" style="color:#455A64"></i> Наружный блок на раме</span>
+                                <span class="viz-leg-item"><span style="display:inline-block;width:12px;height:4px;background:#90A4AE;border-radius:1px;margin-right:3px;vertical-align:middle"></span> Кровельная трасса (кожух)</span>
                                 <span class="viz-leg-item"><span style="display:inline-block;width:12px;height:4px;background:rgba(255,152,0,.35);border-radius:1px;margin-right:3px;vertical-align:middle"></span> Огнест. короб (ПБЗ)</span>
                                 <span class="viz-leg-item"><span class="viz-leg-line" style="background:#E65100;background-image:repeating-linear-gradient(90deg,#E65100 0 6px,transparent 6px 9px)"></span>Трасса ресторана</span>
+                                <span class="viz-leg-item"><span style="display:inline-block;width:8px;height:8px;border:1.5px dashed #7B1FA2;border-radius:2px;margin-right:3px;vertical-align:middle;opacity:.5"></span> Пентхаус (зона собственника)</span>
                             </div>
                         </div>
                     </div>
@@ -565,10 +573,83 @@
                 var pentApts = getRealAptsOnFloor(b, s, nF);
                 var pentBS   = pentApts * sec;
                 addItem('vrf_pent_mini', 'Mini-VRF блок (пентхаус)', 'шт', pentBS,
-                    '1 блок на квартиру, последний этаж (' + pentApts + ' кв.)', 'dev');
+                    'Предусмотрено место. Монтаж силами собственника. (' + pentApts + ' кв.)', 'pent');
                 addItem('vrf_pent_outdoor', 'Наружный блок mini-VRF (пентхаус, кровля)', 'шт', pentBS,
-                    '1 блок на квартиру (индивидуальный)', 'dev');
+                    'Предусмотрено место на раме. Монтаж силами собственника.', 'pent');
             }
+
+            // ════════════════ КРОВЕЛЬНАЯ РАЗВОДКА И ПОДКЛЮЧЕНИЕ ════════════════
+            // Горизонтальные трубы на кровле: 20 м на каждый наружный блок
+            var roofHorizPerUnit = 20; // м на блок
+            var roofHorizTotal = outdoorCount * roofHorizPerUnit * sec;
+            addItem('vrf_roof_pipe_liquid', 'Труба медная Ø12.7 (кровля, горизонтальная разводка, жидкость)', 'м.п.',
+                Math.round(roofHorizTotal * 10) / 10,
+                outdoorCount + ' блоков × ' + roofHorizPerUnit + ' м (от шахты до блоков)', 'dev');
+            addItem('vrf_roof_pipe_gas_hp', 'Труба медная Ø28.6 (кровля, горизонтальная разводка, газ ВД)', 'м.п.',
+                Math.round(roofHorizTotal * 10) / 10,
+                outdoorCount + ' блоков × ' + roofHorizPerUnit + ' м', 'dev');
+            addItem('vrf_roof_pipe_gas_lp', 'Труба медная Ø15.9 (кровля, горизонтальная разводка, газ НД)', 'м.п.',
+                Math.round(roofHorizTotal * 10) / 10,
+                outdoorCount + ' блоков × ' + roofHorizPerUnit + ' м', 'dev');
+
+            // Алюминиевая обшивка (защитный кожух) трасс на кровле
+            // Периметр кожуха ~0.3 м, длина = roofHorizTotal
+            var cladding_m2 = Math.round(roofHorizTotal * 0.3 * 10) / 10;
+            addItem('vrf_roof_cladding', 'Алюминиевая обшивка фреонопроводов (кровля, защитный кожух)', 'м²',
+                cladding_m2,
+                'Периметр кожуха 0.3 м × ' + roofHorizTotal.toFixed(0) + ' м трасс', 'dev');
+
+            // Припой серебряный для пайки медных труб на кровле
+            // ~0.02 кг на стык, ~1 стык на 3 м трубы × 3 трубы
+            var roofSticks = Math.ceil(roofHorizTotal * 3 / 3);
+            var solderKg = Math.round(roofSticks * 0.02 * 10) / 10;
+            addItem('vrf_roof_solder', 'Припой серебряный (пайка медных труб на кровле)', 'кг',
+                solderKg,
+                '~' + roofSticks + ' стыков × 0.02 кг', 'dev');
+
+            // Азот для пайки (продувка при пайке)
+            // ~0.5 л на стык
+            var nitrogenL = Math.round(roofSticks * 0.5);
+            addItem('vrf_roof_nitrogen', 'Азот технический (продувка при пайке)', 'л',
+                nitrogenL,
+                '~' + roofSticks + ' стыков × 0.5 л', 'dev');
+
+            // ════════════════ ОБВЯЗКА ОБОРУДОВАНИЯ НА КРОВЛЕ ════════════════
+            // Виброопоры: 4 шт на каждый наружный блок
+            var vibroTotal = outdoorCount * 4;
+            addItem('vrf_roof_vibro', 'Виброопора (антивибрационное крепление наружного блока)', 'шт',
+                vibroTotal,
+                '4 шт × ' + outdoorCount + ' блоков', 'dev');
+
+            // Греющий кабель: 2 м на каждый наружный блок (дренаж конденсата)
+            var heatingCableM = outdoorCount * 2;
+            addItem('vrf_roof_heating', 'Кабель греющий саморегулирующийся (дренаж конденсата)', 'м.п.',
+                heatingCableM,
+                '2 м × ' + outdoorCount + ' блоков', 'dev');
+
+            // Рамы стальные оцинкованные (основания для наружных блоков)
+            addItem('vrf_roof_frame', 'Рама стальная оцинкованная (основание наружного блока)', 'шт',
+                outdoorCount,
+                '1 рама на блок, высота ~300 мм', 'dev');
+
+            // Пентхаусные рамы (если есть)
+            if (hasPent) {
+                var pentApts2 = getRealAptsOnFloor(b, s, nF);
+                var pentOutdoor = pentApts2 * sec;
+                addItem('vrf_pent_frame', 'Рама стальная оцинкованная (mini-VRF пентхаус)', 'шт',
+                    pentOutdoor,
+                    'Предусмотрено место. Монтаж силами собственника.', 'pent');
+                addItem('vrf_pent_vibro', 'Виброопора (mini-VRF пентхаус)', 'шт',
+                    pentOutdoor * 4,
+                    'Предусмотрено место. Монтаж силами собственника.', 'pent');
+            }
+
+            // ════════════════ АСУД: ШЛЮЗ СВЯЗИ ════════════════
+            // 1 шлюз на каждые 16 наружных блоков (или минимум 1)
+            var gatewayCount = Math.max(1, Math.ceil(outdoorCount / 16));
+            addItem('vrf_asud_gateway', 'Шлюз связи АСУД (контроллер давления/температуры)', 'шт',
+                gatewayCount,
+                '1 шлюз на ~16 блоков. Мониторинг: давление, температура, аварии.', 'dev');
         });
 
         // Сортировка
@@ -578,7 +659,11 @@
             'vrf_insulation',
             'vrf_bs_block', 'vrf_outdoor', 'vrf_buffer',
             'vrf_leak_sensor', 'vrf_fire_duct', 'vrf_fire_box', 'vrf_freon',
-            'vrf_pent_mini', 'vrf_pent_outdoor',
+            'vrf_roof_pipe_liquid', 'vrf_roof_pipe_gas_hp', 'vrf_roof_pipe_gas_lp',
+            'vrf_roof_cladding', 'vrf_roof_solder', 'vrf_roof_nitrogen',
+            'vrf_roof_vibro', 'vrf_roof_heating', 'vrf_roof_frame',
+            'vrf_asud_gateway',
+            'vrf_pent_mini', 'vrf_pent_outdoor', 'vrf_pent_frame', 'vrf_pent_vibro',
             'vrf_comm_bracket',
             'vrf_rest_pipe_liquid', 'vrf_rest_pipe_gas_hp', 'vrf_rest_pipe_gas_lp', 'vrf_rest_outdoor'
         ];
@@ -848,6 +933,8 @@
                 currentGroup = it.group;
                 var groupLabel = currentGroup === 'dev'
                     ? '<span class="zone-label zone-label-dev">Зона застройщика</span>'
+                    : currentGroup === 'pent'
+                    ? '<span class="zone-label" style="color:#7B1FA2;background:rgba(123,31,162,.1)">Пентхаусы (зона собственника)</span>'
                     : '<span class="zone-label zone-label-comm">Коммерция / Ресторан</span>';
                 html += '<tr><td colspan="4" style="padding:10px 0 4px;border:none">' + groupLabel + '</td></tr>';
             }
@@ -1053,7 +1140,7 @@
         var PAD     = 40;
         var LABEL_W = 36;
         var FLOOR_H = 36;
-        var ROOF_H  = 50; // space for outdoor units on roof
+        var ROOF_H  = 70; // space for outdoor units on frames + roof trace
         var totalH  = nF * FLOOR_H;
         var svgH    = totalH + PAD * 2 + ROOF_H + 30;
 
@@ -1112,15 +1199,33 @@
             }
         }
 
+        // ── Shaft entry point on roof (vertical pipe exit) ──
+        var shaftX = bldX + 12;
+        var shaftY = roofY - 4;
+
         // ── VRF risers ──
         var ouW = 20, ouH = 14;
+        var frameH = 6; // frame/pedestal height in SVG units
 
         for (var si = 0; si < sec; si++) {
             var rx = vrfPositions[si];
 
-            // Outdoor unit on roof
-            svgEl('rect', { x: rx - ouW/2, y: roofY - ouH - 8, width: ouW, height: ouH, 'class': 'viz-outdoor-unit' }, svg);
-            svgIcon(rx, roofY - ouH/2 - 8, 'bi-box-seam', '#455A64', 10, 'Наружный блок VRF, секц. ' + (si+1), svg);
+            // Steel frame (pedestal) under outdoor unit
+            svgEl('rect', { x: rx - ouW/2 - 2, y: roofY - frameH - ouH - 8, width: ouW + 4, height: frameH, 'class': 'viz-roof-frame' }, svg);
+
+            // Outdoor unit on frame
+            svgEl('rect', { x: rx - ouW/2, y: roofY - frameH - ouH - 8 - ouH, width: ouW, height: ouH, 'class': 'viz-outdoor-unit' }, svg);
+            svgIcon(rx, roofY - frameH - ouH - 8 - ouH/2, 'bi-box-seam', '#455A64', 10,
+                'Наружный блок VRF на раме, секц. ' + (si+1), svg);
+
+            // Horizontal roof trace (gray cladding) from shaft to outdoor unit
+            var traceY = roofY - frameH - ouH/2 - 8;
+            svgEl('line', { x1: shaftX, y1: traceY, x2: rx - ouW/2 - 2, y2: traceY, 'class': 'viz-roof-trace' }, svg);
+            // Cladding hatch marks
+            for (var hx = shaftX + 8; hx < rx - ouW/2 - 4; hx += 12) {
+                svgEl('line', { x1: hx, y1: traceY - 2, x2: hx + 4, y2: traceY + 2,
+                    stroke: '#B0BEC5', 'stroke-width': 0.7 }, svg);
+            }
 
             // Riser (3 lines close together to show 3 pipes)
             var residStart = hasComm ? 1 : 0;
@@ -1178,14 +1283,21 @@
             // Penthouses on last floor
             if (hasPent) {
                 var pentY = roofY + FLOOR_H / 2;
-                svgIcon(rx + 16, pentY, 'bi-stars', '#7B1FA2', 10, 'Mini-VRF (пентхаус), эт. ' + nF, svg);
-                // Mini outdoor unit
-                svgEl('rect', { x: rx + 22, y: roofY - ouH - 8, width: 12, height: 10,
+                svgIcon(rx + 16, pentY, 'bi-stars', '#7B1FA2', 10, 'Mini-VRF (пентхаус), эт. ' + nF + ' — зона собственника', svg);
+                // Mini frame + outdoor unit (owner responsibility — dashed)
+                var pentUnitX = rx + 22;
+                var pentUnitY = roofY - frameH - ouH - 8;
+                svgEl('rect', { x: pentUnitX - 2, y: pentUnitY + ouH, width: 16, height: frameH,
+                    fill: 'none', stroke: '#7B1FA2', 'stroke-width': 1, rx: 1, 'stroke-dasharray': '3 2', opacity: 0.5 }, svg);
+                svgEl('rect', { x: pentUnitX, y: pentUnitY, width: 12, height: 10,
                     fill: '#7B1FA2', stroke: '#7B1FA2', 'stroke-width': 1, rx: 2, opacity: 0.3 }, svg);
             }
 
-            svgText(rx, roofY - ouH - 20, 'VRF-' + (si+1), 'viz-label', svg);
+            svgText(rx, roofY - frameH - ouH * 2 - 16, 'VRF-' + (si+1), 'viz-label', svg);
         }
+
+        // Shaft entry label
+        svgText(shaftX, roofY - frameH - ouH * 2 - 16, '▼ Шахта', 'viz-label', svg);
 
         // ── Commercial zone (floor 1) ──
         if (hasComm) {
@@ -1209,14 +1321,19 @@
             svgEl('line', { x1: restRiserX - 2, y1: roofY, x2: restRiserX - 2, y2: botY, 'class': 'viz-riser-restaurant' }, svg);
             svgEl('line', { x1: restRiserX + 2, y1: roofY, x2: restRiserX + 2, y2: botY, 'class': 'viz-riser-restaurant', opacity: 0.5 }, svg);
 
-            // Outdoor unit on main roof
-            svgEl('rect', { x: restRiserX - 10, y: roofY - ouH - 8, width: ouW, height: ouH,
+            // Frame + Outdoor unit on main roof
+            var restUnitY = roofY - frameH - ouH - 8;
+            svgEl('rect', { x: restRiserX - ouW/2 - 2, y: restUnitY + ouH, width: ouW + 4, height: frameH, 'class': 'viz-roof-frame' }, svg);
+            svgEl('rect', { x: restRiserX - 10, y: restUnitY, width: ouW, height: ouH,
                 fill: 'none', stroke: '#E65100', 'stroke-width': 1.5, rx: 3 }, svg);
-            svgIcon(restRiserX, roofY - ouH/2 - 8, 'bi-cup-hot', '#E65100', 10, 'Наружный блок (ресторан)', svg);
+            svgIcon(restRiserX, restUnitY + ouH/2, 'bi-cup-hot', '#E65100', 10, 'Наружный блок (ресторан)', svg);
+
+            // Roof trace from shaft to restaurant unit
+            svgEl('line', { x1: shaftX, y1: restUnitY + ouH/2, x2: restRiserX - ouW/2 - 2, y2: restUnitY + ouH/2, 'class': 'viz-roof-trace', 'stroke-dasharray': '6 3' }, svg);
 
             // Restaurant icon on floor 1
             svgIcon(restRiserX + 14, floor1Y, 'bi-cup-hot', '#E65100', 10, 'Ресторан, 1 эт.', svg);
-            svgText(restRiserX, roofY - ouH - 20, 'Рест.', 'viz-label', svg);
+            svgText(restRiserX, restUnitY - 8, 'Рест.', 'viz-label', svg);
         }
     }
 
