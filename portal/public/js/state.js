@@ -273,28 +273,6 @@ export function setCommercialUnits(si, qty) {
   notifyStateChange();
 }
 
-// Автозаполнение квартир по диапазону
-export function autofillApts(si, from, to, qty) {
-  const sec = sections[si];
-  from = Math.max(2, from);
-  to = Math.max(from, to);
-  if (from > sec.floors) from = sec.floors;
-  if (to > sec.floors) to = sec.floors;
-
-  for (let f = from; f <= to; f++) {
-    sec.apts[f] = qty;
-  }
-
-  notifyStateChange();
-  return { from, to, qty };
-}
-
-// Очистка квартир корпуса
-export function clearApts(si) {
-  sections[si].apts = {};
-  notifyStateChange();
-}
-
 // Добавление зоны в корпус
 export function addZone(si) {
   const sec = sections[si];

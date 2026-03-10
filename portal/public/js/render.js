@@ -225,68 +225,6 @@ function renderDnSelect(currentValue, onChangeJs, disabled) {
   return `<select ${disabled ? 'disabled' : ''} onchange="${onChangeJs}">${options}</select>`;
 }
 
-// Рендер таблицы квартир корпуса
-function renderFloorsTableForSection(si) {
-  const sec = sections[si];
-  const numFloors = sec.floors;
-  const bs = buildingStats ? buildingStats[si] : null;
-  const synced = !!bs;
-  let rows = '';
-
-  // Создаём lookup для buildingStats floors
-  const bsFloorMap = {};
-  if (bs && bs.floors) {
-    bs.floors.forEach(f => { bsFloorMap[f.floor] = f; });
-  }
-
-  for (let f = 1; f <= numFloors; f++) {
-    const isFirst = f === 1;
-    const aptVal = isFirst ? 0 : (sec.apts[f] ?? 0);
-    const bsFloor = bsFloorMap[f];
-
-    let aptCell;
-    if (synced) {
-      // Read-only: данные из квартирографии
-      const cls = aptVal === 0 && !isFirst ? 'style="color:#666"' : '';
-      aptCell = `<span ${cls}>${aptVal}</span>`;
-    } else {
-      aptCell = isFirst
-        ? `<input type="number" value="0" disabled/>`
-        : `<input type="number" min="0" max="200" value="${aptVal}" data-focus-id="apt-${si}-${f}" oninput="window.app.setApt(${si}, ${f}, +this.value)">`;
-    }
-
-    // Дополнительные столбцы из buildingStats
-    const bathCell = synced ? `<td>${bsFloor ? bsFloor.bath || 0 : '—'}</td>` : '';
-    const kitchensCell = synced ? `<td>${bsFloor ? bsFloor.kitchens || 0 : '—'}</td>` : '';
-
-    rows += `
-      <tr${aptVal === 0 && !isFirst && synced ? ' class="floor-empty"' : ''}>
-        <td>Этаж ${f}</td>
-        <td>${aptCell}</td>
-        ${bathCell}
-        ${kitchensCell}
-      </tr>
-    `;
-  }
-
-  const extraHeaders = synced ? '<th>Санузлы</th><th>Кухни</th>' : '';
-
-  return `
-    <div class="floors-table">
-      <table>
-        <thead>
-          <tr>
-            <th>Этаж</th>
-            <th>Квартир, шт (на корпус)</th>
-            ${extraHeaders}
-          </tr>
-        </thead>
-        <tbody>${rows}</tbody>
-      </table>
-    </div>
-  `;
-}
-
 // Рендер таблицы зон корпуса
 function renderZonesTableForSection(si) {
   const sec = sections[si];
@@ -477,7 +415,7 @@ export function renderSectionsBlocks() {
 
     return `
     <div class="sec-card">
-      <div class="sec-title">Корпус ${si + 1}${synced && bs.name ? ` — ${bs.name}` : ''}</div>
+      <div class="sec-title">Корпус ${si + 1}${synced && bs.name ? ` — ${bs.name}` : ''}${aptsLabel}</div>
       ${syncIndicator}
 
       <div class="row-2">
@@ -518,11 +456,6 @@ export function renderSectionsBlocks() {
             oninput="window.app.setCommercialUnits(${si}, +this.value)">
         </div>
       </div>
-
-      <details>
-        <summary><b>Квартиры по этажам${aptsLabel}</b></summary>
-        ${renderFloorsTableForSection(si)}
-      </details>
 
       <details>
         <summary><b>Зоны корпуса (начинаются с 1-го этажа)</b></summary>

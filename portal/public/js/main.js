@@ -7,8 +7,6 @@ import {
   setRentEnabled as stateSetRentEnabled,
   setRentQty as stateSetRentQty,
   setCommercialUnits as stateSetCommercialUnits,
-  autofillApts as stateAutofillApts,
-  clearApts as stateClearApts,
   addZone as stateAddZone,
   removeZone as stateRemoveZone,
   clearZones as stateClearZones,
@@ -966,9 +964,8 @@ window.app = {
     recalcAll();
   },
 
-  // Квартиры (заблокировано при синхронизации с проектом)
+  // Квартиры — данные берутся из квартирографии проекта
   setApt(si, f, val) {
-    if (buildingStats) return;
     stateSetApt(si, f, val);
     calculateWaterSupply();
   },
@@ -992,30 +989,6 @@ window.app = {
   setCommercialUnits(si, qty) {
     stateSetCommercialUnits(si, qty);
     calculateWaterSupply();
-  },
-
-  autofillApts(si) {
-    const from = Math.max(2, +document.getElementById(`af_from_${si}`).value || 2);
-    const to = Math.max(from, +document.getElementById(`af_to_${si}`).value || from);
-    const qty = Math.max(0, +document.getElementById(`af_qty_${si}`).value || 0);
-
-    const result = stateAutofillApts(si, from, to, qty);
-    recalcAll();
-
-    // Восстановить значения в полях после ререндера
-    setTimeout(() => {
-      const fromEl = document.getElementById(`af_from_${si}`);
-      const toEl = document.getElementById(`af_to_${si}`);
-      const qtyEl = document.getElementById(`af_qty_${si}`);
-      if (fromEl) fromEl.value = result.from;
-      if (toEl) toEl.value = result.to;
-      if (qtyEl) qtyEl.value = result.qty;
-    }, 0);
-  },
-
-  clearApts(si) {
-    stateClearApts(si);
-    recalcAll();
   },
 
   // Зоны
