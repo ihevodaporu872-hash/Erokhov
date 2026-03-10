@@ -194,7 +194,7 @@ export function computeFloorsData(sections, h1, hn) {
 
     const sectionsInfo = sections.map((sec, si) => {
       if (f === 1) {
-        if (sec.rent.enabled) rentTotal += sec.rent.qty || 0;
+        if (sec.rent.enabled) rentTotal += sec.commercialUnits || 0;
       } else {
         aptsTotal += (sec.apts[f] || 0);
       }
@@ -215,7 +215,7 @@ export function computeFloorsData(sections, h1, hn) {
         const risersPerSection = Math.max(1, +z.risers || 1);
         risersTotalAtFloor += risersPerSection;
 
-        const unitsForCollectors = (f === 1 ? (sec.rent.enabled ? (sec.rent.qty || 0) : 0) : (sec.apts[f] || 0));
+        const unitsForCollectors = (f === 1 ? (sec.rent.enabled ? (sec.commercialUnits || 0) : 0) : (sec.apts[f] || 0));
         collCellText = formatCollectors(unitsForCollectors, risersPerSection);
       }
 
@@ -269,7 +269,7 @@ export function computeZonesData(sections, h1, hn, ivptEnabled) {
       for (let f = zoneFrom; f <= zoneTo; f++) {
         if (f === 1 && sec.rent.enabled) {
           // Аренда только на 1-м этаже
-          rentInZone += (sec.rent.qty || 0);
+          rentInZone += (sec.commercialUnits || 0);
         } else if (f >= 2) {
           aptsInZone += (sec.apts[f] || 0);
         }

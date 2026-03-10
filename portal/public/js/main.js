@@ -6,6 +6,7 @@ import {
   setApt as stateSetApt,
   setRentEnabled as stateSetRentEnabled,
   setRentQty as stateSetRentQty,
+  setCommercialUnits as stateSetCommercialUnits,
   autofillApts as stateAutofillApts,
   clearApts as stateClearApts,
   addZone as stateAddZone,
@@ -281,7 +282,7 @@ function calculateWaterSupply() {
     });
     // Узлы учёта аренды (если аренда включена)
     if (sec.rent && sec.rent.enabled) {
-      totalRentUnits += (sec.rent.qty || 0);
+      totalRentUnits += (sec.commercialUnits || 0);
     }
   });
 
@@ -974,6 +975,11 @@ window.app = {
     calculateWaterSupply();
   },
 
+  setCommercialUnits(si, qty) {
+    stateSetCommercialUnits(si, qty);
+    calculateWaterSupply();
+  },
+
   autofillApts(si) {
     const from = Math.max(2, +document.getElementById(`af_from_${si}`).value || 2);
     const to = Math.max(from, +document.getElementById(`af_to_${si}`).value || from);
@@ -1103,7 +1109,7 @@ function collectCalculationSummary() {
       }
     });
     if (sec.rent && sec.rent.enabled) {
-      totalRentUnits += (sec.rent.qty || 0);
+      totalRentUnits += (sec.commercialUnits || 0);
     }
   });
 
@@ -1248,7 +1254,7 @@ function collectSpecificationData(zonesData) {
       }
     });
     if (sec.rent && sec.rent.enabled) {
-      totalRentUnits += (sec.rent.qty || 0);
+      totalRentUnits += (sec.commercialUnits || 0);
     }
   });
   const waterMetersCount = (totalApartments + totalRentUnits) * 2;

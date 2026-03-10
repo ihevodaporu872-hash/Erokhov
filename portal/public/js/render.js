@@ -245,14 +245,8 @@ function renderFloorsTableForSection(si) {
             <option value="no" ${!sec.rent.enabled ? 'selected' : ''}>Нет</option>
             <option value="yes" ${sec.rent.enabled ? 'selected' : ''}>Да</option>
           </select>
-        </td>
-        <td>
-          <input type="number" min="0" step="1" value="${sec.rent.qty}"
-            ${sec.rent.enabled ? '' : 'disabled'}
-            data-focus-id="rent-${si}"
-            oninput="window.app.setRentQty(${si}, +this.value)">
         </td>`
-      : `<td></td><td></td>`;
+      : `<td></td>`;
 
     rows += `
       <tr>
@@ -271,7 +265,6 @@ function renderFloorsTableForSection(si) {
             <th>Этаж</th>
             <th>Квартир, шт (на корпус)</th>
             <th>Аренда (1-й этаж)</th>
-            <th>Количество узлов учета арендных помещений</th>
           </tr>
         </thead>
         <tbody>${rows}</tbody>
@@ -479,12 +472,22 @@ export function renderSectionsBlocks() {
         </div>
       </div>
 
-      <div style="margin-bottom:8px">
-        <button class="${uvpBtnClass}" data-building-id="${si}" ${uvpDisabled}
-                onclick="window.app.toggleIvpt(${si})">
-          <i class="bi bi-fire"></i> ${uvpLabel}
-        </button>
-        ${uvpWarning}
+      <div class="building-controls-row" style="display:flex; align-items:flex-start; gap:16px; flex-wrap:wrap; margin-bottom:8px">
+        <div>
+          <button class="${uvpBtnClass}" data-building-id="${si}" ${uvpDisabled}
+                  onclick="window.app.toggleIvpt(${si})">
+            <i class="bi bi-fire"></i> ${uvpLabel}
+          </button>
+          ${uvpWarning}
+        </div>
+        <div class="commercial-units-group" style="display:flex; align-items:center; gap:8px; margin-top:10px">
+          <label style="font-size:13px; white-space:nowrap; color:${sec.rent.enabled ? '#ccc' : '#666'}">Узлы учёта коммерции:</label>
+          <input type="number" min="0" step="1" value="${sec.commercialUnits ?? 1}"
+            ${sec.rent.enabled ? '' : 'disabled'}
+            class="commercial-units-input"
+            data-focus-id="comm-${si}"
+            oninput="window.app.setCommercialUnits(${si}, +this.value)">
+        </div>
       </div>
 
       <details>
@@ -2006,7 +2009,7 @@ export function renderFittingsBlock(totalApartments, ivptEnabled, zonesData, tot
       Object.keys(sec.apts).forEach(f => {
         if (+f >= 2) secApts += sec.apts[f] || 0;
       });
-      const secRent = sec.rent?.enabled ? (sec.rent.qty || 0) : 0;
+      const secRent = sec.rent?.enabled ? (sec.commercialUnits || 0) : 0;
       const secUnits = secApts + secRent;
       if (secUnits <= 0) return;
 
@@ -2295,9 +2298,9 @@ export function renderFittingsBlock(totalApartments, ivptEnabled, zonesData, tot
 
   if (sections && sections.length > 0) {
     sections.forEach((sec, si) => {
-      if (sec.rent && sec.rent.enabled && sec.rent.qty > 0) {
-        rentalBySection.set(si, sec.rent.qty);
-        totalRentalNodes += sec.rent.qty;
+      if (sec.rent && sec.rent.enabled && (sec.commercialUnits || 0) > 0) {
+        rentalBySection.set(si, sec.commercialUnits);
+        totalRentalNodes += sec.commercialUnits;
       }
     });
   }
@@ -2708,7 +2711,7 @@ export function renderSpecificationContent(zonesData, sections = []) {
       }
     });
     if (sec.rent && sec.rent.enabled) {
-      totalRentUnits += (sec.rent.qty || 0);
+      totalRentUnits += (sec.commercialUnits || 0);
     }
   });
   // Каждая квартира/аренда = 2 счётчика (В1 + Т3)
@@ -3291,8 +3294,8 @@ export function renderSpecificationContent(zonesData, sections = []) {
   let totalRentalNodesSpec = 0;
   if (sections && sections.length > 0) {
     sections.forEach(sec => {
-      if (sec.rent && sec.rent.enabled && sec.rent.qty > 0) {
-        totalRentalNodesSpec += sec.rent.qty;
+      if (sec.rent && sec.rent.enabled && (sec.commercialUnits || 0) > 0) {
+        totalRentalNodesSpec += sec.commercialUnits;
       }
     });
   }

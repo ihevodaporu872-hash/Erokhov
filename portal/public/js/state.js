@@ -42,6 +42,7 @@ export function makeDefaultSection() {
     apts: {},
     ivptEnabled: false,
     rent: { enabled: false, qty: 1 },
+    commercialUnits: 1,
     zones: [
       { id: uid(), name: 'Зона 1', to: 6, risers: 2, fixedD: { V1: 32, T3: 32, T4: 32 }, albumType: 'collector', locked: false },
       { id: uid(), name: 'Зона 2', to: 12, risers: 3, fixedD: { V1: 40, T3: 40, T4: 40 }, albumType: 'collector_pre_apt', locked: false },
@@ -99,6 +100,10 @@ export function loadCalculatorState(data) {
       // Миграция: ivptEnabled из глобального параметра в per-section
       if (sec.ivptEnabled === undefined) {
         sec.ivptEnabled = !!(data.params && data.params.ivptEnabled);
+      }
+      // Миграция: commercialUnits из rent.qty
+      if (sec.commercialUnits === undefined) {
+        sec.commercialUnits = sec.rent ? (sec.rent.qty || 1) : 1;
       }
     });
   } else {
@@ -216,6 +221,13 @@ export function setRentEnabled(si, enabled) {
 // Установка количества узлов учета аренды
 export function setRentQty(si, qty) {
   sections[si].rent.qty = Math.max(0, +qty || 0);
+  notifyStateChange();
+}
+
+// Установка количества узлов учёта коммерции
+export function setCommercialUnits(si, qty) {
+  if (!sections[si]) return;
+  sections[si].commercialUnits = Math.max(0, +qty || 0);
   notifyStateChange();
 }
 

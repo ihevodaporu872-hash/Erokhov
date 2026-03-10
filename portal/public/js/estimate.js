@@ -936,7 +936,7 @@ export function aggregateEstimateData({ zonesData, risersByDiameter, sections, h
     for (let fl = 2; fl <= section.floors; fl++) {
       apts += section.apts[fl] || 0;
     }
-    const rent = section.rent?.enabled ? (section.rent.qty || 0) : 0;
+    const rent = section.rent?.enabled ? (section.commercialUnits || 0) : 0;
     const totalUnits = apts + rent;
 
     if (totalUnits > 0) {
@@ -975,7 +975,7 @@ export function aggregateEstimateData({ zonesData, risersByDiameter, sections, h
   ];
 
   sections.forEach((section, sectionIndex) => {
-    const rentQty = section.rent?.enabled ? (section.rent.qty || 0) : 0;
+    const rentQty = section.rent?.enabled ? (section.commercialUnits || 0) : 0;
 
     if (rentQty > 0) {
       // ХВС (cold) — работа + материалы
