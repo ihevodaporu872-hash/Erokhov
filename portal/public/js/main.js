@@ -28,7 +28,11 @@ import {
   setMopDiameter as stateSetMopDiameter,
   toggleSectionIvpt,
   estimatePrices,
-  setEstimatePrices
+  setEstimatePrices,
+  buildingStats,
+  setBuildingStats,
+  syncAptsFromBuildingStats,
+  projectSyncName
 } from './state.js';
 
 import { parseExcelFile, convertToSections } from './import.js';
@@ -807,6 +811,7 @@ function positionTooltip(e, tooltip) {
 
 // Обработчик изменения количества корпусов (если элемент существует)
 function onSectionsCountChange() {
+  if (buildingStats) return; // Заблокировано при синхронизации
   const numSecEl = document.getElementById('numSections');
   if (!numSecEl) return;
   const n = Math.max(1, +numSecEl.value || 1);
@@ -944,12 +949,14 @@ window.app = {
 
   // Корпуса
   updateSectionFloors(si, val) {
+    if (buildingStats) return;
     if (stateUpdateSectionFloors(si, val)) {
       recalcAll();
     }
   },
 
   toggleLockFloors(si, checked) {
+    if (buildingStats) return;
     stateToggleLockFloors(si, checked);
     recalcAll();
   },
@@ -959,8 +966,9 @@ window.app = {
     recalcAll();
   },
 
-  // Квартиры
+  // Квартиры (заблокировано при синхронизации с проектом)
   setApt(si, f, val) {
+    if (buildingStats) return;
     stateSetApt(si, f, val);
     calculateWaterSupply();
   },
@@ -2195,10 +2203,18 @@ window.addEventListener('message', (event) => {
       portalProjectName = event.data.projectName;
       console.log('[load-project-data] Имя проекта из портала:', portalProjectName);
     }
+
+    // Сохраняем buildingStats как источник истины
+    setBuildingStats(event.data.buildingStats || null, event.data.projectName || '');
+
     const data = event.data.data;
     if (data && (data.sections || data.params)) {
       // Загружаем состояние из данных проекта
       loadCalculatorState(data);
+
+      // Синхронизируем квартиры из квартирографии проекта
+      syncAptsFromBuildingStats();
+
       applyStateToDOM();
 
       // Инициализация вкладок

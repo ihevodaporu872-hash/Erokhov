@@ -15,6 +15,40 @@ export let calculatorParams = {
 // Цены для сметы (ключ: "секция:система:имя", значение: цена за единицу)
 export let estimatePrices = {};
 
+// Данные квартирографии проекта (источник истины при наличии)
+// Структура: [{ name, num, height, totalApts, totalBath, totalKitchens, floors:[{floor, apts, bath, kitchens}] }]
+export let buildingStats = null;
+export let projectSyncName = '';
+
+export function setBuildingStats(stats, projectName) {
+  buildingStats = stats && Array.isArray(stats) && stats.length > 0 ? stats : null;
+  projectSyncName = projectName || '';
+}
+
+// Синхронизация sections.apts из buildingStats (source of truth)
+export function syncAptsFromBuildingStats() {
+  if (!buildingStats) return;
+  sections.forEach((sec, si) => {
+    const bs = buildingStats[si];
+    if (!bs) return;
+    // Обновляем этажность
+    const maxFloor = (bs.floors || []).reduce((m, f) => Math.max(m, f.floor || 0), 0);
+    if (maxFloor > 0) {
+      sec.floors = maxFloor;
+      sec.floorsLocked = true;
+    }
+    // Обновляем квартиры из квартирографии
+    sec.apts = {};
+    (bs.floors || []).forEach(f => {
+      if (f.floor >= 2) sec.apts[f.floor] = f.apts || 0;
+    });
+    // Корректируем зоны
+    sec.zones.forEach(z => {
+      if (z.to > sec.floors) z.to = sec.floors;
+    });
+  });
+}
+
 // Callback для автосохранения (устанавливается из main.js)
 let onStateChangeCallback = null;
 
@@ -143,7 +177,10 @@ export function applyStateToDOM() {
 
   if (h1El) h1El.value = calculatorParams.h1;
   if (hnEl) hnEl.value = calculatorParams.hn;
-  if (numSecEl) numSecEl.value = calculatorParams.numSections;
+  if (numSecEl) {
+    numSecEl.value = calculatorParams.numSections;
+    numSecEl.disabled = !!buildingStats;
+  }
 }
 
 // Чтение параметров из DOM

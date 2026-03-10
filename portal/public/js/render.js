@@ -1,5 +1,5 @@
 import { REAL_DN, ALBUMS, albumKeys, getSleeveDn, STEEL_ZN_CLAMPS_RULES } from './constants.js';
-import { sections } from './state.js';
+import { sections, buildingStats, projectSyncName } from './state.js';
 import { formatDate, getProjectStats } from './storage.js';
 import { sectionZoneForFloor, computeMopPexLengthsForSection, computeCommissioningData } from './calculations.js';
 
@@ -229,22 +229,47 @@ function renderDnSelect(currentValue, onChangeJs, disabled) {
 function renderFloorsTableForSection(si) {
   const sec = sections[si];
   const numFloors = sec.floors;
+  const bs = buildingStats ? buildingStats[si] : null;
+  const synced = !!bs;
   let rows = '';
+
+  // Создаём lookup для buildingStats floors
+  const bsFloorMap = {};
+  if (bs && bs.floors) {
+    bs.floors.forEach(f => { bsFloorMap[f.floor] = f; });
+  }
 
   for (let f = 1; f <= numFloors; f++) {
     const isFirst = f === 1;
     const aptVal = isFirst ? 0 : (sec.apts[f] ?? 0);
-    const aptCell = isFirst
-      ? `<input type="number" value="0" disabled/>`
-      : `<input type="number" min="0" max="200" value="${aptVal}" data-focus-id="apt-${si}-${f}" oninput="window.app.setApt(${si}, ${f}, +this.value)">`;
+    const bsFloor = bsFloorMap[f];
+
+    let aptCell;
+    if (synced) {
+      // Read-only: данные из квартирографии
+      const cls = aptVal === 0 && !isFirst ? 'style="color:#666"' : '';
+      aptCell = `<span ${cls}>${aptVal}</span>`;
+    } else {
+      aptCell = isFirst
+        ? `<input type="number" value="0" disabled/>`
+        : `<input type="number" min="0" max="200" value="${aptVal}" data-focus-id="apt-${si}-${f}" oninput="window.app.setApt(${si}, ${f}, +this.value)">`;
+    }
+
+    // Дополнительные столбцы из buildingStats
+    const bathCell = synced ? `<td>${bsFloor ? bsFloor.bath || 0 : '—'}</td>` : '';
+    const kitchensCell = synced ? `<td>${bsFloor ? bsFloor.kitchens || 0 : '—'}</td>` : '';
 
     rows += `
-      <tr>
+      <tr${aptVal === 0 && !isFirst && synced ? ' class="floor-empty"' : ''}>
         <td>Этаж ${f}</td>
         <td>${aptCell}</td>
+        ${bathCell}
+        ${kitchensCell}
       </tr>
     `;
   }
+
+  const extraHeaders = synced ? '<th>Санузлы</th><th>Кухни</th>' : '';
 
   return `
     <div class="floors-table">
@@ -253,6 +278,7 @@ function renderFloorsTableForSection(si) {
           <tr>
             <th>Этаж</th>
             <th>Квартир, шт (на корпус)</th>
+            ${extraHeaders}
           </tr>
         </thead>
         <tbody>${rows}</tbody>
@@ -439,24 +465,35 @@ export function renderSectionsBlocks() {
       ? `<div class="uvp-warning"><i class="bi bi-exclamation-triangle-fill"></i>Заполните квартиры для активации</div>`
       : '';
 
+    // Индикатор синхронизации с проектом
+    const bs = buildingStats ? buildingStats[si] : null;
+    const synced = !!bs;
+    const syncIndicator = synced
+      ? `<div class="sync-indicator"><i class="bi bi-link-45deg"></i> Данные синхронизированы с проектом «${projectSyncName || 'Проект'}»</div>`
+      : '';
+
+    // Если синхронизировано — этажность заблокирована
+    const floorsDisabled = synced || sec.floorsLocked;
+
     return `
     <div class="sec-card">
-      <div class="sec-title">Корпус ${si + 1}</div>
+      <div class="sec-title">Корпус ${si + 1}${synced && bs.name ? ` — ${bs.name}` : ''}</div>
+      ${syncIndicator}
 
       <div class="row-2">
         <div class="input-group">
           <label>Количество этажей в корпусе:</label>
           <div class="inline">
-            <input type="number" min="1" max="200" value="${sec.floors}" ${sec.floorsLocked ? 'disabled' : ''}
+            <input type="number" min="1" max="200" value="${sec.floors}" ${floorsDisabled ? 'disabled' : ''}
                    data-focus-id="floors-${si}"
                    oninput="window.app.updateSectionFloors(${si}, +this.value)">
-            <label class="inline" style="gap:6px;">
+            ${!synced ? `<label class="inline" style="gap:6px;">
               <input type="checkbox" ${sec.floorsLocked ? 'checked' : ''}
                      onchange="window.app.toggleLockFloors(${si}, this.checked)">
               Закрепить
-            </label>
+            </label>` : ''}
           </div>
-          <div class="lock-hint">При закреплении поле этажности блокируется и не позволит случайно изменить значение.</div>
+          ${!synced ? '<div class="lock-hint">При закреплении поле этажности блокируется и не позволит случайно изменить значение.</div>' : ''}
         </div>
       </div>
 

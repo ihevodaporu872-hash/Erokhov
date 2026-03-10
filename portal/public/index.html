@@ -2170,11 +2170,15 @@
 
                 const iframe = document.getElementById('waterCalcFrame');
                 if (iframe && iframe.contentWindow) {
+                    const bsData = (project && project.building_stats
+                        && Array.isArray(project.building_stats) && project.building_stats.length > 0)
+                        ? project.building_stats : null;
                     iframe.contentWindow.postMessage({
                         type: 'load-project-data',
                         projectId: projectId,
                         projectName: project ? project.name : '',
-                        data: data
+                        data: data,
+                        buildingStats: bsData
                     }, '*');
                 }
 
