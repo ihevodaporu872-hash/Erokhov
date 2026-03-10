@@ -125,6 +125,13 @@
         .viz-buffer-block {
             fill: #7B1FA2; rx: 2;
         }
+        .viz-pbz-zone {
+            fill: rgba(255,152,0,.06); stroke: #FF9800; stroke-width: 1;
+            stroke-dasharray: 4 2; rx: 3;
+        }
+        .viz-fire-duct {
+            stroke: #FF9800; stroke-width: 4; stroke-linecap: round; opacity: 0.35;
+        }
 
         /* -- Linked (synced from project) input -- */
         .bld-num.linked {
@@ -272,6 +279,7 @@
                                 <span class="viz-leg-item"><span style="display:inline-block;width:8px;height:8px;background:#0277BD;border-radius:2px;margin-right:3px;vertical-align:middle"></span> BS-блок</span>
                                 <span class="viz-leg-item"><span style="display:inline-block;width:8px;height:8px;background:#7B1FA2;border-radius:2px;margin-right:3px;vertical-align:middle"></span> Буферный блок</span>
                                 <span class="viz-leg-item"><i class="bi bi-box-seam" style="color:#455A64"></i> Наружный блок</span>
+                                <span class="viz-leg-item"><span style="display:inline-block;width:12px;height:4px;background:rgba(255,152,0,.35);border-radius:1px;margin-right:3px;vertical-align:middle"></span> Огнест. короб (ПБЗ)</span>
                                 <span class="viz-leg-item"><span class="viz-leg-line" style="background:#E65100;background-image:repeating-linear-gradient(90deg,#E65100 0 6px,transparent 6px 9px)"></span>Трасса ресторана</span>
                             </div>
                         </div>
@@ -297,10 +305,11 @@
             vrfSettings[idx] = {
                 sections:        1,
                 floorHeight:     3.0,
-                floorHeightAuto: false, // авто из проекта
+                floorHeightAuto: false,
                 roofGap:         1.5,
-                aptsPerFloor:    4,     // fallback если нет данных
-                aptsAuto:        false, // данные квартир подтянуты из проекта
+                corridorLength:  30,    // длина коридора секции, м
+                aptsPerFloor:    4,
+                aptsAuto:        false,
                 penthouses:      false,
                 restaurant:      false,
                 commercial:      false,
@@ -447,24 +456,42 @@
                 sec + ' секц. × ' + riserLen.toFixed(1) + ' м', 'dev');
 
             // ════════════════ РАЗВОДКА МОП (Горизонталь) ════════════════
-            var avgBranch = 4;
-            var totalBranches = totalAptsVRF * sec;
-            var branchPipe = totalBranches * avgBranch;
+            // Длина горизонтального участка = corridorLength / (aptsPerFloor / 2)
+            // (квартиры по обе стороны коридора, средний путь до каждой)
+            var corrLen = s.corridorLength || 30;
+            var branchPipeTotal = 0;
+            for (var fi = 0; fi < nF; fi++) {
+                var floorNum = fi + 1;
+                if (hasComm && floorNum === 1) continue;
+                if (hasPent && floorNum === nF) continue;
+                var aptsOnFloor = getRealAptsOnFloor(b, s, floorNum);
+                if (aptsOnFloor <= 0) continue;
+                var avgBranch = corrLen / Math.max(aptsOnFloor / 2, 1);
+                branchPipeTotal += aptsOnFloor * avgBranch * sec;
+            }
+            branchPipeTotal = Math.round(branchPipeTotal * 10) / 10;
 
-            addItem('vrf_branch_liquid', 'Труба медная в НГ-изоляции Ø9.52 (ответвление, жидкость)', 'м.п.',
-                Math.round(branchPipe * 10) / 10,
-                totalBranches + ' ответвлений × ' + avgBranch + ' м', 'dev');
-            addItem('vrf_branch_gas_hp', 'Труба медная в НГ-изоляции Ø15.9 (ответвление, газ ВД)', 'м.п.',
-                Math.round(branchPipe * 10) / 10,
-                totalBranches + ' ответвлений × ' + avgBranch + ' м', 'dev');
-            addItem('vrf_branch_gas_lp', 'Труба медная в НГ-изоляции Ø12.7 (ответвление, газ НД)', 'м.п.',
-                Math.round(branchPipe * 10) / 10,
-                totalBranches + ' ответвлений × ' + avgBranch + ' м', 'dev');
+            addItem('vrf_branch_liquid', 'Труба медная в НГ-изоляции Ø9.52 (ответвление МОП, жидкость)', 'м.п.',
+                branchPipeTotal,
+                'По формуле: L_кор / (N_кв / 2) × N_кв, коридор ' + corrLen + ' м', 'dev');
+            addItem('vrf_branch_gas_hp', 'Труба медная в НГ-изоляции Ø15.9 (ответвление МОП, газ ВД)', 'м.п.',
+                branchPipeTotal,
+                'По формуле: L_кор / (N_кв / 2) × N_кв', 'dev');
+            addItem('vrf_branch_gas_lp', 'Труба медная в НГ-изоляции Ø12.7 (ответвление МОП, газ НД)', 'м.п.',
+                branchPipeTotal,
+                'По формуле: L_кор / (N_кв / 2) × N_кв', 'dev');
+
+            // ════════════════ ИЗОЛЯЦИЯ НГ (вспененный каучук) ════════════════
+            var totalPipeLen = riserTotal * 3 + branchPipeTotal * 3;
+            addItem('vrf_insulation', 'Трубная изоляция из вспененного каучука (НГ — негорючая)', 'м.п.',
+                Math.round(totalPipeLen * 10) / 10,
+                '3 трубы × (' + riserTotal.toFixed(0) + ' м стояк + ' + branchPipeTotal.toFixed(0) + ' м МОП)', 'dev');
 
             // ════════════════ BS-блоки (распределители) ════════════════
+            // Точка разграничения: BS-блок — зона застройщика, далее — собственника
             var totalBS = totalAptsVRF * sec;
-            addItem('vrf_bs_block', 'BS-блок (распределитель VRF)', 'шт', totalBS,
-                '1 шт на квартиру (' + totalAptsVRF + ' кв. × ' + sec + ' секц.)', 'dev');
+            addItem('vrf_bs_block', 'Блок-распределитель (BS-блок) — точка разграничения', 'шт', totalBS,
+                '1 шт/квартира, устанавл. застройщиком. Далее — зона собственника.', 'dev');
 
             // ════════════════ Наружные блоки VRF ════════════════
             var outdoorCount = Math.ceil(totalBS / 8) || 1;
@@ -473,7 +500,7 @@
 
             // ════════════════ Буферные блоки (эт. 2–7) ════════════════
             if (s.bufferFloors) {
-                var bufStart = 1; // 2-й этаж = индекс 1 (0-based → floor 2)
+                var bufStart = 1;
                 var bufEnd   = Math.min(6, nF - 1);
                 var bufCount = 0;
                 for (var fi = bufStart; fi <= bufEnd; fi++) {
@@ -490,15 +517,24 @@
             addItem('vrf_leak_sensor', 'Датчик утечки фреона', 'шт', leakSensors,
                 '2 шт на квартиру (под установку собственником)', 'dev');
 
-            // ════════════════ Огнестойкие короба (ПБЗ) ════════════════
+            // ════════════════ Огнестойкий короб для фреонопроводов ════════════════
+            // Транзитные участки через лифтовые холлы и зоны ПБЗ: 2 м на секцию на этаж
+            var fireDuctLen = 2 * sec * vrfFloors;
+            addItem('vrf_fire_duct', 'Огнестойкий короб для фреонопроводов (зоны ПБЗ)', 'м.п.',
+                Math.round(fireDuctLen * 10) / 10,
+                '2 м на секцию на этаж (лифтовой холл / ПБЗ)', 'dev');
+
+            // ════════════════ Огнестойкие проходки ════════════════
             var fireBoxes = sec * vrfFloors;
-            addItem('vrf_fire_box', 'Огнестойкий короб (проходка перекрытия)', 'шт', fireBoxes,
+            addItem('vrf_fire_box', 'Огнестойкая проходка перекрытия (муфта / манжета)', 'шт', fireBoxes,
                 '1 комплект на секцию на этаж', 'dev');
 
-            // ════════════════ ИЗОЛЯЦИЯ НГ ════════════════
-            addItem('vrf_insulation', 'Изоляция НГ K-FLEX (дополнит., горизонт. МОП)', 'м.п.',
-                Math.round(branchPipe * 3 * 10) / 10,
-                '3 трубы × ' + branchPipe.toFixed(0) + ' м ответвлений', 'dev');
+            // ════════════════ Фреон R410a ════════════════
+            // Расчёт: общий метраж труб × коэффициент объёма (0.04 кг/м для среднего диаметра)
+            var totalTubeLen = riserTotal + branchPipeTotal;
+            var freonKg = Math.round(totalTubeLen * 0.04 * 10) / 10;
+            addItem('vrf_freon', 'Фреон R410a (заправка системы)', 'кг', freonKg,
+                'Общий метраж ' + totalTubeLen.toFixed(0) + ' м × 0.04 кг/м', 'dev');
 
             // ════════════════ КОММЕРЦИЯ (1 этаж) ════════════════
             if (hasComm) {
@@ -541,7 +577,7 @@
             'vrf_branch_liquid', 'vrf_branch_gas_hp', 'vrf_branch_gas_lp',
             'vrf_insulation',
             'vrf_bs_block', 'vrf_outdoor', 'vrf_buffer',
-            'vrf_leak_sensor', 'vrf_fire_box',
+            'vrf_leak_sensor', 'vrf_fire_duct', 'vrf_fire_box', 'vrf_freon',
             'vrf_pent_mini', 'vrf_pent_outdoor',
             'vrf_comm_bracket',
             'vrf_rest_pipe_liquid', 'vrf_rest_pipe_gas_hp', 'vrf_rest_pipe_gas_lp', 'vrf_rest_outdoor'
@@ -611,6 +647,12 @@
             html += '<div class="bld-num-row" style="margin-top:8px">' +
                 '<label>Расстояние кровля → верхний этаж (м):</label>' +
                 '<input type="number" class="bld-num vrf-roof-gap" data-idx="' + idx + '" min="0.5" max="10" step="0.5" value="' + s.roofGap + '">' +
+                '</div>';
+
+            // Corridor length
+            html += '<div class="bld-num-row" style="margin-top:8px">' +
+                '<label>Длина коридора секции (м):</label>' +
+                '<input type="number" class="bld-num vrf-corridor" data-idx="' + idx + '" min="5" max="100" step="1" value="' + s.corridorLength + '">' +
                 '</div>';
 
             // Apts per floor
@@ -690,6 +732,14 @@
 
             html += '</div>'; // 1st floor section
             html += '</div>'; // checkboxes border-top
+
+            // Примечание о разграничении ответственности
+            html += '<div style="margin-top:14px;padding:10px 12px;background:rgba(2,119,189,.04);border:1px solid rgba(2,119,189,.15);border-radius:8px;font-size:12px;color:var(--gray-600)">' +
+                '<i class="bi bi-shield-check" style="color:#0277BD;margin-right:4px"></i>' +
+                '<strong>Точка разграничения:</strong> BS-блок (распределитель) — граница зоны застройщика. ' +
+                'Трассы внутри квартир и внутренние блоки — зона ответственности собственника.' +
+                '</div>';
+
             html += '</div></details>';
         });
 
@@ -711,6 +761,12 @@
         container.querySelectorAll('.vrf-roof-gap').forEach(function (inp) {
             inp.addEventListener('input', function () {
                 getSettings(+inp.dataset.idx).roofGap = Math.max(0.5, +inp.value || 1.5);
+                renderResults();
+            });
+        });
+        container.querySelectorAll('.vrf-corridor').forEach(function (inp) {
+            inp.addEventListener('input', function () {
+                getSettings(+inp.dataset.idx).corridorLength = Math.max(5, +inp.value || 30);
                 renderResults();
             });
         });
@@ -1057,11 +1113,12 @@
         }
 
         // ── VRF risers ──
+        var ouW = 20, ouH = 14;
+
         for (var si = 0; si < sec; si++) {
             var rx = vrfPositions[si];
 
             // Outdoor unit on roof
-            var ouW = 20, ouH = 14;
             svgEl('rect', { x: rx - ouW/2, y: roofY - ouH - 8, width: ouW, height: ouH, 'class': 'viz-outdoor-unit' }, svg);
             svgIcon(rx, roofY - ouH/2 - 8, 'bi-box-seam', '#455A64', 10, 'Наружный блок VRF, секц. ' + (si+1), svg);
 
@@ -1088,6 +1145,9 @@
 
                 var aptsF = getRealAptsOnFloor(b, s, floorNum);
 
+                // ПБЗ зона: огнестойкий короб (утолщённая оранжевая линия у стояка)
+                svgEl('line', { x1: rx - 6, y1: floorY, x2: rx + 6, y2: floorY, 'class': 'viz-fire-duct' }, svg);
+
                 // Branch lines to apartments (show up to 4)
                 var showApts = Math.min(aptsF, 4);
                 for (var ai = 0; ai < showApts; ai++) {
@@ -1100,11 +1160,20 @@
                     svgText(rx + 18 + showApts * 14, floorY + 3, '+' + (aptsF - 4), 'viz-label', svg);
                 }
 
-                // Buffer block (floors 2-7)
+                // Buffer block on riser (floors 2-7) — показываем как узел на магистрали
                 if (s.bufferFloors && floorNum >= 2 && floorNum <= 7) {
-                    svgEl('rect', { x: rx - 10, y: floorY - 4, width: 8, height: 8, 'class': 'viz-buffer-block' }, svg);
+                    svgEl('rect', { x: rx - 6, y: floorY - 5, width: 12, height: 10, 'class': 'viz-buffer-block', opacity: 0.7 }, svg);
+                    svgEl('rect', { x: rx - 4, y: floorY - 3, width: 8, height: 6,
+                        fill: '#fff', rx: 1, opacity: 0.6 }, svg);
                 }
             }
+
+            // ПБЗ зона рамка (лифтовой холл) — вертикальная полоса рядом со стояком
+            var pbzX = rx - 12;
+            var pbzTopY = roofY + (hasPent ? 1 : 0) * FLOOR_H;
+            var pbzBotY = roofY + (nF - (hasComm ? 1 : 0)) * FLOOR_H;
+            svgEl('rect', { x: pbzX - 4, y: pbzTopY, width: 10, height: pbzBotY - pbzTopY, 'class': 'viz-pbz-zone' }, svg);
+            svgText(pbzX, pbzBotY + 10, 'ПБЗ', 'viz-label', svg);
 
             // Penthouses on last floor
             if (hasPent) {
