@@ -125,6 +125,46 @@
         .viz-buffer-block {
             fill: #7B1FA2; rx: 2;
         }
+
+        /* -- Linked (synced from project) input -- */
+        .bld-num.linked {
+            background: var(--gray-100, #f5f5f5);
+            color: var(--gray-500);
+            cursor: default;
+            border-color: var(--gray-200);
+        }
+        .dark-theme .bld-num.linked {
+            background: var(--gray-800, #2a2a2e);
+            color: var(--gray-400);
+        }
+        .linked-badge {
+            display: inline-flex; align-items: center; gap: 3px;
+            font-size: 11px; color: #0277BD; margin-left: 6px;
+            opacity: 0.85;
+        }
+        .linked-badge i { font-size: 12px; }
+
+        /* -- Per-floor apts table -- */
+        .floor-apts-table {
+            font-size: 12px; color: var(--gray-600);
+            border-collapse: collapse; width: 100%; margin-top: 8px;
+        }
+        .floor-apts-table th {
+            font-size: 11px; font-weight: 600; color: var(--gray-500);
+            text-align: left; padding: 3px 8px;
+            border-bottom: 1px solid var(--gray-200);
+        }
+        .floor-apts-table td {
+            padding: 2px 8px;
+            border-bottom: 1px solid var(--gray-100);
+        }
+        .floor-apts-table tr:last-child td { border-bottom: none; }
+        .floor-apts-summary {
+            margin-top: 6px; font-size: 12px; color: var(--gray-500);
+            cursor: pointer; user-select: none;
+        }
+        .floor-apts-summary i { transition: transform .15s; }
+        .floor-apts-summary.open i { transform: rotate(90deg); }
     </style>
 </head>
 <body>
@@ -255,18 +295,62 @@
     function getSettings(idx) {
         if (!vrfSettings[idx]) {
             vrfSettings[idx] = {
-                sections:       1,
-                floorHeight:    3.0,
-                roofGap:        1.5,   // расстояние кровля → верхний этаж
-                aptsPerFloor:   4,     // квартир на типовом этаже секции
-                penthouses:     false, // пентхаусы (mini-VRF) на последнем этаже
-                restaurant:     false, // ресторан на 1 этаже
-                commercial:     false, // коммерция (аренда) на 1 этаже
-                commercialCount: 1,    // количество помещений аренды
-                bufferFloors:   true   // буферные блоки на эт. 2–7
+                sections:        1,
+                floorHeight:     3.0,
+                floorHeightAuto: false, // авто из проекта
+                roofGap:         1.5,
+                aptsPerFloor:    4,     // fallback если нет данных
+                aptsAuto:        false, // данные квартир подтянуты из проекта
+                penthouses:      false,
+                restaurant:      false,
+                commercial:      false,
+                commercialCount: 1,
+                bufferFloors:    true
             };
         }
         return vrfSettings[idx];
+    }
+
+    // Синхронизация настроек из buildingStats при загрузке данных
+    function syncSettingsFromData() {
+        if (!buildingStats || !buildingStats.length) return;
+        buildingStats.forEach(function (b, idx) {
+            var s  = getSettings(idx);
+            var nF = getFloorCount(b);
+
+            // Авто-высота: b.height / nF (если данные есть)
+            if (b.height && nF > 0) {
+                s.floorHeight = Math.round((b.height / nF) * 10) / 10;
+                s.floorHeightAuto = true;
+            }
+
+            // Авто-квартиры: проверяем есть ли реальные данные по этажам
+            if (b.floors && b.floors.length > 0) {
+                var hasApts = b.floors.some(function (f) { return f.apts > 0; });
+                if (hasApts) {
+                    s.aptsAuto = true;
+                    // aptsPerFloor = среднее по типовым (не 1-й, не последний)
+                    var typFloors = b.floors.filter(function (f) { return f.floor > 1 && f.floor < nF; });
+                    if (typFloors.length > 0) {
+                        var sum = 0;
+                        typFloors.forEach(function (f) { sum += f.apts; });
+                        s.aptsPerFloor = Math.round(sum / typFloors.length);
+                    } else if (b.floors.length > 0) {
+                        s.aptsPerFloor = b.floors[0].apts || 4;
+                    }
+                }
+            }
+        });
+    }
+
+    // Получить квартиры для конкретного этажа (1-based floorNum)
+    function getRealAptsOnFloor(b, s, floorNum) {
+        if (s.aptsAuto && b.floors) {
+            for (var i = 0; i < b.floors.length; i++) {
+                if (b.floors[i].floor === floorNum) return b.floors[i].apts || 0;
+            }
+        }
+        return s.aptsPerFloor || 4;
     }
 
     /* --- Helpers --- */
@@ -328,23 +412,29 @@
             var sec    = s.sections || 1;
             var fH     = s.floorHeight || 3.0;
             var roofG  = s.roofGap || 1.5;
-            var aptsF  = s.aptsPerFloor || 4;
             var hasComm  = s.commercial;
             var hasRest  = s.restaurant;
             var hasPent  = s.penthouses;
 
             // Этажи, участвующие в жилой VRF (исключаем 1 этаж если коммерция)
-            var residStart = hasComm ? 1 : 0; // индекс первого жилого этажа (0-based)
+            var residStart = hasComm ? 1 : 0;
             var residFloors = nF - residStart;
-            // Последний этаж = пентхаусы (mini-VRF), исключаем из общей VRF
             var vrfFloors = hasPent ? residFloors - 1 : residFloors;
             if (vrfFloors < 0) vrfFloors = 0;
 
+            // Подсчёт квартир поэтажно (реальные данные из buildingStats)
+            var totalAptsVRF = 0;  // все квартиры на VRF-этажах
+            for (var fi = 0; fi < nF; fi++) {
+                var floorNum = fi + 1; // 1-based
+                if (hasComm && floorNum === 1) continue;
+                if (hasPent && floorNum === nF) continue;
+                totalAptsVRF += getRealAptsOnFloor(b, s, floorNum);
+            }
+
             // ════════════════ МАГИСТРАЛИ (Вертикаль) ════════════════
-            // 3 медные трубы: жидкость, газ высокого давления, газ низкого давления
-            // Длина стояка = roofGap + vrfFloors * floorHeight
+            // Длина стояка с учётом переменной высоты этажа
             var riserLen = roofG + vrfFloors * fH;
-            var riserTotal = riserLen * sec; // на каждую секцию — свой стояк
+            var riserTotal = riserLen * sec;
 
             addItem('vrf_pipe_liquid', 'Труба медная в НГ-изоляции Ø12.7 (жидкость)', 'м.п.',
                 Math.round(riserTotal * 10) / 10,
@@ -357,10 +447,8 @@
                 sec + ' секц. × ' + riserLen.toFixed(1) + ' м', 'dev');
 
             // ════════════════ РАЗВОДКА МОП (Горизонталь) ════════════════
-            // 3 трубы от стояка до входа в каждую квартиру (потолок коридора)
-            // Средняя длина ответвления ≈ 4 м на квартиру
-            var avgBranch = 4; // м
-            var totalBranches = aptsF * vrfFloors * sec;
+            var avgBranch = 4;
+            var totalBranches = totalAptsVRF * sec;
             var branchPipe = totalBranches * avgBranch;
 
             addItem('vrf_branch_liquid', 'Труба медная в НГ-изоляции Ø9.52 (ответвление, жидкость)', 'м.п.',
@@ -374,21 +462,19 @@
                 totalBranches + ' ответвлений × ' + avgBranch + ' м', 'dev');
 
             // ════════════════ BS-блоки (распределители) ════════════════
-            // Строго 1 шт. на каждую квартиру
-            var totalBS = aptsF * vrfFloors * sec;
+            var totalBS = totalAptsVRF * sec;
             addItem('vrf_bs_block', 'BS-блок (распределитель VRF)', 'шт', totalBS,
-                '1 шт на квартиру, ' + vrfFloors + ' жилых эт. × ' + sec + ' секц. × ' + aptsF + ' кв.', 'dev');
+                '1 шт на квартиру (' + totalAptsVRF + ' кв. × ' + sec + ' секц.)', 'dev');
 
             // ════════════════ Наружные блоки VRF ════════════════
-            // 1 блок на ~8 квартир (стандартное деление)
             var outdoorCount = Math.ceil(totalBS / 8) || 1;
             addItem('vrf_outdoor', 'Наружный блок VRF (кровля)', 'шт', outdoorCount,
                 '1 блок на ~8 квартир', 'dev');
 
             // ════════════════ Буферные блоки (эт. 2–7) ════════════════
             if (s.bufferFloors) {
-                var bufStart = hasComm ? 1 : 1; // 2-й этаж = индекс 1 (0-based)
-                var bufEnd   = Math.min(6, nF - 1); // до 7-го этажа включительно = индекс 6
+                var bufStart = 1; // 2-й этаж = индекс 1 (0-based → floor 2)
+                var bufEnd   = Math.min(6, nF - 1);
                 var bufCount = 0;
                 for (var fi = bufStart; fi <= bufEnd; fi++) {
                     bufCount += sec;
@@ -400,20 +486,16 @@
             }
 
             // ════════════════ Датчики утечки фреона ════════════════
-            // 2 шт на квартиру (под установку собственником)
             var leakSensors = 2 * totalBS;
             addItem('vrf_leak_sensor', 'Датчик утечки фреона', 'шт', leakSensors,
                 '2 шт на квартиру (под установку собственником)', 'dev');
 
             // ════════════════ Огнестойкие короба (ПБЗ) ════════════════
-            // Проходки через перекрытия: 1 комплект на секцию на этаж
             var fireBoxes = sec * vrfFloors;
             addItem('vrf_fire_box', 'Огнестойкий короб (проходка перекрытия)', 'шт', fireBoxes,
                 '1 комплект на секцию на этаж', 'dev');
 
-            // ════════════════ ИЗОЛЯЦИЯ НГ (дополнительно на стояки) ════════════════
-            // Негорючая изоляция K-FLEX ST/HT на магистраль (3 трубы, включена в трубу)
-            // Отдельно учитываем изоляцию на горизонтальных участках МОП
+            // ════════════════ ИЗОЛЯЦИЯ НГ ════════════════
             addItem('vrf_insulation', 'Изоляция НГ K-FLEX (дополнит., горизонт. МОП)', 'м.п.',
                 Math.round(branchPipe * 3 * 10) / 10,
                 '3 трубы × ' + branchPipe.toFixed(0) + ' м ответвлений', 'dev');
@@ -421,7 +503,6 @@
             // ════════════════ КОММЕРЦИЯ (1 этаж) ════════════════
             if (hasComm) {
                 var commN = s.commercialCount || 1;
-                // Кронштейны для мульти-сплит в техзоне
                 addItem('vrf_comm_bracket', 'Комплект кронштейнов для мульти-сплит систем (аренда, техзона)', 'компл.',
                     commN * sec,
                     commN + ' пом. × ' + sec + ' секц., установка арендатором', 'comm');
@@ -429,8 +510,7 @@
 
             // ════════════════ РЕСТОРАН (1 этаж) ════════════════
             if (hasRest) {
-                // Отдельная трасса (3 трубы) от кровли 1-го этажа до помещения
-                var restRiser = fH + roofG; // одна высота этажа + зазор до кровли 1 этажа
+                var restRiser = fH + roofG;
                 addItem('vrf_rest_pipe_liquid', 'Труба медная Ø12.7 (ресторан, жидкость)', 'м.п.',
                     Math.round(restRiser * sec * 10) / 10,
                     'Отдельная трасса от кровли 1 эт.', 'comm');
@@ -446,10 +526,10 @@
 
             // ════════════════ ПЕНТХАУСЫ (последний этаж) ════════════════
             if (hasPent) {
-                var pentApts = getAptsOnFloor(b, nF - 1) || aptsF;
+                var pentApts = getRealAptsOnFloor(b, s, nF);
                 var pentBS   = pentApts * sec;
                 addItem('vrf_pent_mini', 'Mini-VRF блок (пентхаус)', 'шт', pentBS,
-                    '1 блок на квартиру, последний этаж', 'dev');
+                    '1 блок на квартиру, последний этаж (' + pentApts + ' кв.)', 'dev');
                 addItem('vrf_pent_outdoor', 'Наружный блок mini-VRF (пентхаус, кровля)', 'шт', pentBS,
                     '1 блок на квартиру (индивидуальный)', 'dev');
             }
@@ -520,9 +600,11 @@
                 '</div>';
 
             // Floor height
+            var fhLinked = s.floorHeightAuto;
             html += '<div class="bld-num-row" style="margin-top:8px">' +
                 '<label>Высота этажа (м):</label>' +
-                '<input type="number" class="bld-num vrf-floor-height" data-idx="' + idx + '" min="2.5" max="5" step="0.1" value="' + s.floorHeight + '">' +
+                '<input type="number" class="bld-num vrf-floor-height' + (fhLinked ? ' linked' : '') + '" data-idx="' + idx + '" min="2.5" max="5" step="0.1" value="' + s.floorHeight + '"' + (fhLinked ? ' readonly' : '') + '>' +
+                (fhLinked ? '<span class="linked-badge"><i class="bi bi-link-45deg"></i>из проекта</span>' : '') +
                 '</div>';
 
             // Roof gap
@@ -531,11 +613,33 @@
                 '<input type="number" class="bld-num vrf-roof-gap" data-idx="' + idx + '" min="0.5" max="10" step="0.5" value="' + s.roofGap + '">' +
                 '</div>';
 
-            // Apts per floor per section
+            // Apts per floor
+            var aptsLinked = s.aptsAuto;
             html += '<div class="bld-num-row" style="margin-top:8px">' +
-                '<label>Квартир на этаже секции:</label>' +
-                '<input type="number" class="bld-num vrf-apts-floor" data-idx="' + idx + '" min="1" max="20" value="' + s.aptsPerFloor + '">' +
+                '<label>Квартир на типовом этаже' + (aptsLinked ? '' : ' секции') + ':</label>' +
+                '<input type="number" class="bld-num vrf-apts-floor' + (aptsLinked ? ' linked' : '') + '" data-idx="' + idx + '" min="1" max="20" value="' + s.aptsPerFloor + '"' + (aptsLinked ? ' readonly' : '') + '>' +
+                (aptsLinked ? '<span class="linked-badge"><i class="bi bi-link-45deg"></i>из проекта</span>' : '') +
                 '</div>';
+
+            // Per-floor breakdown (if data available)
+            if (aptsLinked && b.floors && b.floors.length > 0) {
+                html += '<div class="floor-apts-summary" data-target="floor-table-' + idx + '" style="margin-top:6px;margin-left:2px">' +
+                    '<i class="bi bi-chevron-right"></i> Квартиры по этажам (из квартирографии)</div>';
+                html += '<div id="floor-table-' + idx + '" style="display:none">' +
+                    '<table class="floor-apts-table"><thead><tr><th>Этаж</th><th>Квартир</th><th>С/У</th><th>Кухонь</th></tr></thead><tbody>';
+                // Сортируем по номеру этажа
+                var sortedFloors = b.floors.slice().sort(function (a, bb) { return a.floor - bb.floor; });
+                sortedFloors.forEach(function (f) {
+                    var isFirst = f.floor === 1;
+                    var isLast  = f.floor === nF;
+                    var mark = '';
+                    if (isFirst && s.commercial) mark = ' <span style="color:#E65100;font-size:10px">(комм.)</span>';
+                    if (isLast && s.penthouses) mark = ' <span style="color:#7B1FA2;font-size:10px">(пент.)</span>';
+                    html += '<tr><td>' + f.floor + mark + '</td><td><strong>' + (f.apts || 0) + '</strong></td>' +
+                        '<td>' + (f.bath || 0) + '</td><td>' + (f.kitchens || 0) + '</td></tr>';
+                });
+                html += '</tbody></table></div>';
+            }
 
             // Checkboxes
             html += '<div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--gray-200)">';
@@ -598,7 +702,7 @@
                 renderResults();
             });
         });
-        container.querySelectorAll('.vrf-floor-height').forEach(function (inp) {
+        container.querySelectorAll('.vrf-floor-height:not(.linked)').forEach(function (inp) {
             inp.addEventListener('input', function () {
                 getSettings(+inp.dataset.idx).floorHeight = Math.max(2.5, +inp.value || 3);
                 renderResults();
@@ -610,10 +714,20 @@
                 renderResults();
             });
         });
-        container.querySelectorAll('.vrf-apts-floor').forEach(function (inp) {
+        container.querySelectorAll('.vrf-apts-floor:not(.linked)').forEach(function (inp) {
             inp.addEventListener('input', function () {
                 getSettings(+inp.dataset.idx).aptsPerFloor = Math.max(1, +inp.value || 4);
                 renderResults();
+            });
+        });
+        // Floor summary toggle
+        container.querySelectorAll('.floor-apts-summary').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var target = document.getElementById(btn.dataset.target);
+                if (!target) return;
+                var isOpen = target.style.display !== 'none';
+                target.style.display = isOpen ? 'none' : '';
+                btn.classList.toggle('open', !isOpen);
             });
         });
         container.querySelectorAll('.vrf-penthouses').forEach(function (inp) {
@@ -972,7 +1086,7 @@
                 // Skip last floor if penthouses (separate mini-VRF)
                 if (hasPent && floorNum === nF) continue;
 
-                var aptsF = s.aptsPerFloor || 4;
+                var aptsF = getRealAptsOnFloor(b, s, floorNum);
 
                 // Branch lines to apartments (show up to 4)
                 var showApts = Math.min(aptsF, 4);
@@ -1043,6 +1157,7 @@
         if (!msg) return;
         if (msg.type === 'load-project-data') {
             buildingStats = msg.buildingStats || null;
+            syncSettingsFromData();
             renderBuildingAccordions();
             renderResults();
         }
