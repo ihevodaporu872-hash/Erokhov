@@ -970,6 +970,12 @@ window.app = {
     recalcAll();
   },
 
+  toggleRent(si) {
+    const sec = sections[si];
+    stateSetRentEnabled(si, !sec.rent.enabled);
+    recalcAll();
+  },
+
   setRentQty(si, qty) {
     stateSetRentQty(si, qty);
     calculateWaterSupply();

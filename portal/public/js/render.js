@@ -238,21 +238,10 @@ function renderFloorsTableForSection(si) {
       ? `<input type="number" value="0" disabled/>`
       : `<input type="number" min="0" max="200" value="${aptVal}" data-focus-id="apt-${si}-${f}" oninput="window.app.setApt(${si}, ${f}, +this.value)">`;
 
-    const rentCells = isFirst
-      ? `
-        <td>
-          <select onchange="window.app.setRentEnabled(${si}, this.value==='yes');">
-            <option value="no" ${!sec.rent.enabled ? 'selected' : ''}>Нет</option>
-            <option value="yes" ${sec.rent.enabled ? 'selected' : ''}>Да</option>
-          </select>
-        </td>`
-      : `<td></td>`;
-
     rows += `
       <tr>
         <td>Этаж ${f}</td>
         <td>${aptCell}</td>
-        ${rentCells}
       </tr>
     `;
   }
@@ -264,7 +253,6 @@ function renderFloorsTableForSection(si) {
           <tr>
             <th>Этаж</th>
             <th>Квартир, шт (на корпус)</th>
-            <th>Аренда (1-й этаж)</th>
           </tr>
         </thead>
         <tbody>${rows}</tbody>
@@ -480,18 +468,22 @@ export function renderSectionsBlocks() {
           </button>
           ${uvpWarning}
         </div>
-        <div class="commercial-units-group" style="display:flex; align-items:center; gap:8px; margin-top:10px">
-          <label style="font-size:13px; white-space:nowrap; color:${sec.rent.enabled ? '#ccc' : '#666'}">Узлы учёта коммерции:</label>
-          <input type="number" min="0" step="1" value="${sec.commercialUnits ?? 1}"
+        <div class="rent-input-group ${sec.rent.enabled ? 'active' : ''}">
+          <button type="button" class="rent-toggle ${sec.rent.enabled ? 'active' : ''}"
+                  onclick="window.app.toggleRent(${si})">
+            <i class="bi bi-shop"></i> Аренда
+          </button>
+          <input type="number" min="0" step="1" value="${sec.commercialUnits ?? 0}"
             ${sec.rent.enabled ? '' : 'disabled'}
-            class="commercial-units-input"
+            class="rent-units-input"
             data-focus-id="comm-${si}"
+            placeholder="Узлы"
             oninput="window.app.setCommercialUnits(${si}, +this.value)">
         </div>
       </div>
 
       <details>
-        <summary><b>Квартиры по этажам и аренда (только 1-й этаж)${aptsLabel}</b></summary>
+        <summary><b>Квартиры по этажам${aptsLabel}</b></summary>
         ${renderFloorsTableForSection(si)}
       </details>
 

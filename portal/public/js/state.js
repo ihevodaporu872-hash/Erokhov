@@ -215,6 +215,11 @@ export function setApt(si, f, val) {
 // Включение/выключение аренды
 export function setRentEnabled(si, enabled) {
   sections[si].rent.enabled = !!enabled;
+  if (enabled) {
+    if (!sections[si].commercialUnits) sections[si].commercialUnits = 1;
+  } else {
+    sections[si].commercialUnits = 0;
+  }
   notifyStateChange();
 }
 
