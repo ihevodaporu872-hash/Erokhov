@@ -456,18 +456,24 @@ export function renderSectionsBlocks() {
         <div class="kuu-cards">
           <div class="kuu-card ${sec.kuuVariant === 'collector' ? 'active' : ''}"
                onclick="window.app.setKuuVariant(${si}, 'collector')">
+            <span class="kuu-card-badge">Стандарт</span>
             <div class="kuu-card-head"><i class="bi bi-diagram-3"></i><span class="kuu-card-name">Коллекторный</span></div>
-            <div class="kuu-card-desc">Классическая схема с общим коллектором в МОП. Узлов\u00a0=\u00a0кв.</div>
+            <div class="kuu-card-desc">Общий коллектор в МОП на каждом этаже</div>
+            <div class="kuu-card-formula">КУУ = кол-во квартир \u00d7 2 (В1+Т3)</div>
           </div>
           <div class="kuu-card ${sec.kuuVariant === 'collector_pre_apt' ? 'active' : ''}"
                onclick="window.app.setKuuVariant(${si}, 'collector_pre_apt')">
+            <span class="kuu-card-badge">Гибрид</span>
             <div class="kuu-card-head"><i class="bi bi-node-plus"></i><span class="kuu-card-name">Колл. + перед кв.</span></div>
-            <div class="kuu-card-desc">Смешанная схема: коллектор + узлы перед входом в квартиру.</div>
+            <div class="kuu-card-desc">Коллектор + узлы учёта перед входом в квартиру</div>
+            <div class="kuu-card-formula">Коллектор + кран/фильтр/счётчик \u00d7 кв.</div>
           </div>
           <div class="kuu-card ${sec.kuuVariant === 'pre_apt' ? 'active' : ''}"
                onclick="window.app.setKuuVariant(${si}, 'pre_apt')">
+            <span class="kuu-card-badge">Индивидуально</span>
             <div class="kuu-card-head"><i class="bi bi-door-open"></i><span class="kuu-card-name">Перед квартирой</span></div>
-            <div class="kuu-card-desc">Индивидуальное подключение без общего коллектора.</div>
+            <div class="kuu-card-desc">Индивидуальное подключение без общего коллектора</div>
+            <div class="kuu-card-formula">Кран + фильтр + регулятор + счётчик \u00d7 кв.</div>
           </div>
         </div>
       </div>
