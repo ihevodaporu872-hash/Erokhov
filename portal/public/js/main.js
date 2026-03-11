@@ -7,6 +7,7 @@ import {
   setRentEnabled as stateSetRentEnabled,
   setRentQty as stateSetRentQty,
   setCommercialUnits as stateSetCommercialUnits,
+  setKuuVariant as stateSetKuuVariant,
   addZone as stateAddZone,
   removeZone as stateRemoveZone,
   clearZones as stateClearZones,
@@ -989,6 +990,11 @@ window.app = {
   setCommercialUnits(si, qty) {
     stateSetCommercialUnits(si, qty);
     calculateWaterSupply();
+  },
+
+  setKuuVariant(si, variant) {
+    stateSetKuuVariant(si, variant);
+    recalcAll();
   },
 
   // Зоны

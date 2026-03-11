@@ -257,11 +257,6 @@ function renderZonesTableForSection(si) {
       <td>${renderDnSelect(d.V1 ?? 32, `window.app.updateZoneDia(${si}, ${z.id}, 'V1', +this.value)`, z.locked)}</td>
       <td>${renderDnSelect(d.T3 ?? 32, `window.app.updateZoneDia(${si}, ${z.id}, 'T3', +this.value)`, z.locked)}</td>
       <td>${renderDnSelect(d.T4 ?? 32, `window.app.updateZoneDia(${si}, ${z.id}, 'T4', +this.value)`, z.locked)}</td>
-      <td>
-        <select ${dis} onchange="window.app.updateZone(${si}, ${z.id}, 'albumType', this.value)">
-          ${albumKeys.map(k => `<option value="${k}" ${z.albumType === k ? 'selected' : ''}>${ALBUMS[k]}</option>`).join('')}
-        </select>
-      </td>
       <td style="text-align:right;"><button class="btn-danger" onclick="window.app.removeZone(${si}, ${z.id})" ${z.locked ? 'disabled' : ''}>Удалить</button></td>
     </tr>`;
   }).join('');
@@ -278,7 +273,6 @@ function renderZonesTableForSection(si) {
             <th>DN В1</th>
             <th>DN Т3</th>
             <th>DN Т4</th>
-            <th>Альбом КУУ</th>
             <th></th>
           </tr>
         </thead>
@@ -454,6 +448,18 @@ export function renderSectionsBlocks() {
             data-focus-id="comm-${si}"
             placeholder="Узлы"
             oninput="window.app.setCommercialUnits(${si}, +this.value)">
+        </div>
+      </div>
+
+      <div class="kuu-segment-row" style="margin-bottom:8px">
+        <span class="kuu-label"><i class="bi bi-diagram-3"></i> КУУ:</span>
+        <div class="kuu-segment">
+          <button type="button" class="kuu-btn ${sec.kuuVariant === 'collector' ? 'active' : ''}"
+                  onclick="window.app.setKuuVariant(${si}, 'collector')">Коллекторный</button>
+          <button type="button" class="kuu-btn ${sec.kuuVariant === 'collector_pre_apt' ? 'active' : ''}"
+                  onclick="window.app.setKuuVariant(${si}, 'collector_pre_apt')">Колл. + перед кв.</button>
+          <button type="button" class="kuu-btn ${sec.kuuVariant === 'pre_apt' ? 'active' : ''}"
+                  onclick="window.app.setKuuVariant(${si}, 'pre_apt')">Перед кв.</button>
         </div>
       </div>
 
@@ -2324,6 +2330,40 @@ export function renderFittingsBlock(totalApartments, ivptEnabled, zonesData, tot
               </table>
             </div>
           </div>
+        </details>
+      </div>
+    `;
+  }
+
+  // === Технический комплект: краны на стояки, манометры, заглушки ===
+  if (zonesData && zonesData.length > 0) {
+    hasData = true;
+    // Считаем суммарное количество стояков
+    let totalRisers = 0;
+    zonesData.forEach(zd => { totalRisers += zd.risersPerSection; });
+
+    const ballValvesV1 = totalRisers * 2;  // верх + низ × стояков В1
+    const ballValvesHot = totalRisers * 2 * 2; // Т3 + Т4
+    const numSections = sections.length || 1;
+    const manometers = numSections * 2; // 1 ХВС + 1 ГВС на корпус
+    const plugs = numSections * 10; // 10 на секцию
+
+    const techTotal = ballValvesV1 + ballValvesHot + manometers + plugs;
+
+    html += `
+      <div class="fittings-section">
+        <details class="fittings-details">
+          <summary>Технический комплект (итого: ${techTotal} шт)</summary>
+          <table class="results-table">
+            <thead><tr><th>Система</th><th class="name-col">Наименование</th><th class="unit-col">Ед. изм.</th><th class="qty-col">Количество</th></tr></thead>
+            <tbody>
+              <tr><td class="sys-cell sys-cell--V1">В1</td><td class="name-col">Кран шаровый Ду 32 (запорный, на стояке)</td><td class="unit-col">шт</td><td class="col-qty num-col">${ballValvesV1}</td></tr>
+              <tr><td class="sys-cell sys-cell--T3">Т3/Т4</td><td class="name-col">Кран шаровый Ду 32 (запорный, на стояках)</td><td class="unit-col">шт</td><td class="col-qty num-col">${ballValvesHot}</td></tr>
+              <tr><td class="sys-cell sys-cell--V1">В1/Т3</td><td class="name-col">Манометр (техн. комплект)</td><td class="unit-col">шт</td><td class="col-qty num-col">${manometers}</td></tr>
+              <tr><td class="sys-cell sys-cell--V1">В1/Т3</td><td class="name-col">Заглушка для опрессовки</td><td class="unit-col">шт</td><td class="col-qty num-col">${plugs}</td></tr>
+            </tbody>
+            <tfoot><tr class="total-row"><td colspan="3"><strong>Итого</strong></td><td class="qty-col"><strong>${techTotal}</strong></td></tr></tfoot>
+          </table>
         </details>
       </div>
     `;

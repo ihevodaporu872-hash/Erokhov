@@ -298,7 +298,7 @@ export function computeZonesData(sections, h1, hn, ivptEnabled) {
         }
       });
 
-      const aKey = z.albumType || 'collector';
+      const aKey = sec.kuuVariant || 'collector';
       if (byAlbum[aKey] !== undefined) {
         byAlbum[aKey] += aptsInZone;
       }
@@ -438,7 +438,7 @@ export function computeSpecsAggregates(sections, ivptEnabled) {
         if (f >= 2) aptsInZone += (sec.apts[f] || 0);
       }
 
-      const aKey = z.albumType || 'collector';
+      const aKey = sec.kuuVariant || 'collector';
       const nAuto = computeAutoNForZoneRange(sec, z, zoneFrom, zoneTo);
       const secIvpt = !!(sections[si] && sections[si].ivptEnabled);
       const bom = materializeKuuBom(aKey, aptsInZone, { n: nAuto, ivptEnabled: secIvpt });
@@ -491,7 +491,7 @@ export function computeBomData(sections, ivptEnabled) {
         if (f >= 2) aptsInZone += (sec.apts[f] || 0);
       }
 
-      const aKey = z.albumType || 'collector';
+      const aKey = sec.kuuVariant || 'collector';
       const nAuto = computeAutoNForZoneRange(sec, z, zoneFrom, zoneTo);
       const secIvpt = !!(sections[si] && sections[si].ivptEnabled);
       const bom = materializeKuuBom(aKey, aptsInZone, { n: nAuto, ivptEnabled: secIvpt });
@@ -588,7 +588,7 @@ export function computeMopAverageLength(L, n, r, gamma = 1.0) {
  * @returns {Object} { n, L, r, mPerApt, lengthV1, lengthT3 }
  */
 export function computeMopPexLengthsForSection(section) {
-  const defaultResult = { n: 0, L: 0, r: 0.5, mPerApt: 0, lengthV1: 0, lengthT3: 0 };
+  const defaultResult = { n: 0, L: 0, r: 0.5, mPerApt: 0, lengthV1: 0, lengthT3: 0, lengthT4: 0 };
 
   if (!section) return defaultResult;
 
@@ -601,7 +601,7 @@ export function computeMopPexLengthsForSection(section) {
   const n = getSectionFlatsCount(section);
 
   if (n <= 0 || L <= 0) {
-    return { n, L, r, mPerApt: 0, lengthV1: 0, lengthT3: 0 };
+    return { n, L, r, mPerApt: 0, lengthV1: 0, lengthT3: 0, lengthT4: 0 };
   }
 
   // Константы
@@ -616,13 +616,18 @@ export function computeMopPexLengthsForSection(section) {
   // Длина на секцию для одной системы (В1 или Т3)
   const lengthPerSystem = mPerApt * n;
 
+  // Т4 (рециркуляция) — труба идёт только по МОП (горизонтально), без захода в квартиру
+  // Длина Т4 ≈ длина горизонтальной магистрали (без вертикали h)
+  const lengthT4 = Math.round(dAvg * n * 100) / 100;
+
   return {
     n,
     L,
     r,
     mPerApt: Math.round(mPerApt * 100) / 100,
     lengthV1: Math.round(lengthPerSystem * 100) / 100,
-    lengthT3: Math.round(lengthPerSystem * 100) / 100
+    lengthT3: Math.round(lengthPerSystem * 100) / 100,
+    lengthT4
   };
 }
 

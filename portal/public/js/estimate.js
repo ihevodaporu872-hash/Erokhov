@@ -601,6 +601,55 @@ export function aggregateEstimateData({ zonesData, risersByDiameter, sections, h
         });
       }
     }
+
+    // Т4 (рециркуляция) — PP-R труба и фитинги
+    if (mopResult.lengthT4 > 0) {
+      // Работа по монтажу PP-R для Т4
+      estimateData[sectionIndex].hot.items.push({
+        type: 'работа',
+        name: `Монтаж разводящих трубопроводов рециркуляции из сшитого полиэтилена Ду ${dn} мм (включая фитинги)`,
+        unit: 'м',
+        quantity: Math.round(mopResult.lengthT4 * 10) / 10,
+        sortKey: `pex-t4-${dn}`,
+        sortOrder: 1,
+        systemCode: 'T4',
+        systemName: SYSTEM_NAME_MAP['T4'],
+      });
+
+      // Материал PP-R для Т4
+      estimateData[sectionIndex].hot.items.push({
+        type: 'материал',
+        name: `Труба из сшитого полиэтилена Ду ${dn} мм (Т4 рециркуляция)`,
+        unit: 'м',
+        quantity: Math.round(mopResult.lengthT4 * 10) / 10,
+        sortKey: `pex-t4-${dn}`,
+        sortOrder: 2,
+        systemCode: 'T4',
+        systemName: SYSTEM_NAME_MAP['T4'],
+      });
+
+      // Фитинги PP-R для Т4
+      const fittingsT4 = PPR_FITTINGS_RULES[dn];
+      if (fittingsT4) {
+        let fittingSortOrder = 3;
+        fittingsT4.forEach(f => {
+          const rawQty = mopResult.lengthT4 * f.norm;
+          const qty = roundPprFittingsQuantity(rawQty);
+          if (qty > 0) {
+            estimateData[sectionIndex].hot.items.push({
+              type: 'материал',
+              name: f.name,
+              unit: f.unit,
+              quantity: qty,
+              sortKey: `pex-t4-${dn}`,
+              sortOrder: fittingSortOrder++,
+              systemCode: 'T4',
+              systemName: SYSTEM_NAME_MAP['T4'],
+            });
+          }
+        });
+      }
+    }
   });
 
   // === 3. Теплоизоляция трубопровода ===
@@ -1146,6 +1195,82 @@ export function aggregateEstimateData({ zonesData, risersByDiameter, sections, h
     }
   });
 
+  // === 8.5. Тех. комплект: шаровые краны на стояки, манометры, заглушки ===
+  // Шаровые краны: верх + низ на каждый магистральный стояк (В1, Т3, Т4)
+  // Манометры: 2 шт на корпус
+  // Заглушки для опрессовки: 10 шт на секцию
+  if (zonesData && zonesData.length > 0) {
+    // Считаем количество стояков по корпусам
+    const risersBySec = {};
+    zonesData.forEach(zd => {
+      const si = zd.sectionIndex;
+      if (!risersBySec[si]) risersBySec[si] = 0;
+      risersBySec[si] += zd.risersPerSection;
+    });
+
+    Object.entries(risersBySec).forEach(([si, totalRisers]) => {
+      const idx = parseInt(si);
+      // 3 системы (В1, Т3, Т4) × 2 (верх + низ) × кол-во стояков
+      const ballValves = totalRisers * 3 * 2;
+
+      // Шаровые краны — ХВС (В1)
+      estimateData[idx].cold.items.push({
+        type: 'материал',
+        name: 'Кран шаровый Ду 32 (запорный, на стояке В1)',
+        unit: 'шт',
+        quantity: totalRisers * 2,
+        sortKey: 'tech-valves',
+        sortOrder: 1,
+      });
+
+      // Шаровые краны — ГВС (Т3 + Т4)
+      estimateData[idx].hot.items.push({
+        type: 'материал',
+        name: 'Кран шаровый Ду 32 (запорный, на стояках Т3/Т4)',
+        unit: 'шт',
+        quantity: totalRisers * 2 * 2, // Т3 + Т4
+        sortKey: 'tech-valves',
+        sortOrder: 1,
+      });
+
+      // Манометры: 2 шт на корпус (1 ХВС + 1 ГВС)
+      estimateData[idx].cold.items.push({
+        type: 'материал',
+        name: 'Манометр (техн. комплект)',
+        unit: 'шт',
+        quantity: 1,
+        sortKey: 'tech-manometer',
+        sortOrder: 1,
+      });
+      estimateData[idx].hot.items.push({
+        type: 'материал',
+        name: 'Манометр (техн. комплект)',
+        unit: 'шт',
+        quantity: 1,
+        sortKey: 'tech-manometer',
+        sortOrder: 1,
+      });
+
+      // Заглушки для опрессовки: 10 шт на секцию (5 ХВС + 5 ГВС)
+      estimateData[idx].cold.items.push({
+        type: 'материал',
+        name: 'Заглушка для опрессовки',
+        unit: 'шт',
+        quantity: 5,
+        sortKey: 'tech-plugs',
+        sortOrder: 1,
+      });
+      estimateData[idx].hot.items.push({
+        type: 'материал',
+        name: 'Заглушка для опрессовки',
+        unit: 'шт',
+        quantity: 5,
+        sortKey: 'tech-plugs',
+        sortOrder: 1,
+      });
+    });
+  }
+
   // === 9. Монтаж коллектора (распределительной гребенки) ===
   // Логика зависит от выбранного производителя:
   // - Ридан: только ХВС, название "Монтаж коллектора (распределительной гребенки) ХВС/ГВС"
@@ -1368,6 +1493,34 @@ export function aggregateEstimateData({ zonesData, risersByDiameter, sections, h
           systemName: ESTIMATE_SYSTEM_NAMES[systemKey],
         });
       }
+    });
+  });
+
+  // === 10.5. Коэффициенты запаса на обрезь/бой ===
+  // Трубы ×1.07, Изоляция ×1.10, Крепёж ×1.10
+  const WASTE_COEFF = {
+    pipe: 1.07,       // трубы (стальные, PPR, PEX)
+    insulation: 1.10,  // теплоизоляция
+    fastener: 1.10,    // хомуты, клипсы, крюки
+  };
+
+  const isPipe = (name) => /труб[аоеы]|трубопровод/i.test(name) && !/хомут|крюк|клипс|фиксатор|опор/i.test(name);
+  const isInsulation = (name) => /теплоизол|изоляц/i.test(name);
+  const isFastener = (name) => /хомут|крюк|клипс|фиксатор загиба|подвес/i.test(name);
+
+  Object.keys(estimateData).forEach(sectionIndex => {
+    ['cold', 'hot'].forEach(systemKey => {
+      estimateData[sectionIndex][systemKey].items.forEach(item => {
+        if (item.type !== 'материал') return;
+        const n = item.name;
+        if (isPipe(n)) {
+          item.quantity = Math.round(item.quantity * WASTE_COEFF.pipe * 10) / 10;
+        } else if (isInsulation(n)) {
+          item.quantity = Math.round(item.quantity * WASTE_COEFF.insulation * 10) / 10;
+        } else if (isFastener(n)) {
+          item.quantity = Math.ceil(item.quantity * WASTE_COEFF.fastener);
+        }
+      });
     });
   });
 
