@@ -479,7 +479,7 @@ export function renderSectionsBlocks() {
       </div>
 
       <details>
-        <summary><b>Зоны корпуса (начинаются с 1-го этажа)</b></summary>
+        <summary><b><i class="bi bi-chevron-down"></i> Конфигурация стояков и диаметров (DN)</b></summary>
         ${renderZonesTableForSection(si)}
         <div class="btn-row">
           <button class="btn-secondary" onclick="window.app.addZone(${si})">Добавить зону корпуса</button>
