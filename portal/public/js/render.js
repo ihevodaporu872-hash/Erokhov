@@ -451,15 +451,24 @@ export function renderSectionsBlocks() {
         </div>
       </div>
 
-      <div class="kuu-segment-row" style="margin-bottom:8px">
-        <span class="kuu-label"><i class="bi bi-diagram-3"></i> КУУ:</span>
-        <div class="kuu-segment">
-          <button type="button" class="kuu-btn ${sec.kuuVariant === 'collector' ? 'active' : ''}"
-                  onclick="window.app.setKuuVariant(${si}, 'collector')">Коллекторный</button>
-          <button type="button" class="kuu-btn ${sec.kuuVariant === 'collector_pre_apt' ? 'active' : ''}"
-                  onclick="window.app.setKuuVariant(${si}, 'collector_pre_apt')">Колл. + перед кв.</button>
-          <button type="button" class="kuu-btn ${sec.kuuVariant === 'pre_apt' ? 'active' : ''}"
-                  onclick="window.app.setKuuVariant(${si}, 'pre_apt')">Перед кв.</button>
+      <div class="kuu-cards-block">
+        <div class="kuu-cards-title">Конфигурация узлов учёта (КУУ)</div>
+        <div class="kuu-cards">
+          <div class="kuu-card ${sec.kuuVariant === 'collector' ? 'active' : ''}"
+               onclick="window.app.setKuuVariant(${si}, 'collector')">
+            <div class="kuu-card-head"><i class="bi bi-diagram-3"></i><span class="kuu-card-name">Коллекторный</span></div>
+            <div class="kuu-card-desc">Классическая схема с общим коллектором в МОП. Узлов\u00a0=\u00a0кв.</div>
+          </div>
+          <div class="kuu-card ${sec.kuuVariant === 'collector_pre_apt' ? 'active' : ''}"
+               onclick="window.app.setKuuVariant(${si}, 'collector_pre_apt')">
+            <div class="kuu-card-head"><i class="bi bi-node-plus"></i><span class="kuu-card-name">Колл. + перед кв.</span></div>
+            <div class="kuu-card-desc">Смешанная схема: коллектор + узлы перед входом в квартиру.</div>
+          </div>
+          <div class="kuu-card ${sec.kuuVariant === 'pre_apt' ? 'active' : ''}"
+               onclick="window.app.setKuuVariant(${si}, 'pre_apt')">
+            <div class="kuu-card-head"><i class="bi bi-door-open"></i><span class="kuu-card-name">Перед квартирой</span></div>
+            <div class="kuu-card-desc">Индивидуальное подключение без общего коллектора.</div>
+          </div>
         </div>
       </div>
 

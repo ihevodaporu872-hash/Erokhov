@@ -283,49 +283,68 @@
             opacity: 0.35;
             cursor: not-allowed;
         }
-        /* KUU Segmented Control */
-        .kuu-segment-row {
+        /* KUU Scenario Cards */
+        .kuu-cards-block {
+            margin-bottom: 10px;
+        }
+        .kuu-cards-title {
+            font-size: 11px;
+            font-weight: 600;
+            color: #888;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+        .kuu-cards {
             display: flex;
-            align-items: center;
-            gap: 10px;
+            gap: 8px;
             flex-wrap: wrap;
         }
-        .kuu-label {
-            font-size: 13px;
-            color: #aaa;
-            white-space: nowrap;
-            display: inline-flex;
-            align-items: center;
-            gap: 5px;
-        }
-        .kuu-label i { font-size: 14px; }
-        .kuu-segment {
-            display: inline-flex;
-            border: 1.5px solid #444;
-            border-radius: 8px;
-            overflow: hidden;
-        }
-        .kuu-btn {
-            padding: 5px 12px;
-            border: none;
-            border-right: 1px solid #444;
-            background: transparent;
-            color: #aaa;
-            font-size: 12px;
-            font-weight: 500;
-            font-family: inherit;
+        .kuu-card {
+            flex: 1 1 0;
+            min-width: 150px;
+            padding: 10px 12px;
+            border: 1.5px solid #333;
+            border-radius: 10px;
+            background: #16162a;
             cursor: pointer;
-            transition: background .15s, color .15s;
-            white-space: nowrap;
+            transition: border-color .2s, background .2s, box-shadow .2s;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
         }
-        .kuu-btn:last-child { border-right: none; }
-        .kuu-btn:hover { background: rgba(79,195,247,.08); color: #ccc; }
-        .kuu-btn.active {
-            background: #4fc3f7;
-            color: #111;
+        .kuu-card:hover {
+            border-color: #555;
+            background: #1a1a36;
+        }
+        .kuu-card.active {
+            border-color: #4fc3f7;
+            background: rgba(79,195,247,.06);
+            box-shadow: 0 0 0 1px rgba(79,195,247,.15);
+        }
+        .kuu-card-head {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .kuu-card-head i {
+            font-size: 16px;
+            color: #666;
+            transition: color .2s;
+        }
+        .kuu-card.active .kuu-card-head i { color: #4fc3f7; }
+        .kuu-card-name {
+            font-size: 13px;
             font-weight: 600;
+            color: #ccc;
         }
-        .kuu-btn.active:hover { background: #39b0db; }
+        .kuu-card.active .kuu-card-name { color: #e8e8e8; }
+        .kuu-card-desc {
+            font-size: 11px;
+            color: #666;
+            line-height: 1.35;
+        }
+        .kuu-card.active .kuu-card-desc { color: #888; }
         .rent-units-input:focus {
             background: #222244;
         }

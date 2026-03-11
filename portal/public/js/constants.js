@@ -84,8 +84,29 @@ export const KUU_BOM_TEMPLATES = {
     { nameTpl: 'Коллектор на {n} подключений', qtyPerApt: 2, unit: 'шт' },
     { nameTpl: 'Кран сливной Ду 15', qtyPerApt: 2, unit: 'шт' },
   ],
-  collector_pre_apt: [],
-  pre_apt: []
+  collector_pre_apt: [
+    // Коллекторная часть (в МОП)
+    { nameTpl: 'Кран шаровый Ду 32', qtyPerApt: 2, unit: 'шт' },
+    { nameTpl: 'Фильтр сетчатый косой Ду 32', qtyPerApt: 2, unit: 'шт' },
+    { nameTpl: 'Регулятор давления Ду 32', qtyPerApt: 2, unit: 'шт' },
+    { nameTpl: 'Манометр', qtyPerApt: 2, unit: 'шт' },
+    { nameTpl: 'Коллектор на {n} подключений', qtyPerApt: 2, unit: 'шт' },
+    { nameTpl: 'Кран сливной Ду 15', qtyPerApt: 2, unit: 'шт' },
+    // Дополнительные узлы перед квартирой
+    { nameTpl: 'Кран шаровый Ду 20 (перед кв.)', qtyPerApt: 2, unit: 'шт' },
+    { nameTpl: 'Фильтр сетчатый косой Ду 20 (перед кв.)', qtyPerApt: 2, unit: 'шт' },
+    { nameTpl: 'Счетчик воды Ду 15 (перед кв.)', qtyPerApt: 2, unit: 'шт' },
+    { nameTpl: 'Клапан обратный Ду 20 (перед кв.)', qtyPerApt: 2, unit: 'шт' },
+  ],
+  pre_apt: [
+    // Индивидуальное подключение без коллектора
+    { nameTpl: 'Кран шаровый Ду 20 (перед кв.)', qtyPerApt: 2, unit: 'шт' },
+    { nameTpl: 'Фильтр сетчатый косой Ду 20 (перед кв.)', qtyPerApt: 2, unit: 'шт' },
+    { nameTpl: 'Регулятор давления Ду 20 (перед кв.)', qtyPerApt: 2, unit: 'шт' },
+    { nameTpl: 'Счетчик воды Ду 15 (перед кв.)', qtyPerApt: 2, unit: 'шт' },
+    { nameTpl: 'Клапан обратный Ду 20 (перед кв.)', qtyPerApt: 2, unit: 'шт' },
+    { nameTpl: 'Манометр', qtyPerApt: 2, unit: 'шт' },
+  ]
 };
 
 // Генератор уникальных идентификаторов
