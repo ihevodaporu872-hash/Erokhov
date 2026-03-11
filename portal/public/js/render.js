@@ -452,6 +452,26 @@ export function renderSectionsBlocks() {
       </div>
 
       <div class="kuu-cards-block">
+        <div class="kuu-cards-title">Схема розлива ГВС</div>
+        <div class="kuu-cards">
+          <div class="kuu-card ${sec.distributionType !== 'top' ? 'active' : ''}"
+               onclick="window.app.setDistributionType(${si}, 'bottom')">
+            <span class="kuu-card-badge">Стандарт</span>
+            <div class="kuu-card-head"><i class="bi bi-arrow-up-circle"></i><span class="kuu-card-name">Нижний розлив</span></div>
+            <div class="kuu-card-desc">Классическая подача снизу вверх. Циркуляция через Т4.</div>
+            <div class="kuu-card-formula">Стояки В1 + Т3 + Т4 по зонам</div>
+          </div>
+          <div class="kuu-card ${sec.distributionType === 'top' ? 'active' : ''}"
+               onclick="window.app.setDistributionType(${si}, 'top')">
+            <span class="kuu-card-badge">Корпус 1.1 / 1.2</span>
+            <div class="kuu-card-head"><i class="bi bi-arrow-down-circle"></i><span class="kuu-card-name">Верхний розлив</span></div>
+            <div class="kuu-card-desc">Подача на чердак по главным стоякам, раздача сверху вниз.</div>
+            <div class="kuu-card-formula">+чердак Т3/Т4, +2 гл. стояка, Т3 \u00d71.15</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="kuu-cards-block">
         <div class="kuu-cards-title">Конфигурация узлов учёта (КУУ)</div>
         <div class="kuu-cards">
           <div class="kuu-card ${sec.kuuVariant === 'collector' ? 'active' : ''}"

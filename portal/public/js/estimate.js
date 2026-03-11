@@ -1271,6 +1271,76 @@ export function aggregateEstimateData({ zonesData, risersByDiameter, sections, h
     });
   }
 
+  // === 8.7. Верхний розлив ГВС — дополнительные позиции ===
+  sections.forEach((section, sectionIndex) => {
+    if (section.distributionType !== 'top') return;
+
+    // Считаем общее кол-во стояков в корпусе
+    let totalRisers = 0;
+    if (zonesData) {
+      zonesData.forEach(zd => {
+        if (zd.sectionIndex === sectionIndex) totalRisers += zd.risersPerSection;
+      });
+    }
+    if (totalRisers <= 0) return;
+
+    const mopL = section.mop?.L || 30;
+    const atticLen = Math.round(mopL * 0.8 * 10) / 10;
+
+    // 1) Воздухоотводчики Ду15 (латунь) — по 1 на каждый стояк Т3/Т4 в верхней точке
+    const airVents = totalRisers * 2; // Т3 + Т4
+    estimateData[sectionIndex].hot.items.push({
+      type: 'материал',
+      name: 'Воздухоотводчик автоматический Ду 15 латунь (верхний розлив)',
+      unit: 'шт',
+      quantity: airVents,
+      sortKey: 'top-dist-airvents',
+      sortOrder: 1,
+    });
+
+    // 2) Балансировочный клапан автоматический (Danfoss MTCV) — по 1 на стояк Т4
+    estimateData[sectionIndex].hot.items.push({
+      type: 'материал',
+      name: 'Клапан балансировочный автоматический (Danfoss MTCV) Ду 20 (Т4)',
+      unit: 'шт',
+      quantity: totalRisers,
+      sortKey: 'top-dist-balance',
+      sortOrder: 1,
+    });
+
+    // 3) Шаровые краны Ду 25/32 для секционирования чердака: стояков × 2
+    const atticValves = totalRisers * 2;
+    estimateData[sectionIndex].hot.items.push({
+      type: 'материал',
+      name: 'Кран шаровый Ду 32 (секционирование чердачной магистрали)',
+      unit: 'шт',
+      quantity: atticValves,
+      sortKey: 'top-dist-valves',
+      sortOrder: 1,
+    });
+
+    // 4) Изоляция чердачной магистрали 13 мм НГ (Т3 + Т4)
+    if (atticLen > 0) {
+      const atticInsulation = Math.round(atticLen * 2 * 10) / 10; // Т3 + Т4
+      estimateData[sectionIndex].hot.items.push({
+        type: 'работа',
+        name: 'Теплоизоляция чердачной магистрали ГВС (13 мм, НГ)',
+        unit: 'м',
+        quantity: atticInsulation,
+        sortKey: 'top-dist-insulation',
+        sortOrder: 1,
+      });
+      estimateData[sectionIndex].hot.items.push({
+        type: 'материал',
+        name: 'Теплоизоляция трубная 13 мм класс НГ (чердачная магистраль)',
+        unit: 'м',
+        quantity: atticInsulation,
+        sortKey: 'top-dist-insulation',
+        sortOrder: 2,
+      });
+    }
+  });
+
   // === 9. Монтаж коллектора (распределительной гребенки) ===
   // Логика зависит от выбранного производителя:
   // - Ридан: только ХВС, название "Монтаж коллектора (распределительной гребенки) ХВС/ГВС"

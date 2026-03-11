@@ -1,4 +1,4 @@
-import { ALBUMS, KUU_BOM_TEMPLATES } from './constants.js';
+import { ALBUMS, KUU_BOM_TEMPLATES, REAL_DN } from './constants.js';
 
 // === Константы для расчёта сшитого полиэтилена в МОП ===
 // Эти значения можно вынести в настройки, но пока фиксированы
@@ -335,6 +335,47 @@ export function computeZonesData(sections, h1, hn, ivptEnabled) {
       // Переход к следующей зоне: начиная с этажа после текущей
       currentFloor = zoneTo + 1;
     });
+
+    // === Верхний розлив: чердачная магистраль + 2 главных подающих стояка ===
+    if (sec.distributionType === 'top') {
+      const mopL = sec.mop?.L || 30;
+      const atticLen = Math.round(mopL * 0.8 * 10) / 10; // Периметр × 0.8
+
+      // Макс. DN из зон для Т3 и Т4
+      let maxDnT3 = 0, maxDnT4 = 0;
+      sec.zones.forEach(z => {
+        const d = z.fixedD || {};
+        if ((d.T3 || 0) > maxDnT3) maxDnT3 = d.T3;
+        if ((d.T4 || 0) > maxDnT4) maxDnT4 = d.T4;
+      });
+
+      // Чердачная магистраль Т3 и Т4
+      if (maxDnT3 > 0 && atticLen > 0) {
+        const keyT3 = `${si}:T3:${maxDnT3}`;
+        if (!byDiameter[keyT3]) byDiameter[keyT3] = { len: 0, count: 0 };
+        byDiameter[keyT3].len += atticLen;
+      }
+      if (maxDnT4 > 0 && atticLen > 0) {
+        const keyT4 = `${si}:T4:${maxDnT4}`;
+        if (!byDiameter[keyT4]) byDiameter[keyT4] = { len: 0, count: 0 };
+        byDiameter[keyT4].len += atticLen;
+      }
+
+      // 2 главных подающих стояка увеличенного DN на всю высоту здания
+      const buildingH = floorRangeHeightMeters(h1, hn, 1, sec.floors);
+      const mainRiserLen = buildingH * 2; // 2 стояка
+
+      // DN на 2 ступени выше макс. зонального
+      const dnIdxT3 = REAL_DN.indexOf(maxDnT3);
+      const mainDnT3 = dnIdxT3 >= 0 && dnIdxT3 + 2 < REAL_DN.length ? REAL_DN[dnIdxT3 + 2] : maxDnT3;
+      if (mainDnT3 > 0 && mainRiserLen > 0) {
+        const keyMain = `${si}:T3:${mainDnT3}`;
+        if (!byDiameter[keyMain]) byDiameter[keyMain] = { len: 0, count: 0 };
+        byDiameter[keyMain].len += mainRiserLen;
+        byDiameter[keyMain].count += 2;
+        grandTotalRisersLen += mainRiserLen;
+      }
+    }
   });
 
   return { zonesData, grandTotalRisersLen, byDiameter, byAlbum };
@@ -616,6 +657,10 @@ export function computeMopPexLengthsForSection(section) {
   // Длина на секцию для одной системы (В1 или Т3)
   const lengthPerSystem = mPerApt * n;
 
+  // Верхний розлив: Т3 увеличивается на 15% (учет опуска с чердака)
+  const isTop = section.distributionType === 'top';
+  const t3Coeff = isTop ? 1.15 : 1.0;
+
   // Т4 (рециркуляция) — труба идёт только по МОП (горизонтально), без захода в квартиру
   // Длина Т4 ≈ длина горизонтальной магистрали (без вертикали h)
   const lengthT4 = Math.round(dAvg * n * 100) / 100;
@@ -626,7 +671,7 @@ export function computeMopPexLengthsForSection(section) {
     r,
     mPerApt: Math.round(mPerApt * 100) / 100,
     lengthV1: Math.round(lengthPerSystem * 100) / 100,
-    lengthT3: Math.round(lengthPerSystem * 100) / 100,
+    lengthT3: Math.round(lengthPerSystem * t3Coeff * 100) / 100,
     lengthT4
   };
 }

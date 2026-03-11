@@ -8,6 +8,7 @@ import {
   setRentQty as stateSetRentQty,
   setCommercialUnits as stateSetCommercialUnits,
   setKuuVariant as stateSetKuuVariant,
+  setDistributionType as stateSetDistributionType,
   addZone as stateAddZone,
   removeZone as stateRemoveZone,
   clearZones as stateClearZones,
@@ -994,6 +995,11 @@ window.app = {
 
   setKuuVariant(si, variant) {
     stateSetKuuVariant(si, variant);
+    recalcAll();
+  },
+
+  setDistributionType(si, type) {
+    stateSetDistributionType(si, type);
     recalcAll();
   },
 
