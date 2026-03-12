@@ -2351,6 +2351,19 @@
 
     // Генерация работы для позиции материала
     function workNameFor(materialName) {
+        // Трубопроводы К1/К2 — специальные наименования работ
+        var pipeMatch = materialName.match(/^Трубопровод\s+(ПП|ПП Бесшумный|НПВХ|SML)\s+DN\s*(\d+)/i);
+        if (pipeMatch) {
+            var pipeMat = pipeMatch[1];
+            var dn = parseInt(pipeMatch[2], 10);
+            if (pipeMat === 'SML') {
+                var duSml = dn <= 110 ? 100 : 150;
+                return 'Монтаж трубопроводов безраструбнных чугунных труб (SML) Ду ' + duSml + 'мм';
+            }
+            // ПП, ПП Бесшумный, НПВХ — пластик
+            var duPvc = dn <= 110 ? 100 : 160;
+            return 'Монтаж трубопроводов из труб ПВХ (раструбных) до Ду ' + duPvc + 'мм вкл. (включая фасоннные части)';
+        }
         return 'Монтаж: ' + materialName;
     }
 
