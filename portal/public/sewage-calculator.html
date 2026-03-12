@@ -2368,6 +2368,10 @@
             var duPp = dn <= 110 ? 100 : 160;
             return 'Монтаж трубопроводов из труб ПВХ (раструбных) до Ду ' + duPp + 'мм вкл. (включая фасоннные части)';
         }
+        // Воронки кровельные
+        if (/Водоприёмная воронка|Воронка кровельная/i.test(materialName)) {
+            return 'Установка воронок водосточных кровельных (полимерных)';
+        }
         return 'Монтаж: ' + materialName;
     }
 
@@ -2446,10 +2450,6 @@
         };
 
         groupOrder.forEach(function (g) {
-            if (g !== '_default') {
-                var label = GROUP_LABELS[g] || g;
-                html += '<tr class="group-row"><td colspan="6">' + escHtml(label) + '</td></tr>';
-            }
             groups[g].forEach(function (item) {
                 var isWork = item.type === 'работа';
                 var priceKey = systemKey + ':' + (isWork ? 'w:' : 'm:') + item.name;
