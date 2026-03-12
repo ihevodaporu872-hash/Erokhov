@@ -941,6 +941,26 @@
         .analytics-sys-card .sys-val.danger strong { color: #ef4444; }
         .analytics-sys-bar { height: 3px; border-radius: 2px; margin-top: 6px; background: var(--border-color); overflow: hidden; }
         .analytics-sys-bar-fill { height: 100%; transition: width .4s ease; }
+
+        /* === Сравнение проектов === */
+        .comp-table { font-size: 0.85rem; margin-bottom: 0; }
+        .comp-table th { font-weight: 600; white-space: nowrap; background: var(--bg-secondary, #f8f9fa); vertical-align: middle; }
+        .comp-table td { vertical-align: middle; }
+        .comp-table .param-name { font-weight: 500; color: var(--text-primary); white-space: nowrap; min-width: 180px; }
+        .comp-table .param-group { font-weight: 700; font-size: .78rem; text-transform: uppercase; letter-spacing: .3px; color: var(--text-secondary); background: var(--bg-secondary, #f8f9fa); }
+        .comp-cell-best { background: rgba(16,185,129,.1) !important; color: #059669; font-weight: 600; }
+        .comp-cell-worst { background: rgba(239,68,68,.08) !important; color: #dc2626; font-weight: 600; }
+        .dark-theme .comp-table th { background: #2a2a2a; }
+        .dark-theme .comp-table .param-group { background: #2a2a2a; }
+
+        /* Бар-чарты */
+        .comp-chart-group { margin-bottom: 1.2rem; }
+        .comp-chart-title { font-size: .8rem; font-weight: 600; margin-bottom: .5rem; color: var(--text-primary); }
+        .comp-bar-row { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
+        .comp-bar-label { min-width: 110px; font-size: .78rem; color: var(--text-secondary); text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .comp-bar-track { flex: 1; height: 18px; background: var(--border-color); border-radius: 3px; overflow: hidden; position: relative; }
+        .comp-bar-fill { height: 100%; border-radius: 3px; transition: width .4s ease; display: flex; align-items: center; justify-content: flex-end; padding-right: 6px; }
+        .comp-bar-val { font-size: .7rem; font-weight: 600; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,.3); }
     </style>
 </head>
 <body>
@@ -977,6 +997,12 @@
                     <a class="nav-link active" href="#" data-section="dashboard">
                         <i class="bi bi-speedometer2"></i>
                         Управление проектами
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="#" data-section="comparison">
+                        <i class="bi bi-bar-chart-line"></i>
+                        Сравнение проектов
                     </a>
                 </li>
                 <li class="nav-item">
@@ -1395,6 +1421,59 @@
                     id="condCalcFrame">
                 </iframe>
             </div>
+
+            <!-- Сравнение проектов -->
+            <div id="comparison" class="content-section">
+                <div class="page-header">
+                    <h1><i class="bi bi-bar-chart-line"></i> Сравнение проектов</h1>
+                    <p class="lead mb-0">Сопоставление технических решений и удельной стоимости систем</p>
+                </div>
+
+                <div class="container-fluid px-4 pt-3 pb-4">
+                    <!-- Выбор проектов -->
+                    <div class="card project-characteristics-card mb-3">
+                        <div class="card-body px-4 py-3">
+                            <h6 class="mb-3" style="font-weight:600"><i class="bi bi-check2-square me-2"></i>Выберите проекты для сравнения (2–4)</h6>
+                            <div class="row g-2" id="compProjectSelectors">
+                                <div class="col-md-3"><select class="form-select comp-project-select" data-slot="0"><option value="">— Проект 1 —</option></select></div>
+                                <div class="col-md-3"><select class="form-select comp-project-select" data-slot="1"><option value="">— Проект 2 —</option></select></div>
+                                <div class="col-md-3"><select class="form-select comp-project-select" data-slot="2"><option value="">— Проект 3 —</option></select></div>
+                                <div class="col-md-3"><select class="form-select comp-project-select" data-slot="3"><option value="">— Проект 4 —</option></select></div>
+                            </div>
+                            <button class="btn btn-primary mt-3" id="btnRunComparison"><i class="bi bi-play-fill me-1"></i>Сравнить</button>
+                        </div>
+                    </div>
+
+                    <!-- Результат сравнения -->
+                    <div id="compResultBlock" style="display:none">
+                        <!-- Сравнительная таблица -->
+                        <div class="card project-characteristics-card mb-3">
+                            <div class="card-body px-4 py-3">
+                                <h6 class="mb-3" style="font-weight:600"><i class="bi bi-table me-2"></i>Сравнительная таблица</h6>
+                                <div class="table-responsive">
+                                    <table class="table table-sm comp-table" id="compTable">
+                                        <thead><tr id="compTableHead"></tr></thead>
+                                        <tbody id="compTableBody"></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Бар-чарты -->
+                        <div class="card project-characteristics-card">
+                            <div class="card-body px-4 py-3">
+                                <h6 class="mb-3" style="font-weight:600"><i class="bi bi-bar-chart me-2"></i>Визуальное сравнение</h6>
+                                <div id="compCharts"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="compPlaceholder" class="text-center py-5" style="color:var(--text-secondary)">
+                        <i class="bi bi-arrow-left-right" style="font-size:2.5rem;opacity:.3"></i>
+                        <p class="mt-2">Выберите 2–4 проекта и нажмите «Сравнить»</p>
+                    </div>
+                </div>
+            </div>
         </main>
     </div>
 
@@ -1606,6 +1685,7 @@
                 portalProjects = await fetchProjects();
                 renderDashboardProjects();
                 populateAllDropdowns();
+                if (typeof populateCompSelectors === 'function') populateCompSelectors();
             } catch (err) {
                 console.error('Ошибка загрузки проектов:', err);
             }
@@ -2395,6 +2475,252 @@
             }
         });
 
+        // ==================== Сравнение проектов ====================
+
+        const COMP_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6'];
+        const KUU_LABELS = { collector: 'Коллекторный', collector_pre_apt: 'Колл. + перед кв.', pre_apt: 'Перед квартирой' };
+        const DIST_LABELS = { bottom: 'Нижний розлив', top: 'Верхний розлив' };
+
+        function populateCompSelectors() {
+            document.querySelectorAll('.comp-project-select').forEach(sel => {
+                const cur = sel.value;
+                const slot = sel.dataset.slot;
+                sel.innerHTML = `<option value="">— Проект ${+slot + 1} —</option>`;
+                portalProjects.forEach(p => {
+                    sel.innerHTML += `<option value="${p.id}" ${p.id == cur ? 'selected' : ''}>${p.name}</option>`;
+                });
+            });
+        }
+
+        async function loadComparisonData(projectId) {
+            const project = portalProjects.find(p => p.id === projectId);
+            if (!project) return null;
+
+            let calcData = null;
+            try {
+                const calc = await fetchCalculation(projectId, 'water-supply');
+                calcData = calc.data_json ? JSON.parse(calc.data_json) : null;
+            } catch(e) { /* no saved calculation */ }
+
+            // Извлекаем ключевые параметры
+            const sections = calcData?.sections || [];
+            const prices = calcData?.estimatePrices || {};
+
+            // Схема розлива и КУУ (берём из первого корпуса)
+            const sec0 = sections[0] || {};
+            const distType = sec0.distributionType || 'bottom';
+            const kuuVariant = sec0.kuuVariant || 'collector';
+
+            // Среднее кол-во стояков
+            let totalRisers = 0, zoneCount = 0;
+            sections.forEach(s => {
+                (s.zones || []).forEach(z => { totalRisers += (+z.risers || 1); zoneCount++; });
+            });
+            const avgRisers = zoneCount > 0 ? (totalRisers / sections.length).toFixed(1) : '—';
+
+            // Кол-во квартир
+            let totalApts = 0;
+            if (project.building_stats) {
+                project.building_stats.forEach(bs => { totalApts += bs.totalApts || 0; });
+            }
+
+            // Финансовые итоги — считаем из сохранённых estimatePrices
+            // Нам нужно пересчитать их. Для простоты суммируем все цены × кол-во из items
+            // Но у нас нет estimate engine в портале. Поэтому используем cached estimate-totals
+            // или подтягиваем из analyticsTotals если проект текущий
+            let workTotal = 0, materialTotal = 0;
+
+            // Пробуем взять из сохранённых цен (estimatePrices хранит "si:sys:name" -> price)
+            // Но мы не можем пересчитать кол-ва без engine. Используем маркер из estimate-totals
+            // Сохраняем totals в localStorage при каждом auto-save
+            const cachedTotals = loadCachedEstimateTotals(projectId);
+            if (cachedTotals) {
+                workTotal = cachedTotals.totalWork || 0;
+                materialTotal = cachedTotals.totalMaterial || 0;
+            }
+
+            return {
+                id: projectId,
+                name: project.name,
+                area: project.total_area || 0,
+                aboveGroundArea: project.above_ground_area || 0,
+                totalApts,
+                sections: sections.length,
+                distType,
+                kuuVariant,
+                avgRisers,
+                workTotal,
+                materialTotal,
+                allTotal: workTotal + materialTotal
+            };
+        }
+
+        // Кэш финансовых итогов по проектам (сохраняем при estimate-totals)
+        function saveCachedEstimateTotals(projectId, data) {
+            try {
+                const cache = JSON.parse(localStorage.getItem('compEstimateCache') || '{}');
+                cache[projectId] = { totalWork: data.totalWork, totalMaterial: data.totalMaterial, ts: Date.now() };
+                localStorage.setItem('compEstimateCache', JSON.stringify(cache));
+            } catch(e) {}
+        }
+
+        function loadCachedEstimateTotals(projectId) {
+            try {
+                const cache = JSON.parse(localStorage.getItem('compEstimateCache') || '{}');
+                return cache[projectId] || null;
+            } catch(e) { return null; }
+        }
+
+        function fmtCompMoney(v) {
+            if (!v && v !== 0) return '—';
+            return Number(v).toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+        }
+
+        function fmtPerM2(total, area) {
+            if (!area || area <= 0) return '—';
+            return fmtCompMoney(Math.round(total / area));
+        }
+
+        async function runComparison() {
+            const selects = document.querySelectorAll('.comp-project-select');
+            const ids = [];
+            selects.forEach(s => { if (s.value) ids.push(+s.value); });
+
+            if (ids.length < 2) {
+                alert('Выберите минимум 2 проекта для сравнения');
+                return;
+            }
+
+            // Загружаем данные параллельно
+            const projects = await Promise.all(ids.map(id => loadComparisonData(id)));
+            const valid = projects.filter(p => p !== null);
+            if (valid.length < 2) {
+                alert('Не удалось загрузить данные проектов');
+                return;
+            }
+
+            renderComparisonTable(valid);
+            renderComparisonCharts(valid);
+            document.getElementById('compResultBlock').style.display = '';
+            document.getElementById('compPlaceholder').style.display = 'none';
+        }
+
+        function renderComparisonTable(projects) {
+            const head = document.getElementById('compTableHead');
+            const body = document.getElementById('compTableBody');
+
+            // Заголовок
+            head.innerHTML = `<th class="param-name">Параметр</th>` +
+                projects.map((p, i) => `<th style="border-bottom:3px solid ${COMP_COLORS[i]}">${p.name}</th>`).join('');
+
+            // Строки
+            const rows = [
+                { group: 'Технические характеристики' },
+                { label: 'Общая площадь', key: 'area', fmt: v => fmtCompMoney(v) + ' м²' },
+                { label: 'Квартир всего', key: 'totalApts', fmt: v => v || '—' },
+                { label: 'Корпусов', key: 'sections', fmt: v => v },
+                { label: 'Схема ГВС', key: 'distType', fmt: v => DIST_LABELS[v] || v },
+                { label: 'Тип КУУ', key: 'kuuVariant', fmt: v => KUU_LABELS[v] || v },
+                { label: 'Ср. стояков/секция', key: 'avgRisers', fmt: v => v },
+                { group: 'Стоимость (абсолютная)' },
+                { label: 'Работы', key: 'workTotal', fmt: v => fmtCompMoney(v) + ' ₽', highlight: true, lower: true },
+                { label: 'Материалы', key: 'materialTotal', fmt: v => fmtCompMoney(v) + ' ₽', highlight: true, lower: true },
+                { label: 'Итого', key: 'allTotal', fmt: v => fmtCompMoney(v) + ' ₽', highlight: true, lower: true },
+                { group: 'Удельная стоимость (руб/м²)' },
+                { label: 'Работы / м²', val: p => fmtPerM2(p.workTotal, p.area), raw: p => p.area > 0 ? p.workTotal / p.area : 0, highlight: true, lower: true },
+                { label: 'Материалы / м²', val: p => fmtPerM2(p.materialTotal, p.area), raw: p => p.area > 0 ? p.materialTotal / p.area : 0, highlight: true, lower: true },
+                { label: 'Итого / м²', val: p => fmtPerM2(p.allTotal, p.area), raw: p => p.area > 0 ? p.allTotal / p.area : 0, highlight: true, lower: true },
+            ];
+
+            let html = '';
+            rows.forEach(row => {
+                if (row.group) {
+                    html += `<tr><td class="param-group" colspan="${projects.length + 1}">${row.group}</td></tr>`;
+                    return;
+                }
+
+                // Значения
+                const values = projects.map(p => {
+                    if (row.val) return { display: row.val(p), raw: row.raw ? row.raw(p) : 0 };
+                    const v = p[row.key];
+                    return { display: row.fmt(v), raw: typeof v === 'number' ? v : 0 };
+                });
+
+                // Highlight best/worst
+                let bestIdx = -1, worstIdx = -1;
+                if (row.highlight) {
+                    const nums = values.map(v => v.raw).filter(v => v > 0);
+                    if (nums.length >= 2) {
+                        const minVal = Math.min(...nums);
+                        const maxVal = Math.max(...nums);
+                        if (minVal !== maxVal) {
+                            bestIdx = values.findIndex(v => v.raw === (row.lower ? minVal : maxVal));
+                            worstIdx = values.findIndex(v => v.raw === (row.lower ? maxVal : minVal));
+                        }
+                    }
+                }
+
+                html += `<tr><td class="param-name">${row.label}</td>`;
+                values.forEach((v, i) => {
+                    let cls = '';
+                    if (i === bestIdx) cls = 'comp-cell-best';
+                    else if (i === worstIdx) cls = 'comp-cell-worst';
+                    html += `<td class="${cls}">${v.display}</td>`;
+                });
+                html += '</tr>';
+            });
+
+            body.innerHTML = html;
+        }
+
+        function renderComparisonCharts(projects) {
+            const container = document.getElementById('compCharts');
+            const charts = [
+                { title: 'Работы (руб/м²)', key: p => p.area > 0 ? p.workTotal / p.area : 0 },
+                { title: 'Материалы (руб/м²)', key: p => p.area > 0 ? p.materialTotal / p.area : 0 },
+                { title: 'Итого (руб/м²)', key: p => p.area > 0 ? p.allTotal / p.area : 0 },
+            ];
+
+            let html = '';
+            charts.forEach(chart => {
+                const vals = projects.map(p => chart.key(p));
+                const maxVal = Math.max(...vals, 1);
+                html += `<div class="comp-chart-group"><div class="comp-chart-title">${chart.title}</div>`;
+                projects.forEach((p, i) => {
+                    const v = vals[i];
+                    const pct = maxVal > 0 ? (v / maxVal) * 100 : 0;
+                    html += `
+                        <div class="comp-bar-row">
+                            <div class="comp-bar-label">${p.name}</div>
+                            <div class="comp-bar-track">
+                                <div class="comp-bar-fill" style="width:${pct}%;background:${COMP_COLORS[i]}">
+                                    <span class="comp-bar-val">${fmtCompMoney(Math.round(v))}</span>
+                                </div>
+                            </div>
+                        </div>`;
+                });
+                html += '</div>';
+            });
+
+            container.innerHTML = html;
+        }
+
+        // Сохраняем estimate-totals в кэш для текущего проекта
+        function cacheEstimateTotalsForComparison(data) {
+            const wsProjectId = getSystemProjectId('water-supply');
+            if (wsProjectId && data) {
+                saveCachedEstimateTotals(wsProjectId, data);
+            }
+        }
+
+        document.getElementById('btnRunComparison')?.addEventListener('click', runComparison);
+
+        // При навигации на сравнение — обновляем списки
+        const origNavigate = typeof navigateToSection === 'function' ? null : null;
+        document.querySelectorAll('.sidebar .nav-link[data-section="comparison"]').forEach(link => {
+            link.addEventListener('click', () => setTimeout(populateCompSelectors, 50));
+        });
+
         // ==================== Финансовая аналитика ====================
 
         const analyticsTotals = {};
@@ -2419,6 +2745,10 @@
                 totalAll: data.totalAll || 0
             };
             renderAnalytics();
+            // Кэшируем для сравнения проектов
+            if (typeof cacheEstimateTotalsForComparison === 'function') {
+                cacheEstimateTotalsForComparison(data);
+            }
         }
 
         function renderAnalytics() {
