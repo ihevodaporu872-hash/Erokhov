@@ -109,6 +109,7 @@ console.log('=== main.js ЗАГРУЖЕН (после импортов) ===');
 let projects = [];
 let activeProjectId = null;
 let portalProjectName = ''; // Имя проекта из родительского портала
+let portalProjectId = null; // ID проекта из портала (для Supabase)
 
 // Кэш последнего расчёта для сметы
 let lastCalculationCache = {
@@ -246,6 +247,75 @@ function deleteProjectById(projectId) {
   );
 }
 
+// ===== Supabase: сохранение / загрузка расчётов =====
+
+function showSaveToast(message, isError) {
+  const existing = document.getElementById('waterSaveToast');
+  if (existing) existing.remove();
+  const toast = document.createElement('div');
+  toast.id = 'waterSaveToast';
+  toast.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(20px);' +
+    'padding:10px 24px;border-radius:10px;font-size:13px;font-weight:500;color:#fff;z-index:9999;' +
+    'opacity:0;transition:opacity .3s,transform .3s;pointer-events:none;' +
+    'background:' + (isError ? 'rgba(239,68,68,.92)' : 'rgba(34,197,94,.92)') + ';';
+  toast.textContent = message;
+  document.body.appendChild(toast);
+  requestAnimationFrame(() => {
+    toast.style.opacity = '1';
+    toast.style.transform = 'translateX(-50%) translateY(0)';
+  });
+  setTimeout(() => {
+    toast.style.opacity = '0';
+    toast.style.transform = 'translateX(-50%) translateY(20px)';
+    setTimeout(() => toast.remove(), 350);
+  }, 2000);
+}
+
+function saveCalculationToSupabase() {
+  if (!portalProjectId) return;
+  readParamsFromDOM();
+  const state = serializeCalculatorState();
+  state.activeTabId = getActiveTabId();
+
+  fetch(`/api/calculations/${portalProjectId}/water-supply`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ data_json: JSON.stringify(state) })
+  }).then(res => {
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    showSaveToast('Расчёт сохранён в облаке');
+  }).catch(err => {
+    console.error('Ошибка сохранения расчёта:', err);
+    showSaveToast('Ошибка сохранения', true);
+  });
+}
+
+function loadCalculationFromSupabase() {
+  if (!portalProjectId) return;
+  fetch(`/api/calculations/${portalProjectId}/water-supply`)
+    .then(res => res.json())
+    .then(result => {
+      const raw = result.data_json;
+      if (!raw || raw === '{}') return;
+      const saved = typeof raw === 'string' ? JSON.parse(raw) : raw;
+      if (!saved.sections && !saved.params) return;
+
+      loadCalculatorState(saved);
+      syncAptsFromBuildingStats();
+      applyStateToDOM();
+
+      const savedTabId = saved.activeTabId || 'residential';
+      initTabs(savedTabId);
+
+      renderSectionsBlocks();
+      calculateWaterSupply();
+      console.log('[Water] Расчёт восстановлен из облака');
+    })
+    .catch(err => {
+      console.error('Ошибка загрузки расчёта:', err);
+    });
+}
+
 // ===== Функции калькулятора =====
 
 // Высоты этажей (fallback — используются только если buildingHeight не задан в секции)
@@ -315,6 +385,9 @@ function calculateWaterSupply() {
   if (window.parent !== window) {
     sendEstimateTotals();
   }
+
+  // Сохраняем расчёт в Supabase
+  saveCalculationToSupabase();
 }
 
 // Полный пересчёт (ререндер карточек + расчёт)
@@ -2238,7 +2311,8 @@ function calculateUndergroundCost() {
 // ===== Обработка сообщений от родительского окна (портал) =====
 window.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'load-project-data') {
-    // Сохраняем имя проекта из портала
+    // Сохраняем ID и имя проекта из портала
+    portalProjectId = event.data.projectId || null;
     if (event.data.projectName) {
       portalProjectName = event.data.projectName;
       console.log('[load-project-data] Имя проекта из портала:', portalProjectName);
@@ -2264,6 +2338,9 @@ window.addEventListener('message', (event) => {
       // Ререндер
       renderSectionsBlocks();
       calculateWaterSupply();
+    } else if (portalProjectId) {
+      // Нет данных в сообщении — пробуем загрузить из Supabase
+      loadCalculationFromSupabase();
     }
   }
 
