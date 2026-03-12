@@ -1106,7 +1106,7 @@
             var bathR    = calcBathRisers(b);
             var kitR     = calcKitchenRisers(b);
             var len      = calcRiserLengthM(b, activeScenario);
-            var isPlastic = (s.pipeType === 'pp' || s.pipeType === 'pp_silent');
+            var isPlastic = (s.pipeType === 'pp' || s.pipeType === 'pp_silent' || s.pipeType === 'pvc');
             var isSML    = (s.pipeType === 'sml');
             var revPer   = floorsN > 0 ? Math.floor(floorsN / 3) : 0;
             var SG = 'service'; // группа для подгруппы обслуживания
@@ -1125,7 +1125,7 @@
 
             // ── Ревизии (все типы труб) ───────────────────────────────────
             if (revPer > 0) {
-                var matLabel = isPlastic ? (s.pipeType === 'pp_silent' ? 'ПП Бесшумный' : 'ПП') : 'SML';
+                var matLabel = isPlastic ? (s.pipeType === 'pvc' ? 'НПВХ' : s.pipeType === 'pp_silent' ? 'ПП Бесшумный' : 'ПП') : 'SML';
                 if (bathR > 0) {
                     var revBath = bathR * revPer;
                     addItem('rev_' + s.riserDiameter,
@@ -1198,7 +1198,7 @@
                 // Ревизии (ПУИ)
                 if (revPer > 0) {
                     addItem('rev_' + s.riserDiameter,
-                        'Ревизия ' + (isPlastic ? (s.pipeType === 'pp_silent' ? 'ПП Бесшумный' : 'ПП') : 'SML') + ' DN\u00a0' + s.riserDiameter, 'шт',
+                        'Ревизия ' + (isPlastic ? (s.pipeType === 'pvc' ? 'НПВХ' : s.pipeType === 'pp_silent' ? 'ПП Бесшумный' : 'ПП') : 'SML') + ' DN\u00a0' + s.riserDiameter, 'шт',
                         revPer, 'Каждый 3-й этаж (ПУИ)', SG);
                     if (isSML)
                         addItem('rapid_rev_' + s.riserDiameter,
@@ -1588,6 +1588,7 @@
                 '<select data-idx="' + idx + '" data-field="pipeType" class="bld-select">' +
                 '<option value="pp"'        + (s.pipeType === 'pp'        ? ' selected' : '') + '>ПП (Полипропилен)</option>' +
                 '<option value="pp_silent"' + (s.pipeType === 'pp_silent' ? ' selected' : '') + '>ПП Бесшумный</option>' +
+                '<option value="pvc"'       + (s.pipeType === 'pvc'       ? ' selected' : '') + '>НПВХ (PVC-U)</option>' +
                 '<option value="sml"'       + (s.pipeType === 'sml'       ? ' selected' : '') + '>SML (Безраструбный чугун)</option>' +
                 '</select></div>' +
                 '<div class="input-group"><label>Диаметр основного стояка, мм:</label>' +
@@ -1606,7 +1607,7 @@
                 '</div>' +
 
                 (function () {
-                    if (s.pipeType !== 'pp' && s.pipeType !== 'pp_silent') return '';
+                    if (s.pipeType !== 'pp' && s.pipeType !== 'pp_silent' && s.pipeType !== 'pvc') return '';
                     var totalR = rc + (s.trashRoom ? 1 : 0);
                     var collars = totalR * floorsN;
                     if (collars <= 0) return '';
@@ -1695,7 +1696,7 @@
             return;
         }
 
-        var matLabels   = { pp: 'ПП', pp_silent: 'ПП Бесшумный', sml: 'SML' };
+        var matLabels   = { pp: 'ПП', pp_silent: 'ПП Бесшумный', pvc: 'НПВХ', sml: 'SML' };
         var showKitchen = (activeScenario === 2 || activeScenario === 3);
         var totalRisers = 0, totalLength = 0;
 
@@ -1857,7 +1858,7 @@
             return;
         }
 
-        var matLabels   = { pp: 'ПП', pp_silent: 'ПП Бесшумный', sml: 'SML' };
+        var matLabels   = { pp: 'ПП', pp_silent: 'ПП Бесшумный', pvc: 'НПВХ', sml: 'SML' };
         var showKitchen = (activeScenario === 2 || activeScenario === 3);
         var rowNum = 1, rows = '';
 
@@ -2112,7 +2113,7 @@
         var bathR = calcBathRisers(b);
         var kitR = calcKitchenRisers(b);
         var len = calcRiserLengthM(b, activeScenario);
-        var isPlastic = (s.pipeType === 'pp' || s.pipeType === 'pp_silent');
+        var isPlastic = (s.pipeType === 'pp' || s.pipeType === 'pp_silent' || s.pipeType === 'pvc');
         var isSML = (s.pipeType === 'sml');
         var totalRisers = calcRisers(b, idx);
 
@@ -2465,7 +2466,7 @@
             return;
         }
 
-        var matLabels = { pp: 'ПП', pp_silent: 'ПП Бесшумный', sml: 'SML' };
+        var matLabels = { pp: 'ПП', pp_silent: 'ПП Бесшумный', pvc: 'НПВХ', sml: 'SML' };
         var html = '';
 
         // ═══ Уровень 1: Аккордеоны по Корпусам ═══
@@ -2592,7 +2593,7 @@
     /* ─── Отправка итогов в портал ──────────────────────────────────────── */
     function sendEstimateTotals() {
         var totalWork = 0, totalMaterial = 0;
-        var matLabels = { pp: 'ПП', pp_silent: 'ПП Бесшумный', sml: 'SML' };
+        var matLabels = { pp: 'ПП', pp_silent: 'ПП Бесшумный', pvc: 'НПВХ', sml: 'SML' };
 
         function sumItems(items, systemKey) {
             var expanded = expandItemsWithWork(items);
@@ -2667,7 +2668,7 @@
             alert('Нет данных для экспорта. Загрузите проект.');
             return;
         }
-        var matLabels   = { pp: 'ПП', pp_silent: 'ПП Бесшумный', sml: 'SML' };
+        var matLabels   = { pp: 'ПП', pp_silent: 'ПП Бесшумный', pvc: 'НПВХ', sml: 'SML' };
         var showKitchen = (activeScenario === 2 || activeScenario === 3);
         var sep = ';', lines = [], rowNum = 1;
 
@@ -3867,7 +3868,7 @@
             }
         }
 
-        var isPlastic = (s1.pipeType === 'pp' || s1.pipeType === 'pp_silent');
+        var isPlastic = (s1.pipeType === 'pp' || s1.pipeType === 'pp_silent' || s1.pipeType === 'pvc');
         var riserClass = isPlastic ? 'viz-riser-k1-pp' : 'viz-riser-k1-sml';
 
         // ── K1 risers ──
