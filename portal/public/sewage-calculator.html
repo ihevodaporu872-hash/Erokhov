@@ -2371,13 +2371,24 @@
         return 'Монтаж: ' + materialName;
     }
 
-    // Развёртка items: для каждого материала без явного type генерируем пару работа+материал
+    // Проверка: нужно ли генерировать отдельную строку работ для данного материала
+    function needsWorkRow(name) {
+        // Работы генерируются только для труб и оборудования (жироуловители, насосы, воронки, трапы)
+        // Фасонные части (тройники, отводы, крестовины, муфты, хомуты, ревизии, патрубки) —
+        // их монтаж включён в расценку трубы
+        if (/Трубопровод|Труба/i.test(name)) return true;
+        if (/Жироуловитель|Насос|Воронка|Трап/i.test(name)) return true;
+        return false;
+    }
+
+    // Развёртка items: для труб и оборудования генерируем пару работа+материал,
+    // для фасонных частей — только материал (монтаж включён в расценку трубы)
     function expandItemsWithWork(items) {
         var result = [];
         items.forEach(function (item) {
             if (item.type === 'работа') {
                 result.push(item);
-            } else {
+            } else if (needsWorkRow(item.name)) {
                 // Работа
                 result.push({
                     name: workNameFor(item.name), unit: item.unit, qty: item.qty,
@@ -2385,6 +2396,13 @@
                     defaultPrice: item.defaultWorkPrice || null
                 });
                 // Материал
+                result.push({
+                    name: item.name, unit: item.unit, qty: item.qty,
+                    note: item.note, group: item.group, type: 'материал',
+                    defaultPrice: item.defaultPrice || null
+                });
+            } else {
+                // Фасонная часть — только материал, без строки работ
                 result.push({
                     name: item.name, unit: item.unit, qty: item.qty,
                     note: item.note, group: item.group, type: 'материал',
