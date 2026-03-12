@@ -153,6 +153,8 @@ function onStateChange() {
       type: 'auto-save',
       state: state
     }, '*');
+
+    // Финансовые итоги отправляются из calculateWaterSupply()
   }
 }
 
@@ -308,6 +310,11 @@ function calculateWaterSupply() {
     hn,
     ivptEnabled
   };
+
+  // Отправляем финансовые итоги для аналитики портала
+  if (window.parent !== window) {
+    sendEstimateTotals();
+  }
 }
 
 // Полный пересчёт (ререндер карточек + расчёт)
@@ -360,6 +367,54 @@ function renderEstimate() {
   // Рендерим смету (с учётом подземной части)
   const undergroundArea = parseFloat(document.getElementById('undergroundArea')?.value) || 0;
   renderEstimateBlock(estimateData, sections.length, estimatePrices, undergroundArea);
+}
+
+// Отправка финансовых итогов в родительское окно (портал)
+function sendEstimateTotals() {
+  const { zonesData, risersByDiameter, h1, hn, ivptEnabled } = lastCalculationCache;
+  if (!zonesData || !risersByDiameter) return;
+
+  const collectorSelect = document.querySelector('select.manufacturer-select[data-section="collectors"]');
+  const collectorVendor = collectorSelect ?
+    (collectorSelect.options[collectorSelect.selectedIndex]?.text || 'РФ') : 'РФ';
+
+  const estimateData = aggregateEstimateData({
+    zonesData, risersByDiameter, sections, h1, hn, ivptEnabled, collectorVendor
+  });
+
+  let totalWork = 0, totalMaterial = 0;
+
+  // Используем ту же логику разрешения цен, что и в renderEstimateBlock
+  Object.keys(estimateData).forEach(si => {
+    const sd = estimateData[si];
+    ['cold', 'hot'].forEach(sys => {
+      if (!sd[sys]) return;
+      sd[sys].items.forEach(item => {
+        const priceKey = `${si}:${sys}:${item.name}`;
+        let price = parseFloat(estimatePrices[priceKey]) || 0;
+        if (!price && item.defaultPrice != null) price = item.defaultPrice;
+        if (!price) {
+          // Мастер-цены из localStorage (попытка)
+          try {
+            const masterKey = item.type === 'работа' ? 'masterPrices_works' : 'masterPrices_materials';
+            const master = JSON.parse(localStorage.getItem(masterKey) || '{}');
+            if (master[item.name]) price = parseFloat(master[item.name]) || 0;
+          } catch(e) {}
+        }
+        const rowTotal = price * item.quantity;
+        if (item.type === 'работа') totalWork += rowTotal;
+        else totalMaterial += rowTotal;
+      });
+    });
+  });
+
+  window.parent.postMessage({
+    type: 'estimate-totals',
+    system: 'water-supply',
+    totalWork,
+    totalMaterial,
+    totalAll: totalWork + totalMaterial
+  }, '*');
 }
 
 // Рендеринг вкладки "Визуализация расчёта"

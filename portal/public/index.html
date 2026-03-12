@@ -883,6 +883,64 @@
             color: var(--text-secondary);
             opacity: 0.6;
         }
+
+        /* === Финансовая аналитика === */
+        .analytics-widget {
+            position: relative;
+            border: 1px solid var(--border-color);
+            border-radius: 0.6rem;
+            padding: 1rem 1.1rem 0.7rem;
+            background: var(--bg-primary);
+            display: flex;
+            align-items: flex-start;
+            gap: 0.8rem;
+            overflow: hidden;
+            transition: border-color .2s;
+        }
+        .analytics-widget:hover { border-color: #3b82f6; }
+        .aw-icon {
+            width: 38px; height: 38px;
+            border-radius: 0.5rem;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.1rem;
+            flex-shrink: 0;
+        }
+        .aw-work .aw-icon  { background: rgba(59,130,246,.12); color: #3b82f6; }
+        .aw-material .aw-icon { background: rgba(16,185,129,.12); color: #10b981; }
+        .aw-total .aw-icon { background: rgba(139,92,246,.12); color: #8b5cf6; }
+        .aw-body { flex: 1; min-width: 0; }
+        .aw-label { font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: .5px; font-weight: 600; }
+        .aw-value { font-size: 1.45rem; font-weight: 700; line-height: 1.2; margin-top: 2px; color: var(--text-primary); }
+        .aw-value.warn { color: #f59e0b; }
+        .aw-value.danger { color: #ef4444; }
+        .aw-sub { font-size: 0.73rem; color: var(--text-secondary); margin-top: 2px; }
+        .aw-bar { position: absolute; bottom: 0; left: 0; right: 0; height: 3px; background: var(--border-color); }
+        .aw-bar-fill { height: 100%; border-radius: 0 0 0 3px; transition: width .4s ease; width: 0; }
+        .aw-bar-work { background: #3b82f6; }
+        .aw-bar-material { background: #10b981; }
+        .aw-bar-total { background: #8b5cf6; }
+
+        /* Карточка системы (детализация) */
+        .analytics-sys-card {
+            border: 1px solid var(--border-color);
+            border-radius: 0.5rem;
+            padding: 0.6rem 0.9rem;
+            background: var(--bg-primary);
+        }
+        .analytics-sys-card .sys-name {
+            font-size: 0.78rem; font-weight: 600; color: var(--text-primary);
+            display: flex; align-items: center; gap: 6px;
+        }
+        .analytics-sys-card .sys-name i { font-size: 0.9rem; }
+        .analytics-sys-card .sys-vals {
+            display: flex; gap: 1rem; margin-top: 4px; font-size: 0.78rem;
+        }
+        .analytics-sys-card .sys-val { color: var(--text-secondary); }
+        .analytics-sys-card .sys-val strong { color: var(--text-primary); font-weight: 600; }
+        .analytics-sys-card .sys-val.warn strong { color: #f59e0b; }
+        .analytics-sys-card .sys-val.danger strong { color: #ef4444; }
+        .analytics-sys-bar { height: 3px; border-radius: 2px; margin-top: 6px; background: var(--border-color); overflow: hidden; }
+        .analytics-sys-bar-fill { height: 100%; transition: width .4s ease; }
     </style>
 </head>
 <body>
@@ -1026,6 +1084,67 @@
                                 <div class="col-md-4">
                                     <label class="form-label" for="inputUndergroundArea">Подземная площадь (м²)</label>
                                     <input type="text" inputmode="decimal" class="form-control" id="inputUndergroundArea" placeholder="0">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Финансовая аналитика -->
+                    <div class="card project-characteristics-card mt-3" id="analyticsCard" style="display:none">
+                        <div class="card-body px-4 py-3">
+                            <div class="d-flex align-items-center justify-content-between mb-3">
+                                <h6 class="mb-0" style="font-weight: 600;">
+                                    <i class="bi bi-graph-up-arrow me-2"></i>Финансовая аналитика (руб/м²)
+                                </h6>
+                                <div class="d-flex align-items-center gap-2">
+                                    <div class="form-check form-switch form-switch-sm mb-0">
+                                        <input class="form-check-input" type="checkbox" id="analyticsDetailToggle">
+                                        <label class="form-check-label" for="analyticsDetailToggle" style="font-size:.78rem;color:var(--text-secondary)">По системам</label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Сводные виджеты -->
+                            <div class="row g-3 mb-2" id="analyticsSummary">
+                                <div class="col-md-4">
+                                    <div class="analytics-widget aw-work">
+                                        <div class="aw-icon"><i class="bi bi-wrench-adjustable"></i></div>
+                                        <div class="aw-body">
+                                            <div class="aw-label">Работы</div>
+                                            <div class="aw-value" id="awWorkPerM2">—</div>
+                                            <div class="aw-sub" id="awWorkTotal"></div>
+                                        </div>
+                                        <div class="aw-bar"><div class="aw-bar-fill aw-bar-work" id="awWorkBar"></div></div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="analytics-widget aw-material">
+                                        <div class="aw-icon"><i class="bi bi-box-seam"></i></div>
+                                        <div class="aw-body">
+                                            <div class="aw-label">Материалы</div>
+                                            <div class="aw-value" id="awMaterialPerM2">—</div>
+                                            <div class="aw-sub" id="awMaterialTotal"></div>
+                                        </div>
+                                        <div class="aw-bar"><div class="aw-bar-fill aw-bar-material" id="awMaterialBar"></div></div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="analytics-widget aw-total">
+                                        <div class="aw-icon"><i class="bi bi-calculator"></i></div>
+                                        <div class="aw-body">
+                                            <div class="aw-label">Итого</div>
+                                            <div class="aw-value" id="awTotalPerM2">—</div>
+                                            <div class="aw-sub" id="awTotalAll"></div>
+                                        </div>
+                                        <div class="aw-bar"><div class="aw-bar-fill aw-bar-total" id="awTotalBar"></div></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Детализация по системам (скрытая по умолчанию) -->
+                            <div id="analyticsDetail" style="display:none">
+                                <div class="row g-2 mt-1" id="analyticsSystemCards">
+                                    <!-- Заполняется JS -->
                                 </div>
                             </div>
                         </div>
@@ -2261,6 +2380,9 @@
                 lastAutoSaveState = event.data.state;
                 handleAutoSave(event.data.state);
             }
+            if (event.data && event.data.type === 'estimate-totals') {
+                updateAnalytics(event.data);
+            }
             if (event.data && event.data.type === 'iframe-ready') {
                 const iframe = document.getElementById('waterCalcFrame');
                 if (iframe && iframe.contentWindow) {
@@ -2270,6 +2392,124 @@
                 const wsProjectId = getSystemProjectId('water-supply');
                 if (wsProjectId) sendProjectToIframe(wsProjectId);
             }
+        });
+
+        // ==================== Финансовая аналитика ====================
+
+        const analyticsTotals = {};
+        const ANALYTICS_LIMITS = { work: 1500, material: 3000, total: 4500 };
+        const ANALYTICS_SYSTEMS = {
+            'water-supply': { name: 'Водоснабжение (В1/Т3/Т4)', icon: 'bi-droplet', color: '#3b82f6' },
+            'sewage':       { name: 'Канализация (К1/К3)',       icon: 'bi-moisture',  color: '#10b981' },
+            'conditioning': { name: 'Кондиционирование (VRF)',   icon: 'bi-snow2',     color: '#8b5cf6' },
+            'fire-safety':  { name: 'Пожаротушение',              icon: 'bi-shield-exclamation', color: '#ef4444' },
+        };
+
+        function fmtMoney(v) {
+            if (!v && v !== 0) return '—';
+            return Number(v).toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+        }
+
+        function updateAnalytics(data) {
+            if (!data || !data.system) return;
+            analyticsTotals[data.system] = {
+                totalWork: data.totalWork || 0,
+                totalMaterial: data.totalMaterial || 0,
+                totalAll: data.totalAll || 0
+            };
+            renderAnalytics();
+        }
+
+        function renderAnalytics() {
+            const card = document.getElementById('analyticsCard');
+            if (!card) return;
+
+            const area = parseFloat(document.getElementById('inputTotalArea')?.value) || 0;
+
+            // Суммарные значения по всем системам
+            let sumWork = 0, sumMaterial = 0, sumAll = 0;
+            Object.values(analyticsTotals).forEach(t => {
+                sumWork += t.totalWork;
+                sumMaterial += t.totalMaterial;
+                sumAll += t.totalAll;
+            });
+
+            // Показываем карточку если есть данные
+            if (sumAll <= 0) { card.style.display = 'none'; return; }
+            card.style.display = '';
+
+            const workPerM2 = area > 0 ? sumWork / area : 0;
+            const matPerM2  = area > 0 ? sumMaterial / area : 0;
+            const totalPerM2 = area > 0 ? sumAll / area : 0;
+
+            // Классы предупреждений
+            const warnClass = (val, limit) => val > limit * 1.2 ? 'danger' : val > limit ? 'warn' : '';
+
+            // Обновляем виджеты
+            const setWidget = (id, val, cls) => {
+                const el = document.getElementById(id);
+                if (el) { el.textContent = area > 0 ? fmtMoney(val) + ' ₽/м²' : 'Укажите площадь'; el.className = 'aw-value ' + cls; }
+            };
+            setWidget('awWorkPerM2', workPerM2, warnClass(workPerM2, ANALYTICS_LIMITS.work));
+            setWidget('awMaterialPerM2', matPerM2, warnClass(matPerM2, ANALYTICS_LIMITS.material));
+            setWidget('awTotalPerM2', totalPerM2, warnClass(totalPerM2, ANALYTICS_LIMITS.total));
+
+            const setSub = (id, val) => {
+                const el = document.getElementById(id);
+                if (el) el.textContent = 'Итого: ' + fmtMoney(val) + ' ₽';
+            };
+            setSub('awWorkTotal', sumWork);
+            setSub('awMaterialTotal', sumMaterial);
+            setSub('awTotalAll', sumAll);
+
+            // Прогресс-бары (% от лимита, макс 100%)
+            const barPct = (val, limit) => Math.min(100, area > 0 ? (val / limit) * 100 : 0);
+            const setBar = (id, pct) => { const el = document.getElementById(id); if (el) el.style.width = pct + '%'; };
+            setBar('awWorkBar', barPct(workPerM2, ANALYTICS_LIMITS.work));
+            setBar('awMaterialBar', barPct(matPerM2, ANALYTICS_LIMITS.material));
+            setBar('awTotalBar', barPct(totalPerM2, ANALYTICS_LIMITS.total));
+
+            // Детализация по системам
+            const container = document.getElementById('analyticsSystemCards');
+            if (!container) return;
+            let html = '';
+            Object.entries(analyticsTotals).forEach(([sys, t]) => {
+                const info = ANALYTICS_SYSTEMS[sys] || { name: sys, icon: 'bi-gear', color: '#6b7280' };
+                if (t.totalAll <= 0) return;
+                const sysPerM2 = area > 0 ? t.totalAll / area : 0;
+                const sysWorkM2 = area > 0 ? t.totalWork / area : 0;
+                const sysMatM2 = area > 0 ? t.totalMaterial / area : 0;
+                const cls = warnClass(sysPerM2, ANALYTICS_LIMITS.total);
+                const pct = Math.min(100, sumAll > 0 ? (t.totalAll / sumAll) * 100 : 0);
+                html += `
+                    <div class="col-md-3 col-sm-6">
+                        <div class="analytics-sys-card">
+                            <div class="sys-name"><i class="bi ${info.icon}" style="color:${info.color}"></i>${info.name}</div>
+                            <div class="sys-vals">
+                                <div class="sys-val ${cls}"><strong>${area > 0 ? fmtMoney(sysPerM2) : '—'}</strong> ₽/м²</div>
+                                <div class="sys-val">${fmtMoney(t.totalAll)} ₽</div>
+                            </div>
+                            <div class="sys-vals" style="font-size:.72rem">
+                                <div class="sys-val">Работы: ${fmtMoney(sysWorkM2)} ₽/м²</div>
+                                <div class="sys-val">Материалы: ${fmtMoney(sysMatM2)} ₽/м²</div>
+                            </div>
+                            <div class="analytics-sys-bar"><div class="analytics-sys-bar-fill" style="width:${pct}%;background:${info.color}"></div></div>
+                        </div>
+                    </div>
+                `;
+            });
+            container.innerHTML = html;
+        }
+
+        // Переключатель детализации
+        document.getElementById('analyticsDetailToggle')?.addEventListener('change', function() {
+            const detail = document.getElementById('analyticsDetail');
+            if (detail) detail.style.display = this.checked ? '' : 'none';
+        });
+
+        // Пересчёт аналитики при изменении площади
+        ['inputTotalArea', 'inputAboveGroundArea', 'inputUndergroundArea'].forEach(id => {
+            document.getElementById(id)?.addEventListener('input', () => renderAnalytics());
         });
 
         // ==================== Утилиты ====================
