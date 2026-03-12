@@ -442,6 +442,18 @@
         .btn-export-excel i { font-size: 18px; }
         .spec-export-bar { margin-top: 24px; display: flex; justify-content: center; }
 
+        /* ── Кнопка «Произвести расчет» ────────────────────────────────── */
+        .btn.btn-primary {
+            display: inline-flex; align-items: center; justify-content: center;
+            padding: 10px 28px; font-size: 14px; font-weight: 600;
+            color: #fff; background: var(--accent-blue, #007AFF);
+            border: none; border-radius: 10px; cursor: pointer;
+            transition: background .15s, box-shadow .15s, transform .12s;
+        }
+        .btn.btn-primary:hover { background: #0062d1; box-shadow: 0 4px 14px rgba(0,122,255,.35); transform: translateY(-1px); }
+        .btn.btn-primary:active { transform: translateY(0); }
+        .mb-3 { margin-bottom: 16px; }
+
         /* ── Смета: цвета системных иконок К1/К2/К3 (базовые стили из water-styles.css) ── */
         .estimate-system-icon.icon-k1 { background: linear-gradient(135deg, #8B4513 0%, #6B3410 100%); }
         .estimate-system-icon.icon-k2 { background: linear-gradient(135deg, #0066CC 0%, #004999 100%); }
@@ -554,6 +566,8 @@
                                     </div>
                                 </details>
                             </div>
+
+                            <button id="recalculate-sewage" class="btn btn-primary mb-3">Произвести расчет</button>
 
                             <!-- Секция: Результаты расчёта К1 -->
                             <div class="panel-section panel-section-output">
@@ -955,6 +969,22 @@
 
     /* ─── Кнопка экспорта ────────────────────────────────────────────────── */
     document.getElementById('btnExportExcel').addEventListener('click', exportToExcel);
+
+    /* ─── Кнопка «Произвести расчет» ─────────────────────────────────────── */
+    document.getElementById('recalculate-sewage').addEventListener('click', function () {
+        if (!buildingStats || !buildingStats.length) return;
+
+        // Все данные уже живут в buildingSettings, stormSettings, k3Settings —
+        // они обновляются при каждом изменении в UI (обработчики input/change).
+        // Пересчитываем результаты и смету:
+        renderResultsTable();
+        renderFittingsTable();
+        renderStormResults();
+        renderK3Results();
+        renderFullSpecification();
+        renderEstimate();
+        sendEstimateTotals();
+    });
 
     /* ─── Вспомогательные функции ────────────────────────────────────────── */
 
@@ -2158,7 +2188,15 @@
 
     // Собирает К3-фитинги для одного корпуса
     function collectK3FittingsForBuilding(idx) {
-        if (!k3Settings[idx] || !k3Settings[idx].length) return [];
+        var s = getK3Settings(idx);
+        var s1 = getSettings(idx);
+        var b = buildingStats && buildingStats[idx];
+        var bHeight = b ? (b.height || 0) : 0;
+        var zones = s.zones || [];
+        var hasK1cCatering = s1.k1cCount > 0 && s1.k1cCatering;
+
+        if (!zones.length && !hasK1cCatering) return [];
+
         var acc = {};
         function addItem(key, name, unit, qty, note, group) {
             if (!qty || qty <= 0) return;
@@ -2166,23 +2204,77 @@
             else { acc[key] = { name: name, unit: unit, qty: qty, note: note || '', group: group || '' }; }
         }
 
-        k3Settings[idx].forEach(function (zone) {
-            var qty = zone.qty || 1;
-            var pipeLen = zone.pipeLength || 0;
-            if (zone.type === 'restaurant') {
-                addItem('k3_grease', 'Жироуловитель (К3)', 'шт', qty, '', '');
-                addItem('k3_pipe_110', 'Труба ПП DN110 (К3)', 'м.п.', pipeLen, '', '');
-            } else if (zone.type === 'laundry') {
-                addItem('k3_trap', 'Трап DN50 (К3, прачечная)', 'шт', qty, '', '');
-                addItem('k3_pipe_50', 'Труба ПП DN50 (К3)', 'м.п.', pipeLen, '', '');
-            } else {
-                addItem('k3_generic', 'Подключение К3 (' + (zone.type || 'прочее') + ')', 'компл', qty, '', '');
+        zones.forEach(function (z) {
+            var n = z.qty || 1;
+            var defPipe = z.type === 'restaurant' ? 15 : 5;
+            var pLen = z.pipeLength || defPipe;
+
+            if (z.type === 'restaurant') {
+                addItem('k3_grease_trap', 'Жироуловитель', 'шт', 1 * n);
+                addItem('k3_pump_wilo', 'Насосная установка Wilo N-Lift', 'шт', 1 * n);
+                addItem('k3_steel_pipe', 'Стальная напорная труба DN\u00a050', 'м.п.', 15 * n);
+                addItem('k3_voronka_20', 'Воронка с разрывом струи 20\u00a0мм', 'шт', 2 * n);
             }
-            // Ревизия
-            addItem('k3_revision', 'Ревизия DN110 (К3)', 'шт', qty, '', 'service');
+
+            if (z.type === 'commercial') {
+                addItem('k3_voronka_20', 'Воронка с разрывом струи 20\u00a0мм', 'шт', 1 * n);
+            }
+
+            // Самотечный выпуск SML DN100
+            if (pLen > 0) {
+                addItem('k3_sml_pipe', 'Самотечный выпуск SML DN\u00a0100', 'м.п.', pLen * n);
+                addItem('k3_rapid_100', 'Муфта соединительная Rapid DN\u00a0100 (SML)', 'шт',
+                    Math.ceil(pLen / 3) * n);
+            }
+
+            // Вентиляция
+            var vt = z.ventType || 'none';
+            var ventLen = 0;
+            if (vt === 'riser') {
+                ventLen = bHeight;
+            } else if (vt === 'valve') {
+                ventLen = 3;
+                addItem('k3_air_valve', 'Воздушный клапан HL905 DN\u00a0110', 'шт', 1 * n);
+            }
+            if (ventLen > 0) {
+                var totalVent = ventLen * n;
+                addItem('k3_vent_sml', 'Вентиляционная труба SML DN\u00a0110', 'м.п.', totalVent);
+                addItem('k3_rapid_110', 'Муфта соединительная Rapid DN\u00a0110 (SML)', 'шт',
+                    Math.ceil(ventLen / 3) * n);
+                addItem('k3_khomuty', 'Хомут стальной (крепление стояков К3)', 'шт',
+                    Math.ceil(ventLen / 1.5) * n);
+            }
+
+            // Прочистка
+            addItem('k3_cleanout',
+                'Прочистка SML DN\u00a0100 (магистраль К3)', 'шт', 1 * n,
+                'Перед выпуском горизонтального участка', 'service');
+            addItem('k3_rapid_cleanout',
+                'Муфта Rapid DN\u00a0100 (прочистки К3)', 'шт', 2 * n,
+                '+2 муфты на SML-прочистку', 'service');
         });
 
-        return Object.keys(acc).map(function (k) { return acc[k]; });
+        // К1С → К3: общепит (жироуловитель + сифоны)
+        if (hasK1cCatering) {
+            if (!acc['k3_grease_trap'])
+                addItem('k3_grease_trap', 'Жироуловитель', 'шт', 1);
+            addItem('k3_sifon_dry',
+                'Сифон с разрывом струи (сухой затвор)', 'шт',
+                s1.k1cCount * 2,
+                'Кондиционер + кухня на каждое помещение К1С');
+        }
+
+        var ORDER = [
+            'k3_grease_trap', 'k3_pump_wilo', 'k3_steel_pipe',
+            'k3_sml_pipe', 'k3_voronka_20', 'k3_sifon_dry',
+            'k3_vent_sml', 'k3_air_valve',
+            'k3_rapid_100', 'k3_rapid_110', 'k3_khomuty',
+            'k3_cleanout', 'k3_rapid_cleanout'
+        ];
+        var result = [];
+        ORDER.forEach(function (k) { if (acc[k]) result.push(acc[k]); });
+        Object.keys(acc).forEach(function (k) { if (ORDER.indexOf(k) === -1) result.push(acc[k]); });
+        return result;
     }
 
     // Собирает отделку для одного корпуса
