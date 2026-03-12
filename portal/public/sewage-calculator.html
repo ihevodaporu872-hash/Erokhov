@@ -2320,6 +2320,25 @@
         addItem('fin_bath', isLuxury ? 'Ванна акриловая' : 'Ванна стальная', 'шт', Math.ceil(baths * reserve), '', 'devices');
         addItem('fin_ksink', 'Мойка кухонная', 'шт', Math.ceil(kitchens * reserve), '', 'devices');
 
+        // Сифоны
+        addItem('fin_siphon_sink', 'Сифон для умывальника', 'шт', Math.ceil(baths * reserve), '', 'devices');
+        addItem('fin_siphon_bath', 'Сифон для ванны', 'шт', Math.ceil(baths * reserve), '', 'devices');
+        addItem('fin_siphon_kitchen', 'Сифон для мойки кухонной', 'шт', Math.ceil(kitchens * reserve), '', 'devices');
+
+        // Гибкие подводки (2 шт на каждый прибор: горячая + холодная)
+        var totalDevices = Math.ceil(baths * reserve) * 2 + Math.ceil(kitchens * reserve); // умывальник+ванна + мойка
+        addItem('fin_flex_hose', 'Гибкая подводка 1/2" L=500мм', 'шт', Math.ceil(totalDevices * 2 * reserve), '', 'devices');
+
+        // Отводы К1 для подключения приборов (DN50)
+        var totalPoints = Math.ceil(baths * reserve) * 3 + Math.ceil(kitchens * reserve); // унитаз+умывальник+ванна + мойка
+        addItem('fin_elbow_50', 'Отвод ПП DN50 45°', 'шт', Math.ceil(totalPoints * reserve), '', 'devices');
+
+        // Трубы разводки внутри санузла (DN40/50)
+        var pipePerBath = 3.5; // средняя длина разводки на санузел, м
+        var pipePerKit = 1.5;  // средняя длина на кухню, м
+        addItem('fin_pipe_50', 'Труба ПП DN50 (разводка санузел)', 'м.п.', Math.ceil((baths * pipePerBath + kitchens * pipePerKit) * reserve), '', 'devices');
+        addItem('fin_pipe_40', 'Труба ПП DN40 (подводка умывальник)', 'м.п.', Math.ceil(baths * 1.0 * reserve), '', 'devices');
+
         // Смесители
         addItem('fin_mix_sink', 'Смеситель для умывальника', 'шт', Math.ceil(baths * reserve), '', 'mixers');
         addItem('fin_mix_bath', 'Смеситель для ванны', 'шт', Math.ceil(baths * reserve), '', 'mixers');
@@ -2352,7 +2371,7 @@
     // Генерация работы для позиции материала
     function workNameFor(materialName) {
         // Трубопроводы К1/К2 — специальные наименования работ
-        var pipeMatch = materialName.match(/^Трубопровод\s+(ПП|ПП Бесшумный|НПВХ|SML)\s+DN\s*(\d+)/i);
+        var pipeMatch = materialName.match(/^(?:Трубопровод|Труба)\s+(ПП|ПП Бесшумный|НПВХ|SML)\s+DN\s*(\d+)/i);
         if (pipeMatch) {
             var pipeMat = pipeMatch[1];
             var dn = parseInt(pipeMatch[2], 10);
@@ -2391,6 +2410,10 @@
         if (/Трап/i.test(materialName)) {
             return 'Установка трапов (полимерных)';
         }
+        // Сифоны отделки
+        if (/Сифон для/i.test(materialName)) {
+            return 'Установка ' + materialName;
+        }
         // Санфаянс (отделка квартир)
         if (/Унитаз|Умывальник|Биде|Ванна|Мойка|Смеситель/i.test(materialName)) {
             return 'Установка ' + materialName;
@@ -2404,39 +2427,137 @@
         if (/Дюбель/i.test(name)) return false;
         // Фасонные части (тройники, отводы, крестовины, хомуты, ревизии, патрубки, муфты Rapid/соединительные) —
         // их монтаж включён в расценку трубы
-        if (/Тройник|Отвод|Крестовина|Хомут|Ревизия|Патрубок компенсац|Муфта соединительная|Муфта Rapid|Прочистка|Сифон|Клапан/i.test(name)) return false;
+        if (/Тройник|Отвод|Крестовина|Хомут|Ревизия|Патрубок компенсац|Муфта соединительная|Муфта Rapid|Прочистка|Клапан/i.test(name)) return false;
+        // Сифоны К3 (с разрывом струи) — без работы; сифоны отделки (для умывальника/ванны/мойки) — с работой
+        if (/Сифон с разрывом/i.test(name)) return false;
+        // Гибкие подводки — без работы (установка входит в монтаж прибора)
+        if (/Гибкая подводка/i.test(name)) return false;
+        // Отводы отделки (DN40/50 подключение) — без работы (входит в разводку)
+        if (/Отвод ПП DN/i.test(name)) return false;
         // Трубы, изоляция, противопожарные муфты, оборудование, санфаянс — да
         if (/Трубопровод|Труба/i.test(name)) return true;
         if (/Изоляция|Теплоизоляция/i.test(name)) return true;
         if (/Муфта противопожарная/i.test(name)) return true;
         if (/Жироуловитель|Насос|Воронка|Трап/i.test(name)) return true;
+        if (/Сифон для/i.test(name)) return true;
         if (/Унитаз|Умывальник|Биде|Ванна|Мойка|Смеситель/i.test(name)) return true;
         if (/Греющий кабель/i.test(name)) return true;
         return false;
     }
 
-    // Развёртка items: для труб и оборудования генерируем пару работа+материал,
-    // для фасонных частей — только материал (монтаж включён в расценку трубы)
-    function expandItemsWithWork(items) {
-        var result = [];
+    // Определение: является ли позиция фасониной, привязанной к трубе
+    function isFitting(name) {
+        return /Тройник|Отвод(?! конденс)|Крестовина|Хомут|Ревизия|Патрубок компенсац|Муфта соединительная|Муфта Rapid|Прочистка|Дюбель/i.test(name);
+    }
+
+    // Извлечение DN из названия для привязки фасонины к трубе
+    function extractDN(name) {
+        var m = name.match(/DN\s*(\d+)/i);
+        return m ? parseInt(m[1], 10) : 0;
+    }
+
+    // Дедупликация: суммирует qty для совпадающих name+unit
+    function deduplicateItems(items) {
+        var map = {};
+        var order = [];
         items.forEach(function (item) {
+            var key = item.name + '|' + (item.unit || '');
+            if (map[key]) {
+                map[key].qty = (map[key].qty || 0) + (item.qty || 0);
+            } else {
+                map[key] = { name: item.name, unit: item.unit, qty: item.qty || 0,
+                    note: item.note, group: item.group, type: item.type,
+                    defaultPrice: item.defaultPrice, defaultWorkPrice: item.defaultWorkPrice };
+                order.push(key);
+            }
+        });
+        return order.map(function (k) { return map[k]; });
+    }
+
+    // Развёртка items с группировкой: Работа трубы → Труба → Фасонина → ... → Оборудование
+    function expandItemsWithWork(items) {
+        var deduped = deduplicateItems(items);
+
+        // Разделяем на трубы, фасонину и standalone
+        var pipes = [];      // Трубопроводы/трубы
+        var fittings = [];   // Фасонина (привязана к трубе по DN)
+        var standalone = []; // Оборудование, изоляция, муфты п/п, санфаянс и т.д.
+
+        deduped.forEach(function (item) {
+            if (item.type === 'работа') {
+                standalone.push(item);
+            } else if (/^(Трубопровод|Труба)\s/i.test(item.name)) {
+                pipes.push(item);
+            } else if (isFitting(item.name)) {
+                fittings.push(item);
+            } else {
+                standalone.push(item);
+            }
+        });
+
+        var result = [];
+
+        // 1. Для каждой трубы: работа → труба → привязанная фасонина
+        pipes.forEach(function (pipe) {
+            var pipeDN = extractDN(pipe.name);
+            // Работа по трубе
+            result.push({
+                name: workNameFor(pipe.name), unit: pipe.unit, qty: pipe.qty,
+                note: pipe.note, group: pipe.group, type: 'работа',
+                defaultPrice: pipe.defaultWorkPrice || null
+            });
+            // Материал трубы
+            result.push({
+                name: pipe.name, unit: pipe.unit, qty: pipe.qty,
+                note: pipe.note, group: pipe.group, type: 'материал',
+                defaultPrice: pipe.defaultPrice || null
+            });
+            // Фасонина того же DN
+            var attached = [];
+            var remaining = [];
+            fittings.forEach(function (f) {
+                var fDN = extractDN(f.name);
+                if (fDN === pipeDN || (pipeDN > 0 && fDN === 0)) {
+                    attached.push(f);
+                } else {
+                    remaining.push(f);
+                }
+            });
+            fittings = remaining;
+            attached.forEach(function (f) {
+                result.push({
+                    name: f.name, unit: f.unit, qty: f.qty,
+                    note: f.note, group: f.group, type: 'материал',
+                    defaultPrice: f.defaultPrice || null
+                });
+            });
+        });
+
+        // 2. Оставшаяся фасонина без привязанной трубы — в конец как материал
+        fittings.forEach(function (f) {
+            result.push({
+                name: f.name, unit: f.unit, qty: f.qty,
+                note: f.note, group: f.group, type: 'материал',
+                defaultPrice: f.defaultPrice || null
+            });
+        });
+
+        // 3. Standalone (оборудование, изоляция, санфаянс и т.д.)
+        standalone.forEach(function (item) {
             if (item.type === 'работа') {
                 result.push(item);
             } else if (needsWorkRow(item.name)) {
-                // Работа
                 result.push({
                     name: workNameFor(item.name), unit: item.unit, qty: item.qty,
                     note: item.note, group: item.group, type: 'работа',
                     defaultPrice: item.defaultWorkPrice || null
                 });
-                // Материал
                 result.push({
                     name: item.name, unit: item.unit, qty: item.qty,
                     note: item.note, group: item.group, type: 'материал',
                     defaultPrice: item.defaultPrice || null
                 });
             } else {
-                // Фасонная часть — только материал, без строки работ
                 result.push({
                     name: item.name, unit: item.unit, qty: item.qty,
                     note: item.note, group: item.group, type: 'материал',
@@ -2444,13 +2565,14 @@
                 });
             }
         });
+
         return result;
     }
 
     function renderEstimateTable(items, systemKey) {
         if (!items || !items.length) return '<p style="color:var(--gray-500);font-size:13px;padding:8px 0">Нет данных</p>';
 
-        // Развёртываем: материал → работа + материал
+        // Развёртываем: дедупликация + группировка (работа трубы → труба → фасонина → ...)
         var expanded = expandItemsWithWork(items);
 
         var html = '<table class="estimate-table estimate-table-financial"><thead><tr>' +
@@ -2461,46 +2583,26 @@
 
         var totalWork = 0, totalMaterial = 0;
 
-        // Группируем по group
-        var groups = {};
-        var groupOrder = [];
         expanded.forEach(function (item) {
-            var g = item.group || '_default';
-            if (!groups[g]) { groups[g] = []; groupOrder.push(g); }
-            groups[g].push(item);
-        });
+            var isWork = item.type === 'работа';
+            var priceKey = systemKey + ':' + (isWork ? 'w:' : 'm:') + item.name;
+            var price = resolvePrice(priceKey, item.name, item.type, item.defaultPrice);
+            var qty = typeof item.qty === 'number' ? (Math.round(item.qty * 10) / 10) : item.qty;
+            var numQty = parseFloat(qty) || 0;
+            var rowTotal = price * numQty;
 
-        var GROUP_LABELS = {
-            fixture: 'Фасонные изделия для подключения приборов',
-            k1c: 'К1С — Встроенные помещения',
-            service: 'Элементы обслуживания и прочистки',
-            devices: 'Приборы',
-            mixers: 'Смесители',
-            pipes: 'Трубы и фасонина'
-        };
+            if (isWork) totalWork += rowTotal;
+            else totalMaterial += rowTotal;
 
-        groupOrder.forEach(function (g) {
-            groups[g].forEach(function (item) {
-                var isWork = item.type === 'работа';
-                var priceKey = systemKey + ':' + (isWork ? 'w:' : 'm:') + item.name;
-                var price = resolvePrice(priceKey, item.name, item.type, item.defaultPrice);
-                var qty = typeof item.qty === 'number' ? (Math.round(item.qty * 10) / 10) : item.qty;
-                var numQty = parseFloat(qty) || 0;
-                var rowTotal = price * numQty;
-
-                if (isWork) totalWork += rowTotal;
-                else totalMaterial += rowTotal;
-
-                html += '<tr class="' + (isWork ? 'type-work' : 'type-material') + '">' +
-                    '<td class="col-type">' + (isWork ? 'работа' : 'материал') + '</td>' +
-                    '<td class="col-name">' + escHtml(item.name) + '</td>' +
-                    '<td class="col-unit">' + escHtml(item.unit) + '</td>' +
-                    '<td class="col-qty">' + qty + '</td>' +
-                    '<td class="col-price"><input type="text" inputmode="decimal" class="estimate-price-input" ' +
-                        'data-price-key="' + escHtml(priceKey) + '" value="' + (price || '') + '" placeholder="—"></td>' +
-                    '<td class="col-total">' + (rowTotal > 0 ? formatEstimateMoney(rowTotal) : '') + '</td>' +
-                    '</tr>';
-            });
+            html += '<tr class="' + (isWork ? 'type-work' : 'type-material') + '">' +
+                '<td class="col-type">' + (isWork ? 'работа' : 'материал') + '</td>' +
+                '<td class="col-name">' + escHtml(item.name) + '</td>' +
+                '<td class="col-unit">' + escHtml(item.unit) + '</td>' +
+                '<td class="col-qty">' + qty + '</td>' +
+                '<td class="col-price"><input type="text" inputmode="decimal" class="estimate-price-input" ' +
+                    'data-price-key="' + escHtml(priceKey) + '" value="' + (price || '') + '" placeholder="—"></td>' +
+                '<td class="col-total">' + (rowTotal > 0 ? formatEstimateMoney(rowTotal) : '') + '</td>' +
+                '</tr>';
         });
 
         // Итого по таблице
