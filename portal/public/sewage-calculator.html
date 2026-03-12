@@ -1817,9 +1817,15 @@
             addItem('fin_siphon',
                 'Сифон бутылочный' + (isLux ? ' (люкс)' : ''), 'шт', Math.ceil(apts * 2 * k),
                 'Ванна/душ + мойка', 'pipes');
-            addItem('fin_flex',
-                'Гибкая подводка (комплект)', 'шт', Math.ceil(apts * 2 * k),
-                '2 комплекта на квартиру', 'pipes');
+            addItem('fin_flex_sink',
+                'Гибкая подводка для смесителя умывальника 1/2" L=500мм', 'шт', Math.ceil(apts * 2 * k),
+                '2 шт на умывальник', 'pipes');
+            addItem('fin_flex_bath',
+                'Гибкая подводка для смесителя ванны 1/2" L=500мм', 'шт', Math.ceil(apts * 2 * k),
+                '2 шт на ванну', 'pipes');
+            addItem('fin_flex_kitchen',
+                'Гибкая подводка для смесителя кухни 1/2" L=500мм', 'шт', Math.ceil(apts * 2 * k),
+                '2 шт на кухню', 'pipes');
         });
 
         if (!totalApts) return [];
@@ -1829,7 +1835,7 @@
             'fin_mixer_bath','fin_mixer_wash','fin_mixer_sink',
             'fin_pipe_50','fin_pipe_110',
             'fin_tee_50','fin_tee_110_50','fin_elbow_50',
-            'fin_siphon','fin_flex'
+            'fin_siphon','fin_flex_sink','fin_flex_bath','fin_flex_kitchen'
         ];
         var result = [];
         ORDER.forEach(function (k) { if (acc[k]) result.push(acc[k]); });
@@ -2325,9 +2331,10 @@
         addItem('fin_siphon_bath', 'Сифон для ванны', 'шт', Math.ceil(baths * reserve), '', '');
         addItem('fin_siphon_kitchen', 'Сифон бутылочный для мойки кухонной', 'шт', Math.ceil(kitchens * reserve), '', '');
 
-        // Гибкие подводки (комплект: 2 шт на смеситель — ГВС+ХВС)
-        var totalSmesiteley = Math.ceil(baths * reserve) * 2 + Math.ceil(kitchens * reserve); // умывальник+ванна + кухня
-        addItem('fin_flex_hose', 'Гибкая подводка 1/2" L=500мм (комплект)', 'шт', totalSmesiteley * 2, '', '');
+        // Гибкие подводки (2 шт на каждый смеситель — ГВС+ХВС), распределены по приборам
+        addItem('fin_flex_sink', 'Гибкая подводка для смесителя умывальника 1/2" L=500мм', 'шт', Math.ceil(baths * reserve) * 2, '', '');
+        addItem('fin_flex_bath', 'Гибкая подводка для смесителя ванны 1/2" L=500мм', 'шт', Math.ceil(baths * reserve) * 2, '', '');
+        addItem('fin_flex_kitchen', 'Гибкая подводка для смесителя кухни 1/2" L=500мм', 'шт', Math.ceil(kitchens * reserve) * 2, '', '');
 
         // Трубы разводки внутри санузла
         var pipePerBath = 3.5; // средняя длина разводки DN50 на санузел, м
@@ -2382,7 +2389,7 @@
                 return 'Монтаж трубопровода из труб напорных (клеевое соединение) НПВХ до Ду=' + duNpvh + 'мм (включая фасоннные части)';
             }
             // ПП, ПП Бесшумный — раструбный пластик
-            var duPp = dn <= 50 ? 50 : dn <= 110 ? 100 : 160;
+            var duPp = dn <= 40 ? 40 : dn <= 50 ? 50 : dn <= 110 ? 100 : 160;
             return 'Монтаж трубопроводов из труб ПВХ (раструбных) до Ду ' + duPp + 'мм вкл. (включая фасоннные части)';
         }
         // Теплоизоляция / Изоляция
@@ -2572,7 +2579,9 @@
                 if (/Сифон.*умывальник/i.test(a.name) && /Умывальник/i.test(dev.name)) attach = true;
                 if (/Сифон.*ванн/i.test(a.name) && /Ванна/i.test(dev.name)) attach = true;
                 if (/Сифон.*мойк/i.test(a.name) && /Мойка/i.test(dev.name)) attach = true;
-                if (/Гибкая подводка/i.test(a.name) && /Смеситель/i.test(dev.name)) attach = true;
+                if (/Гибкая подводка.*умывальник/i.test(a.name) && /Смеситель для умывальника/i.test(dev.name)) attach = true;
+                if (/Гибкая подводка.*ванн/i.test(a.name) && /Смеситель для ванны/i.test(dev.name)) attach = true;
+                if (/Гибкая подводка.*кухн/i.test(a.name) && /Смеситель для кухни/i.test(dev.name)) attach = true;
                 if (attach) {
                     result.push({
                         name: a.name, unit: a.unit, qty: a.qty,
