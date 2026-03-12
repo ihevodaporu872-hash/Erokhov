@@ -442,112 +442,11 @@
         .btn-export-excel i { font-size: 18px; }
         .spec-export-bar { margin-top: 24px; display: flex; justify-content: center; }
 
-        /* ── Смета: аккордеон-в-аккордеоне ──────────────────────────────── */
-        .estimate-header { margin-bottom: 16px; }
-        .estimate-subtitle { font-size: 13px; color: var(--gray-500); margin: 4px 0 0; }
-        .estimate-price-buttons { display: flex; gap: 12px; margin-top: 16px; flex-wrap: wrap; }
-        .btn-secondary {
-            display: inline-flex; align-items: center; gap: 8px;
-            padding: 10px 20px; background: var(--bg-card); color: var(--gray-700);
-            border: 1px solid var(--gray-200); border-radius: 10px;
-            font-size: 13px; font-weight: 500; font-family: inherit; cursor: pointer;
-            transition: background .15s, border-color .15s, box-shadow .15s;
-        }
-        .btn-secondary:hover { background: var(--gray-50); border-color: var(--gray-300); box-shadow: 0 2px 6px rgba(0,0,0,.06); }
-        .btn-secondary i { font-size: 15px; }
-
-        /* Корпус (уровень 1) */
-        .estimate-section-details { margin-bottom: 10px; border: 1px solid var(--gray-200); border-radius: 10px; overflow: hidden; }
-        .estimate-section-details[open] { box-shadow: 0 2px 8px rgba(0,0,0,.04); }
-        .estimate-section-header {
-            display: flex; align-items: center; gap: 10px; padding: 14px 18px;
-            background: var(--bg-card); font-weight: 600; font-size: 14px; cursor: pointer;
-            list-style: none; user-select: none; color: var(--gray-900);
-        }
-        .estimate-section-header::-webkit-details-marker { display: none; }
-        .estimate-section-header::before {
-            content: '▶'; font-size: 10px; color: var(--gray-400);
-            transition: transform .2s; display: inline-block;
-        }
-        .estimate-section-details[open] > .estimate-section-header::before { transform: rotate(90deg); }
-        .estimate-section-icon { font-size: 16px; }
-        .estimate-section-content { padding: 8px 14px 14px; }
-
-        /* Система (уровень 2) */
-        .estimate-details { margin-bottom: 6px; border: 1px solid var(--gray-100); border-radius: 8px; overflow: hidden; }
-        .estimate-details[open] { background: var(--bg-main); }
-        .estimate-details-header {
-            display: flex; align-items: center; gap: 8px; padding: 10px 14px;
-            background: var(--gray-50); font-weight: 500; font-size: 13px; cursor: pointer;
-            list-style: none; user-select: none; color: var(--gray-800);
-        }
-        .estimate-details-header::-webkit-details-marker { display: none; }
-        .estimate-details-header::before {
-            content: '▶'; font-size: 9px; color: var(--gray-400);
-            transition: transform .2s; display: inline-block;
-        }
-        .estimate-details[open] > .estimate-details-header::before { transform: rotate(90deg); }
-        .estimate-system-icon { font-size: 14px; }
-        .estimate-system-icon.icon-k1 { color: #8B4513; }
-        .estimate-system-icon.icon-k2 { color: #0066CC; }
-        .estimate-system-icon.icon-k3 { color: #E04000; }
-        .estimate-system-icon.icon-finish { color: #10b981; }
-        .estimate-details-content { padding: 8px 10px 10px; }
-
-        /* Таблица сметы */
-        .estimate-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
-        .estimate-table th {
-            text-align: left; padding: 7px 8px; font-weight: 600; font-size: 11px;
-            color: var(--gray-500); border-bottom: 2px solid var(--gray-200);
-            text-transform: uppercase; letter-spacing: .3px;
-        }
-        .estimate-table td { padding: 6px 8px; border-bottom: 1px solid var(--gray-100); }
-        .estimate-table .col-type { width: 70px; }
-        .estimate-table .col-name { }
-        .estimate-table .col-unit { width: 50px; text-align: center; }
-        .estimate-table .col-qty { width: 70px; text-align: right; }
-        .estimate-table .col-price { width: 90px; }
-        .estimate-table .col-total { width: 100px; text-align: right; font-weight: 500; }
-        .estimate-table .type-work .col-type { color: #3b82f6; }
-        .estimate-table .type-material .col-type { color: #10b981; }
-        .estimate-table .group-row td { font-weight: 600; color: var(--gray-600); background: var(--gray-50); font-size: 11.5px; }
-        .estimate-table .subtotal-row td { font-weight: 700; border-top: 2px solid var(--gray-300); color: var(--gray-900); }
-        .estimate-price-input {
-            width: 100%; padding: 4px 6px; border: 1px solid var(--gray-200); border-radius: 6px;
-            font-size: 12px; text-align: right; background: var(--bg-card); color: var(--gray-900);
-            outline: none; transition: border-color .15s;
-        }
-        .estimate-price-input:focus { border-color: var(--accent-blue); box-shadow: 0 0 0 2px rgba(0,122,255,.12); }
-
-        /* Сводка */
-        .estimate-summary-section { margin-top: 20px; padding-top: 16px; border-top: 2px solid var(--gray-200); }
-        .estimate-summary-title { font-weight: 700; font-size: 15px; margin-bottom: 12px; color: var(--gray-900); }
-
-        /* Итого по секции */
-        .estimate-section-total {
-            display: flex; justify-content: space-between; align-items: center;
-            padding: 10px 14px; margin-top: 8px; background: var(--gray-50);
-            border-radius: 8px; font-size: 13px;
-        }
-        .estimate-section-total-label { font-weight: 600; color: var(--gray-700); }
-        .estimate-section-total-value { font-weight: 700; color: var(--gray-900); }
-
-        /* Темная тема */
-        .dark-theme .estimate-section-details { border-color: #333; }
-        .dark-theme .estimate-section-header { background: #1e1e1e; color: #e0e0e0; }
-        .dark-theme .estimate-details { border-color: #2a2a2a; }
-        .dark-theme .estimate-details[open] { background: #1a1a1a; }
-        .dark-theme .estimate-details-header { background: #252525; color: #ccc; }
-        .dark-theme .estimate-table th { color: #888; border-color: #333; }
-        .dark-theme .estimate-table td { border-color: #2a2a2a; }
-        .dark-theme .estimate-table .group-row td { background: #252525; color: #aaa; }
-        .dark-theme .estimate-table .subtotal-row td { border-color: #555; color: #e0e0e0; }
-        .dark-theme .estimate-section-total { background: #252525; }
-        .dark-theme .estimate-section-total-label { color: #aaa; }
-        .dark-theme .estimate-section-total-value { color: #e0e0e0; }
-        .dark-theme .btn-secondary { background: #252525; color: #ccc; border-color: #444; }
-        .dark-theme .btn-secondary:hover { background: #333; border-color: #555; }
-        .dark-theme .estimate-price-input { background: #1e1e1e; color: #e0e0e0; border-color: #444; }
+        /* ── Смета: цвета системных иконок К1/К2/К3 (базовые стили из water-styles.css) ── */
+        .estimate-system-icon.icon-k1 { background: linear-gradient(135deg, #8B4513 0%, #6B3410 100%); }
+        .estimate-system-icon.icon-k2 { background: linear-gradient(135deg, #0066CC 0%, #004999 100%); }
+        .estimate-system-icon.icon-k3 { background: linear-gradient(135deg, #E04000 0%, #B83200 100%); }
+        .estimate-system-icon.icon-finish { background: linear-gradient(135deg, #10b981 0%, #059669 100%); }
     </style>
 </head>
 <body>
@@ -904,10 +803,7 @@
                     <div class="control-panel">
                         <div class="panel-section panel-section-output">
                             <div class="estimate-header">
-                                <h3 class="panel-section-title">
-                                    <span class="panel-section-icon panel-section-icon-output"></span>
-                                    Смета по системам водоотведения
-                                </h3>
+                                <h2 class="estimate-title">Смета по системам водоотведения</h2>
                                 <p class="estimate-subtitle">Группировка работ и материалов по корпусам и системам</p>
                                 <div class="estimate-price-buttons">
                                     <button id="btnEditWorkPrices" class="btn-secondary"><i class="bi bi-pencil-square"></i> Редактировать стоимость работ</button>
@@ -2333,8 +2229,8 @@
     }
 
     function renderEstimateTable(items, systemKey) {
-        if (!items || !items.length) return '<p style="color:var(--gray-500);font-size:12px;padding:4px 0">Нет данных</p>';
-        var html = '<table class="estimate-table"><thead><tr>' +
+        if (!items || !items.length) return '<p style="color:var(--gray-500);font-size:13px;padding:8px 0">Нет данных</p>';
+        var html = '<table class="estimate-table estimate-table-financial"><thead><tr>' +
             '<th class="col-type">Тип</th><th class="col-name">Наименование</th>' +
             '<th class="col-unit">Ед.</th><th class="col-qty">Кол-во</th>' +
             '<th class="col-price">Цена</th><th class="col-total">Сумма</th>' +
@@ -2406,7 +2302,7 @@
             var s = getSettings(idx);
 
             html += '<details class="estimate-section-details" ' + (idx === 0 ? 'open' : '') + '>' +
-                '<summary class="estimate-section-header"><span class="estimate-section-icon"><i class="bi bi-building"></i></span>' + escHtml(bName) + '</summary>' +
+                '<summary class="estimate-section-header"><span class="estimate-section-icon"></span>' + escHtml(bName) + '</summary>' +
                 '<div class="estimate-section-content">';
 
             // ═══ Уровень 2: К1 ═══
@@ -2426,7 +2322,7 @@
             }
 
             html += '<details class="estimate-details" open>' +
-                '<summary class="estimate-details-header"><span class="estimate-system-icon icon-k1"><i class="bi bi-moisture"></i></span>К1 — Бытовая канализация</summary>' +
+                '<summary class="estimate-details-header"><span class="estimate-system-icon icon-k1"></span>К1 — Бытовая канализация</summary>' +
                 '<div class="estimate-details-content">' + renderEstimateTable(k1Items, idx + ':k1') + '</div></details>';
 
             // ═══ Уровень 2: К2 ═══
@@ -2444,14 +2340,14 @@
             }
 
             html += '<details class="estimate-details">' +
-                '<summary class="estimate-details-header"><span class="estimate-system-icon icon-k2"><i class="bi bi-cloud-rain"></i></span>К2 — Дождевая канализация</summary>' +
+                '<summary class="estimate-details-header"><span class="estimate-system-icon icon-k2"></span>К2 — Дождевая канализация</summary>' +
                 '<div class="estimate-details-content">' + renderEstimateTable(k2Items, idx + ':k2') + '</div></details>';
 
             // ═══ Уровень 2: К3 ═══
             var k3Items = collectK3FittingsForBuilding(idx);
             if (k3Items.length > 0) {
                 html += '<details class="estimate-details">' +
-                    '<summary class="estimate-details-header"><span class="estimate-system-icon icon-k3"><i class="bi bi-exclamation-triangle"></i></span>К3 — Производственная канализация</summary>' +
+                    '<summary class="estimate-details-header"><span class="estimate-system-icon icon-k3"></span>К3 — Производственная канализация</summary>' +
                     '<div class="estimate-details-content">' + renderEstimateTable(k3Items, idx + ':k3') + '</div></details>';
             }
 
@@ -2459,7 +2355,7 @@
             var finItems = collectFinishingForBuilding(idx);
             if (finItems.length > 0) {
                 html += '<details class="estimate-details">' +
-                    '<summary class="estimate-details-header"><span class="estimate-system-icon icon-finish"><i class="bi bi-brush"></i></span>Отделка квартир</summary>' +
+                    '<summary class="estimate-details-header"><span class="estimate-system-icon icon-finish"></span>Отделка квартир</summary>' +
                     '<div class="estimate-details-content">' + renderEstimateTable(finItems, idx + ':finish') + '</div></details>';
             }
 
@@ -2467,20 +2363,21 @@
         });
 
         // ═══ Сводка по объекту ═══
-        html += '<div class="estimate-summary-section">' +
-            '<div class="estimate-summary-title"><i class="bi bi-clipboard-data"></i> Сводка по объекту</div>';
+        html += '<details class="estimate-section-details estimate-summary-details" open>' +
+            '<summary class="estimate-section-header"><span class="estimate-section-icon"></span>Сводка по объекту</summary>' +
+            '<div class="estimate-section-content">';
 
         // К1 — все корпуса
         var allK1 = collectFittings();
         html += '<details class="estimate-details">' +
-            '<summary class="estimate-details-header"><span class="estimate-system-icon icon-k1"><i class="bi bi-moisture"></i></span>К1 — Итого по всем корпусам</summary>' +
+            '<summary class="estimate-details-header"><span class="estimate-system-icon icon-k1"></span>К1 — Итого по всем корпусам</summary>' +
             '<div class="estimate-details-content">' + renderEstimateTable(allK1, 'all:k1') + '</div></details>';
 
         // К2 — все корпуса
         var allK2 = collectStormFittings();
         if (allK2.length > 0) {
             html += '<details class="estimate-details">' +
-                '<summary class="estimate-details-header"><span class="estimate-system-icon icon-k2"><i class="bi bi-cloud-rain"></i></span>К2 — Итого по всем корпусам</summary>' +
+                '<summary class="estimate-details-header"><span class="estimate-system-icon icon-k2"></span>К2 — Итого по всем корпусам</summary>' +
                 '<div class="estimate-details-content">' + renderEstimateTable(allK2, 'all:k2') + '</div></details>';
         }
 
@@ -2488,7 +2385,7 @@
         if (hasAnyK3Zones()) {
             var allK3 = collectK3Fittings();
             html += '<details class="estimate-details">' +
-                '<summary class="estimate-details-header"><span class="estimate-system-icon icon-k3"><i class="bi bi-exclamation-triangle"></i></span>К3 — Итого по всем корпусам</summary>' +
+                '<summary class="estimate-details-header"><span class="estimate-system-icon icon-k3"></span>К3 — Итого по всем корпусам</summary>' +
                 '<div class="estimate-details-content">' + renderEstimateTable(allK3, 'all:k3') + '</div></details>';
         }
 
@@ -2496,11 +2393,11 @@
         if (hasAnyFinishing()) {
             var allFin = collectFinishingItems();
             html += '<details class="estimate-details">' +
-                '<summary class="estimate-details-header"><span class="estimate-system-icon icon-finish"><i class="bi bi-brush"></i></span>Отделка — Итого по всем корпусам</summary>' +
+                '<summary class="estimate-details-header"><span class="estimate-system-icon icon-finish"></span>Отделка — Итого по всем корпусам</summary>' +
                 '<div class="estimate-details-content">' + renderEstimateTable(allFin, 'all:finish') + '</div></details>';
         }
 
-        html += '</div>'; // close summary section
+        html += '</div></details>'; // close summary section
 
         el.innerHTML = html;
 
