@@ -441,6 +441,113 @@
         .btn-export-excel:active { transform: translateY(0); }
         .btn-export-excel i { font-size: 18px; }
         .spec-export-bar { margin-top: 24px; display: flex; justify-content: center; }
+
+        /* ── Смета: аккордеон-в-аккордеоне ──────────────────────────────── */
+        .estimate-header { margin-bottom: 16px; }
+        .estimate-subtitle { font-size: 13px; color: var(--gray-500); margin: 4px 0 0; }
+        .estimate-price-buttons { display: flex; gap: 12px; margin-top: 16px; flex-wrap: wrap; }
+        .btn-secondary {
+            display: inline-flex; align-items: center; gap: 8px;
+            padding: 10px 20px; background: var(--bg-card); color: var(--gray-700);
+            border: 1px solid var(--gray-200); border-radius: 10px;
+            font-size: 13px; font-weight: 500; font-family: inherit; cursor: pointer;
+            transition: background .15s, border-color .15s, box-shadow .15s;
+        }
+        .btn-secondary:hover { background: var(--gray-50); border-color: var(--gray-300); box-shadow: 0 2px 6px rgba(0,0,0,.06); }
+        .btn-secondary i { font-size: 15px; }
+
+        /* Корпус (уровень 1) */
+        .estimate-section-details { margin-bottom: 10px; border: 1px solid var(--gray-200); border-radius: 10px; overflow: hidden; }
+        .estimate-section-details[open] { box-shadow: 0 2px 8px rgba(0,0,0,.04); }
+        .estimate-section-header {
+            display: flex; align-items: center; gap: 10px; padding: 14px 18px;
+            background: var(--bg-card); font-weight: 600; font-size: 14px; cursor: pointer;
+            list-style: none; user-select: none; color: var(--gray-900);
+        }
+        .estimate-section-header::-webkit-details-marker { display: none; }
+        .estimate-section-header::before {
+            content: '▶'; font-size: 10px; color: var(--gray-400);
+            transition: transform .2s; display: inline-block;
+        }
+        .estimate-section-details[open] > .estimate-section-header::before { transform: rotate(90deg); }
+        .estimate-section-icon { font-size: 16px; }
+        .estimate-section-content { padding: 8px 14px 14px; }
+
+        /* Система (уровень 2) */
+        .estimate-details { margin-bottom: 6px; border: 1px solid var(--gray-100); border-radius: 8px; overflow: hidden; }
+        .estimate-details[open] { background: var(--bg-main); }
+        .estimate-details-header {
+            display: flex; align-items: center; gap: 8px; padding: 10px 14px;
+            background: var(--gray-50); font-weight: 500; font-size: 13px; cursor: pointer;
+            list-style: none; user-select: none; color: var(--gray-800);
+        }
+        .estimate-details-header::-webkit-details-marker { display: none; }
+        .estimate-details-header::before {
+            content: '▶'; font-size: 9px; color: var(--gray-400);
+            transition: transform .2s; display: inline-block;
+        }
+        .estimate-details[open] > .estimate-details-header::before { transform: rotate(90deg); }
+        .estimate-system-icon { font-size: 14px; }
+        .estimate-system-icon.icon-k1 { color: #8B4513; }
+        .estimate-system-icon.icon-k2 { color: #0066CC; }
+        .estimate-system-icon.icon-k3 { color: #E04000; }
+        .estimate-system-icon.icon-finish { color: #10b981; }
+        .estimate-details-content { padding: 8px 10px 10px; }
+
+        /* Таблица сметы */
+        .estimate-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+        .estimate-table th {
+            text-align: left; padding: 7px 8px; font-weight: 600; font-size: 11px;
+            color: var(--gray-500); border-bottom: 2px solid var(--gray-200);
+            text-transform: uppercase; letter-spacing: .3px;
+        }
+        .estimate-table td { padding: 6px 8px; border-bottom: 1px solid var(--gray-100); }
+        .estimate-table .col-type { width: 70px; }
+        .estimate-table .col-name { }
+        .estimate-table .col-unit { width: 50px; text-align: center; }
+        .estimate-table .col-qty { width: 70px; text-align: right; }
+        .estimate-table .col-price { width: 90px; }
+        .estimate-table .col-total { width: 100px; text-align: right; font-weight: 500; }
+        .estimate-table .type-work .col-type { color: #3b82f6; }
+        .estimate-table .type-material .col-type { color: #10b981; }
+        .estimate-table .group-row td { font-weight: 600; color: var(--gray-600); background: var(--gray-50); font-size: 11.5px; }
+        .estimate-table .subtotal-row td { font-weight: 700; border-top: 2px solid var(--gray-300); color: var(--gray-900); }
+        .estimate-price-input {
+            width: 100%; padding: 4px 6px; border: 1px solid var(--gray-200); border-radius: 6px;
+            font-size: 12px; text-align: right; background: var(--bg-card); color: var(--gray-900);
+            outline: none; transition: border-color .15s;
+        }
+        .estimate-price-input:focus { border-color: var(--accent-blue); box-shadow: 0 0 0 2px rgba(0,122,255,.12); }
+
+        /* Сводка */
+        .estimate-summary-section { margin-top: 20px; padding-top: 16px; border-top: 2px solid var(--gray-200); }
+        .estimate-summary-title { font-weight: 700; font-size: 15px; margin-bottom: 12px; color: var(--gray-900); }
+
+        /* Итого по секции */
+        .estimate-section-total {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 10px 14px; margin-top: 8px; background: var(--gray-50);
+            border-radius: 8px; font-size: 13px;
+        }
+        .estimate-section-total-label { font-weight: 600; color: var(--gray-700); }
+        .estimate-section-total-value { font-weight: 700; color: var(--gray-900); }
+
+        /* Темная тема */
+        .dark-theme .estimate-section-details { border-color: #333; }
+        .dark-theme .estimate-section-header { background: #1e1e1e; color: #e0e0e0; }
+        .dark-theme .estimate-details { border-color: #2a2a2a; }
+        .dark-theme .estimate-details[open] { background: #1a1a1a; }
+        .dark-theme .estimate-details-header { background: #252525; color: #ccc; }
+        .dark-theme .estimate-table th { color: #888; border-color: #333; }
+        .dark-theme .estimate-table td { border-color: #2a2a2a; }
+        .dark-theme .estimate-table .group-row td { background: #252525; color: #aaa; }
+        .dark-theme .estimate-table .subtotal-row td { border-color: #555; color: #e0e0e0; }
+        .dark-theme .estimate-section-total { background: #252525; }
+        .dark-theme .estimate-section-total-label { color: #aaa; }
+        .dark-theme .estimate-section-total-value { color: #e0e0e0; }
+        .dark-theme .btn-secondary { background: #252525; color: #ccc; border-color: #444; }
+        .dark-theme .btn-secondary:hover { background: #333; border-color: #555; }
+        .dark-theme .estimate-price-input { background: #1e1e1e; color: #e0e0e0; border-color: #444; }
     </style>
 </head>
 <body>
@@ -794,16 +901,25 @@
 
                 <!-- ========== СМЕТА ========== -->
                 <div class="tab-panel" id="tab-estimate">
-                    <div class="placeholder-container">
-                        <div class="placeholder-content">
-                            <div class="placeholder-icon">
-                                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                                    <path d="M14 2v6h6"/><path d="M8 13h8M8 17h8M8 9h2"/>
-                                </svg>
+                    <div class="control-panel">
+                        <div class="panel-section panel-section-output">
+                            <div class="estimate-header">
+                                <h3 class="panel-section-title">
+                                    <span class="panel-section-icon panel-section-icon-output"></span>
+                                    Смета по системам водоотведения
+                                </h3>
+                                <p class="estimate-subtitle">Группировка работ и материалов по корпусам и системам</p>
+                                <div class="estimate-price-buttons">
+                                    <button id="btnEditWorkPrices" class="btn-secondary"><i class="bi bi-pencil-square"></i> Редактировать стоимость работ</button>
+                                    <button id="btnEditMaterialPrices" class="btn-secondary"><i class="bi bi-currency-dollar"></i> Редактировать стоимость материалов</button>
+                                </div>
                             </div>
-                            <h2>Раздел в разработке</h2>
-                            <p class="note">Здесь будут стоимостные показатели: расценки на монтаж и материалы системы водоотведения К1/К2, сводная смета.</p>
+                            <div id="estimateContent">
+                                <div class="no-data-banner">
+                                    <i class="bi bi-info-circle-fill"></i>
+                                    <span>Перейдите на вкладку <strong>Жилая часть</strong>, выберите проект и настройте параметры — смета сформируется автоматически.</span>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -900,6 +1016,7 @@
             var panel = document.getElementById(targetId);
             if (panel) panel.classList.add('active');
             if (btn.dataset.tab === 'specification') renderFullSpecification();
+            if (btn.dataset.tab === 'estimate') renderEstimate();
             if (btn.dataset.tab === 'visualization') renderVisualization();
         });
     });
@@ -2035,6 +2152,438 @@
         }
     }
 
+    /* ─── Смета: per-building collection ──────────────────────────────────── */
+
+    // Собирает К1-фитинги для одного корпуса (idx)
+    function collectFittingsForBuilding(idx) {
+        if (!buildingStats || !buildingStats[idx]) return [];
+        var b = buildingStats[idx];
+        var showKitchen = (activeScenario === 2 || activeScenario === 3);
+        var acc = {};
+        function addItem(key, name, unit, qty, note, group) {
+            if (!qty || qty <= 0) return;
+            if (acc[key]) { acc[key].qty += qty; }
+            else { acc[key] = { name: name, unit: unit, qty: qty, note: note || '', group: group || '' }; }
+        }
+
+        var s = getSettings(idx);
+        var floorsN = b.floors ? b.floors.length : 0;
+        var bathR = calcBathRisers(b);
+        var kitR = calcKitchenRisers(b);
+        var len = calcRiserLengthM(b, activeScenario);
+        var isPlastic = (s.pipeType === 'pp' || s.pipeType === 'pp_silent');
+        var isSML = (s.pipeType === 'sml');
+        var totalRisers = calcRisers(b, idx);
+
+        // Муфты Rapid (SML)
+        if (isSML) {
+            var rapidCount = Math.ceil(len / 3);
+            addItem('rapid_' + s.riserDiameter, 'Муфта Rapid DN' + s.riserDiameter, 'шт', rapidCount, '', '');
+            if (showKitchen && s.kitchenDiameter !== s.riserDiameter) {
+                var kitLen = calcRiserLengthM(b, activeScenario) * (kitR / Math.max(totalRisers, 1));
+                var rapidKit = Math.ceil(kitLen / 3);
+                addItem('rapid_' + s.kitchenDiameter, 'Муфта Rapid DN' + s.kitchenDiameter, 'шт', rapidKit, '', '');
+            }
+        }
+
+        // Хомуты (ПП)
+        if (isPlastic) {
+            var clampCount = Math.ceil(len / 1.5);
+            addItem('clamp_' + s.riserDiameter, 'Хомут ' + s.riserDiameter + ' мм', 'шт', clampCount, '', '');
+        }
+
+        // Противопожарные муфты
+        var fireSleeveCount = totalRisers * Math.max(floorsN - 1, 0);
+        addItem('firesleeve_' + s.riserDiameter, 'Муфта противопожарная DN' + s.riserDiameter, 'шт', fireSleeveCount, '', '');
+        // Дюбели для муфт (4 шт на муфту)
+        addItem('dowel_fire', 'Дюбель для муфты', 'шт', fireSleeveCount * 4, '', '');
+
+        // Крестовины (по этажам)
+        if (floorsN > 0) {
+            var bathPerFloor = maxFloorValue(b, 'bath');
+            var kitPerFloor = maxFloorValue(b, 'kitchens');
+            addItem('cross_110', 'Крестовина 110/110/110 90°', 'шт', bathR * floorsN, '', 'fixture');
+            if (showKitchen && kitR > 0) {
+                addItem('tee_110_50', 'Тройник 110/' + s.kitchenDiameter + ' 45°', 'шт', kitR * floorsN, '', 'fixture');
+            }
+        }
+
+        // Ревизии
+        var revCount = totalRisers;
+        addItem('revision_110', 'Ревизия DN' + s.riserDiameter, 'шт', revCount, 'На первом этаже каждого стояка', 'service');
+
+        // К1С (встроенные помещения)
+        if (s.k1cCount > 0) {
+            addItem('k1c_trap', 'Трап DN50 (К1С)', 'шт', s.k1cCount, '', 'k1c');
+            if (s.k1cCatering) {
+                addItem('k1c_grease', 'Жироуловитель (К1С)', 'шт', s.k1cCount, '', 'k1c');
+            }
+        }
+
+        // Конденсат, ПУИ, мусорная, балконы
+        if (s.condensate) addItem('cond_funnel', 'Воронка конденсатная DN50', 'шт', totalRisers, '', '');
+        if (s.pui) addItem('pui_trap', 'Трап ПУИ DN110', 'шт', 1, '', '');
+        if (s.trashRoom) addItem('trash_trap', 'Трап мусорной DN110', 'шт', 1, '', '');
+        if (s.balconies > 0) addItem('balcony_trap', 'Трап балконный DN110', 'шт', s.balconies, '', '');
+
+        return Object.keys(acc).map(function (k) { return acc[k]; });
+    }
+
+    // Собирает К2-фитинги для одного корпуса
+    function collectStormFittingsForBuilding(idx) {
+        if (!buildingStats || !buildingStats[idx]) return [];
+        var b = buildingStats[idx];
+        var acc = {};
+        function addItem(key, name, unit, qty, note, group) {
+            if (!qty || qty <= 0) return;
+            if (acc[key]) { acc[key].qty += qty; }
+            else { acc[key] = { name: name, unit: unit, qty: qty, note: note || '', group: group || '' }; }
+        }
+
+        var ss = getStormSettings(idx);
+        var pipeLen = calcStormPipeLength(b, idx);
+        if (!pipeLen) return [];
+
+        var risers = ss.funnelCount || 1;
+        // Муфты Rapid DN50
+        addItem('storm_rapid', 'Муфта Rapid DN50 (К2)', 'шт', Math.ceil(pipeLen / 3), '', '');
+        // Воронки
+        addItem('storm_funnel', 'Водоприёмная воронка DN50', 'шт', risers, '', '');
+        // Ревизии
+        addItem('storm_revision', 'Ревизия DN50 (К2)', 'шт', risers, '', 'service');
+
+        if (stormInsulation) {
+            addItem('storm_insul', 'Теплоизоляция 9 мм (К2)', 'м', Math.round(pipeLen * 10) / 10, '', '');
+            addItem('storm_heating', 'Греющий кабель (К2)', 'м', Math.round(pipeLen * 10) / 10, '', '');
+        }
+
+        return Object.keys(acc).map(function (k) { return acc[k]; });
+    }
+
+    // Собирает К3-фитинги для одного корпуса
+    function collectK3FittingsForBuilding(idx) {
+        if (!k3Settings[idx] || !k3Settings[idx].length) return [];
+        var acc = {};
+        function addItem(key, name, unit, qty, note, group) {
+            if (!qty || qty <= 0) return;
+            if (acc[key]) { acc[key].qty += qty; }
+            else { acc[key] = { name: name, unit: unit, qty: qty, note: note || '', group: group || '' }; }
+        }
+
+        k3Settings[idx].forEach(function (zone) {
+            var qty = zone.qty || 1;
+            var pipeLen = zone.pipeLength || 0;
+            if (zone.type === 'restaurant') {
+                addItem('k3_grease', 'Жироуловитель (К3)', 'шт', qty, '', '');
+                addItem('k3_pipe_110', 'Труба ПП DN110 (К3)', 'м.п.', pipeLen, '', '');
+            } else if (zone.type === 'laundry') {
+                addItem('k3_trap', 'Трап DN50 (К3, прачечная)', 'шт', qty, '', '');
+                addItem('k3_pipe_50', 'Труба ПП DN50 (К3)', 'м.п.', pipeLen, '', '');
+            } else {
+                addItem('k3_generic', 'Подключение К3 (' + (zone.type || 'прочее') + ')', 'компл', qty, '', '');
+            }
+            // Ревизия
+            addItem('k3_revision', 'Ревизия DN110 (К3)', 'шт', qty, '', 'service');
+        });
+
+        return Object.keys(acc).map(function (k) { return acc[k]; });
+    }
+
+    // Собирает отделку для одного корпуса
+    function collectFinishingForBuilding(idx) {
+        if (!buildingStats || !buildingStats[idx]) return [];
+        var b = buildingStats[idx];
+        var s = getSettings(idx);
+        if (!s.finishing || !b.totalApts) return [];
+
+        var acc = {};
+        function addItem(key, name, unit, qty, note, group) {
+            if (!qty || qty <= 0) return;
+            if (acc[key]) { acc[key].qty += qty; }
+            else { acc[key] = { name: name, unit: unit, qty: qty, note: note || '', group: group || '' }; }
+        }
+
+        var apts = b.totalApts || 0;
+        var reserve = 1 + (s.finishReserve || 0) / 100;
+        var isLuxury = (s.finishGrade === 'luxury');
+        var baths = 0, kitchens = 0;
+        if (b.floors) b.floors.forEach(function (f) { baths += (f.bath || 0); kitchens += (f.kitchens || 0); });
+
+        // Приборы
+        addItem('fin_wc', 'Унитаз-компакт', 'шт', Math.ceil(baths * reserve), '', 'devices');
+        addItem('fin_sink', 'Умывальник', 'шт', Math.ceil(baths * reserve), '', 'devices');
+        if (isLuxury) addItem('fin_bidet', 'Биде', 'шт', Math.ceil(baths * reserve), '', 'devices');
+        addItem('fin_bath', isLuxury ? 'Ванна акриловая' : 'Ванна стальная', 'шт', Math.ceil(baths * reserve), '', 'devices');
+        addItem('fin_ksink', 'Мойка кухонная', 'шт', Math.ceil(kitchens * reserve), '', 'devices');
+
+        // Смесители
+        addItem('fin_mix_sink', 'Смеситель для умывальника', 'шт', Math.ceil(baths * reserve), '', 'mixers');
+        addItem('fin_mix_bath', 'Смеситель для ванны', 'шт', Math.ceil(baths * reserve), '', 'mixers');
+        addItem('fin_mix_kitchen', 'Смеситель для кухни', 'шт', Math.ceil(kitchens * reserve), '', 'mixers');
+
+        return Object.keys(acc).map(function (k) { return acc[k]; });
+    }
+
+    /* ─── Смета: рендер ───────────────────────────────────────────────── */
+
+    var estimatePrices = {};
+
+    function formatEstimateMoney(v) {
+        return v ? Number(v).toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) + ' ₽' : '';
+    }
+
+    function renderEstimateTable(items, systemKey) {
+        if (!items || !items.length) return '<p style="color:var(--gray-500);font-size:12px;padding:4px 0">Нет данных</p>';
+        var html = '<table class="estimate-table"><thead><tr>' +
+            '<th class="col-type">Тип</th><th class="col-name">Наименование</th>' +
+            '<th class="col-unit">Ед.</th><th class="col-qty">Кол-во</th>' +
+            '<th class="col-price">Цена</th><th class="col-total">Сумма</th>' +
+            '</tr></thead><tbody>';
+
+        var totalWork = 0, totalMaterial = 0;
+        // Группируем по group
+        var groups = {};
+        items.forEach(function (item) {
+            var g = item.group || '_default';
+            if (!groups[g]) groups[g] = [];
+            groups[g].push(item);
+        });
+
+        Object.keys(groups).forEach(function (g) {
+            if (g !== '_default') {
+                var label = g === 'fixture' ? 'Фасонные изделия для подключения приборов'
+                    : g === 'k1c' ? 'К1С — Встроенные помещения'
+                    : g === 'service' ? 'Элементы обслуживания и прочистки'
+                    : g === 'devices' ? 'Приборы'
+                    : g === 'mixers' ? 'Смесители'
+                    : g === 'pipes' ? 'Трубы и фасонина'
+                    : g;
+                html += '<tr class="group-row"><td colspan="6">' + escHtml(label) + '</td></tr>';
+            }
+            groups[g].forEach(function (item) {
+                var priceKey = systemKey + ':' + item.name;
+                var price = parseFloat(estimatePrices[priceKey]) || 0;
+                var rowTotal = price * item.qty;
+                var typeLabel = item.unit === 'м.п.' || item.unit === 'м' ? 'материал' : 'материал';
+                var typeClass = 'type-material';
+
+                if (item.type === 'работа') { typeLabel = 'работа'; typeClass = 'type-work'; totalWork += rowTotal; }
+                else { totalMaterial += rowTotal; }
+
+                var qty = typeof item.qty === 'number' ? (Math.round(item.qty * 10) / 10) : item.qty;
+                html += '<tr class="' + typeClass + '">' +
+                    '<td class="col-type">' + typeLabel + '</td>' +
+                    '<td class="col-name">' + escHtml(item.name) + '</td>' +
+                    '<td class="col-unit">' + escHtml(item.unit) + '</td>' +
+                    '<td class="col-qty">' + qty + '</td>' +
+                    '<td class="col-price"><input type="text" inputmode="decimal" class="estimate-price-input" ' +
+                        'data-price-key="' + escHtml(priceKey) + '" value="' + (price || '') + '" placeholder="—"></td>' +
+                    '<td class="col-total">' + (rowTotal > 0 ? formatEstimateMoney(rowTotal) : '') + '</td>' +
+                    '</tr>';
+            });
+        });
+
+        html += '</tbody></table>';
+        return html;
+    }
+
+    function renderEstimate() {
+        var el = document.getElementById('estimateContent');
+        if (!el) return;
+
+        if (!buildingStats || !buildingStats.length) {
+            el.innerHTML = '<div class="no-data-banner"><i class="bi bi-info-circle-fill"></i>' +
+                '<span>Перейдите на вкладку <strong>Жилая часть</strong>, выберите проект и настройте параметры — смета сформируется автоматически.</span></div>';
+            return;
+        }
+
+        var matLabels = { pp: 'ПП', pp_silent: 'ПП Бесшумный', sml: 'SML' };
+        var html = '';
+
+        // ═══ Уровень 1: Аккордеоны по Корпусам ═══
+        buildingStats.forEach(function (b, idx) {
+            var bName = b.name || ('Корпус ' + (b.num || idx + 1));
+            var s = getSettings(idx);
+
+            html += '<details class="estimate-section-details" ' + (idx === 0 ? 'open' : '') + '>' +
+                '<summary class="estimate-section-header"><span class="estimate-section-icon"><i class="bi bi-building"></i></span>' + escHtml(bName) + '</summary>' +
+                '<div class="estimate-section-content">';
+
+            // ═══ Уровень 2: К1 ═══
+            var k1Items = collectFittingsForBuilding(idx);
+            // Добавляем трубы стояков как первый элемент
+            var totalLen = calcTotalLengthM(b, activeScenario, idx);
+            if (totalLen > 0) {
+                var mat = matLabels[s.pipeType] || s.pipeType;
+                k1Items.unshift({
+                    name: 'Трубопровод ' + mat + ' DN' + s.riserDiameter + ' мм (стояки)',
+                    unit: 'м.п.', qty: Math.round(totalLen * 10) / 10, note: '', group: '', type: 'материал'
+                });
+                k1Items.unshift({
+                    name: 'Монтаж трубопровода ' + mat + ' DN' + s.riserDiameter,
+                    unit: 'м.п.', qty: Math.round(totalLen * 10) / 10, note: '', group: '', type: 'работа'
+                });
+            }
+
+            html += '<details class="estimate-details" open>' +
+                '<summary class="estimate-details-header"><span class="estimate-system-icon icon-k1"><i class="bi bi-moisture"></i></span>К1 — Бытовая канализация</summary>' +
+                '<div class="estimate-details-content">' + renderEstimateTable(k1Items, idx + ':k1') + '</div></details>';
+
+            // ═══ Уровень 2: К2 ═══
+            var k2Items = collectStormFittingsForBuilding(idx);
+            var k2PipeLen = calcStormPipeLength(b, idx);
+            if (k2PipeLen > 0) {
+                k2Items.unshift({
+                    name: 'Трубопровод SML DN50 (фасадный стояк)',
+                    unit: 'м.п.', qty: Math.round(k2PipeLen * 10) / 10, note: '', group: '', type: 'материал'
+                });
+                k2Items.unshift({
+                    name: 'Монтаж трубопровода SML DN50',
+                    unit: 'м.п.', qty: Math.round(k2PipeLen * 10) / 10, note: '', group: '', type: 'работа'
+                });
+            }
+
+            html += '<details class="estimate-details">' +
+                '<summary class="estimate-details-header"><span class="estimate-system-icon icon-k2"><i class="bi bi-cloud-rain"></i></span>К2 — Дождевая канализация</summary>' +
+                '<div class="estimate-details-content">' + renderEstimateTable(k2Items, idx + ':k2') + '</div></details>';
+
+            // ═══ Уровень 2: К3 ═══
+            var k3Items = collectK3FittingsForBuilding(idx);
+            if (k3Items.length > 0) {
+                html += '<details class="estimate-details">' +
+                    '<summary class="estimate-details-header"><span class="estimate-system-icon icon-k3"><i class="bi bi-exclamation-triangle"></i></span>К3 — Производственная канализация</summary>' +
+                    '<div class="estimate-details-content">' + renderEstimateTable(k3Items, idx + ':k3') + '</div></details>';
+            }
+
+            // ═══ Уровень 2: Отделка ═══
+            var finItems = collectFinishingForBuilding(idx);
+            if (finItems.length > 0) {
+                html += '<details class="estimate-details">' +
+                    '<summary class="estimate-details-header"><span class="estimate-system-icon icon-finish"><i class="bi bi-brush"></i></span>Отделка квартир</summary>' +
+                    '<div class="estimate-details-content">' + renderEstimateTable(finItems, idx + ':finish') + '</div></details>';
+            }
+
+            html += '</div></details>'; // close section
+        });
+
+        // ═══ Сводка по объекту ═══
+        html += '<div class="estimate-summary-section">' +
+            '<div class="estimate-summary-title"><i class="bi bi-clipboard-data"></i> Сводка по объекту</div>';
+
+        // К1 — все корпуса
+        var allK1 = collectFittings();
+        html += '<details class="estimate-details">' +
+            '<summary class="estimate-details-header"><span class="estimate-system-icon icon-k1"><i class="bi bi-moisture"></i></span>К1 — Итого по всем корпусам</summary>' +
+            '<div class="estimate-details-content">' + renderEstimateTable(allK1, 'all:k1') + '</div></details>';
+
+        // К2 — все корпуса
+        var allK2 = collectStormFittings();
+        if (allK2.length > 0) {
+            html += '<details class="estimate-details">' +
+                '<summary class="estimate-details-header"><span class="estimate-system-icon icon-k2"><i class="bi bi-cloud-rain"></i></span>К2 — Итого по всем корпусам</summary>' +
+                '<div class="estimate-details-content">' + renderEstimateTable(allK2, 'all:k2') + '</div></details>';
+        }
+
+        // К3 — все корпуса
+        if (hasAnyK3Zones()) {
+            var allK3 = collectK3Fittings();
+            html += '<details class="estimate-details">' +
+                '<summary class="estimate-details-header"><span class="estimate-system-icon icon-k3"><i class="bi bi-exclamation-triangle"></i></span>К3 — Итого по всем корпусам</summary>' +
+                '<div class="estimate-details-content">' + renderEstimateTable(allK3, 'all:k3') + '</div></details>';
+        }
+
+        // Отделка — все корпуса
+        if (hasAnyFinishing()) {
+            var allFin = collectFinishingItems();
+            html += '<details class="estimate-details">' +
+                '<summary class="estimate-details-header"><span class="estimate-system-icon icon-finish"><i class="bi bi-brush"></i></span>Отделка — Итого по всем корпусам</summary>' +
+                '<div class="estimate-details-content">' + renderEstimateTable(allFin, 'all:finish') + '</div></details>';
+        }
+
+        html += '</div>'; // close summary section
+
+        el.innerHTML = html;
+
+        // Обработчики ввода цен
+        el.querySelectorAll('.estimate-price-input').forEach(function (inp) {
+            inp.addEventListener('input', function () {
+                var key = this.dataset.priceKey;
+                var val = this.value.replace(',', '.');
+                estimatePrices[key] = val;
+                // Пересчитать сумму в строке
+                var price = parseFloat(val) || 0;
+                var row = this.closest('tr');
+                if (row) {
+                    var qtyTd = row.querySelector('.col-qty');
+                    var totalTd = row.querySelector('.col-total');
+                    if (qtyTd && totalTd) {
+                        var qty = parseFloat(qtyTd.textContent) || 0;
+                        totalTd.textContent = price * qty > 0 ? formatEstimateMoney(price * qty) : '';
+                    }
+                }
+                sendEstimateTotals();
+            });
+        });
+
+        sendEstimateTotals();
+    }
+
+    /* ─── Отправка итогов в портал ──────────────────────────────────────── */
+    function sendEstimateTotals() {
+        var totalWork = 0, totalMaterial = 0;
+
+        if (buildingStats && buildingStats.length) {
+            buildingStats.forEach(function (b, idx) {
+                // К1
+                var k1Items = collectFittingsForBuilding(idx);
+                var totalLen = calcTotalLengthM(b, activeScenario, idx);
+                if (totalLen > 0) {
+                    k1Items.push({ name: 'Монтаж трубопровода', unit: 'м.п.', qty: totalLen, type: 'работа' });
+                    k1Items.push({ name: 'Трубопровод', unit: 'м.п.', qty: totalLen, type: 'материал' });
+                }
+                k1Items.forEach(function (item) {
+                    var priceKey = idx + ':k1:' + item.name;
+                    var price = parseFloat(estimatePrices[priceKey]) || 0;
+                    var rowTotal = price * (item.qty || 0);
+                    if (item.type === 'работа') totalWork += rowTotal;
+                    else totalMaterial += rowTotal;
+                });
+
+                // К2
+                var k2Items = collectStormFittingsForBuilding(idx);
+                var k2Len = calcStormPipeLength(b, idx);
+                if (k2Len > 0) {
+                    k2Items.push({ name: 'Монтаж К2', unit: 'м.п.', qty: k2Len, type: 'работа' });
+                    k2Items.push({ name: 'Труба К2', unit: 'м.п.', qty: k2Len, type: 'материал' });
+                }
+                k2Items.forEach(function (item) {
+                    var priceKey = idx + ':k2:' + item.name;
+                    var price = parseFloat(estimatePrices[priceKey]) || 0;
+                    var rowTotal = price * (item.qty || 0);
+                    if (item.type === 'работа') totalWork += rowTotal;
+                    else totalMaterial += rowTotal;
+                });
+            });
+        }
+
+        window.parent.postMessage({
+            type: 'estimate-totals',
+            system: 'sewage',
+            totalWork: totalWork,
+            totalMaterial: totalMaterial,
+            totalAll: totalWork + totalMaterial
+        }, '*');
+    }
+
+    /* ─── Модальное окно редактирования цен ──────────────────────────── */
+    function openPriceModal(type) {
+        // Заглушка: в будущем — модальное окно как в водоснабжении
+        alert('Редактирование стоимости ' + (type === 'works' ? 'работ' : 'материалов') + ' — в разработке');
+    }
+
+    document.getElementById('btnEditWorkPrices').addEventListener('click', function () { openPriceModal('works'); });
+    document.getElementById('btnEditMaterialPrices').addEventListener('click', function () { openPriceModal('materials'); });
+
     /* ─── Экспорт в CSV (UTF-8 BOM для Excel) ────────────────────────────── */
     function exportToExcel() {
         if (!buildingStats || !buildingStats.length) {
@@ -3005,9 +3554,17 @@
         if (!msg) return;
         if (msg.type === 'load-project-data') {
             buildingStats = msg.buildingStats || null;
+            // Восстанавливаем сохранённые цены
+            if (msg.data && msg.data.estimatePrices) {
+                estimatePrices = msg.data.estimatePrices;
+            }
             renderResultsTable();
             renderStormResults();
             if (activeSystem === 'K3') { renderK3BuildingAccordions(); renderK3Results(); }
+            // Обновляем смету если вкладка активна
+            var estTab = document.getElementById('tab-estimate');
+            if (estTab && estTab.classList.contains('active')) renderEstimate();
+            sendEstimateTotals();
         }
         if (msg.type === 'theme-change') {
             document.body.classList.toggle('dark-theme', msg.theme === 'dark');
