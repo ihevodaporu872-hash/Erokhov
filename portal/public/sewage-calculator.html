@@ -450,6 +450,7 @@
             border: none; border-radius: 10px; cursor: pointer;
             transition: background .15s, box-shadow .15s, transform .12s;
         }
+        .btn.btn-primary.btn-sm { padding: 7px 20px; font-size: 13px; border-radius: 8px; }
         .btn.btn-primary:hover { background: #0062d1; box-shadow: 0 4px 14px rgba(0,122,255,.35); transform: translateY(-1px); }
         .btn.btn-primary:active { transform: translateY(0); }
         .mb-3 { margin-bottom: 16px; }
@@ -567,7 +568,7 @@
                                 </details>
                             </div>
 
-                            <button id="recalculate-sewage" class="btn btn-primary mb-3">Произвести расчет</button>
+                            <button id="recalc-k1" class="btn btn-primary btn-sm mb-3 btn-recalc-subsystem">Произвести расчет К1</button>
 
                             <!-- Секция: Результаты расчёта К1 -->
                             <div class="panel-section panel-section-output">
@@ -644,6 +645,8 @@
                                 </details>
                             </div>
 
+                            <button id="recalc-k2" class="btn btn-primary btn-sm mb-3 btn-recalc-subsystem">Произвести расчет К2</button>
+
                             <!-- Секция: Результаты расчёта К2 -->
                             <div class="panel-section panel-section-output">
                                 <h3 class="panel-section-title">
@@ -705,6 +708,8 @@
                                     </div>
                                 </div>
                             </div>
+
+                            <button id="recalc-k3" class="btn btn-primary btn-sm mb-3 btn-recalc-subsystem">Произвести расчет К3</button>
 
                             <!-- Секция: Результаты расчёта К3 -->
                             <div class="panel-section panel-section-output">
@@ -970,16 +975,26 @@
     /* ─── Кнопка экспорта ────────────────────────────────────────────────── */
     document.getElementById('btnExportExcel').addEventListener('click', exportToExcel);
 
-    /* ─── Кнопка «Произвести расчет» ─────────────────────────────────────── */
-    document.getElementById('recalculate-sewage').addEventListener('click', function () {
+    /* ─── Кнопки «Произвести расчет» по системам ────────────────────────── */
+    document.getElementById('recalc-k1').addEventListener('click', function () {
         if (!buildingStats || !buildingStats.length) return;
-
-        // Все данные уже живут в buildingSettings, stormSettings, k3Settings —
-        // они обновляются при каждом изменении в UI (обработчики input/change).
-        // Пересчитываем результаты и смету:
         renderResultsTable();
         renderFittingsTable();
+        renderFullSpecification();
+        renderEstimate();
+        sendEstimateTotals();
+    });
+
+    document.getElementById('recalc-k2').addEventListener('click', function () {
+        if (!buildingStats || !buildingStats.length) return;
         renderStormResults();
+        renderFullSpecification();
+        renderEstimate();
+        sendEstimateTotals();
+    });
+
+    document.getElementById('recalc-k3').addEventListener('click', function () {
+        if (!buildingStats || !buildingStats.length) return;
         renderK3Results();
         renderFullSpecification();
         renderEstimate();
