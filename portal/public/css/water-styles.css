@@ -2651,6 +2651,14 @@ button:active {
   color: var(--gray-300);
 }
 
+/* Подсветка ячеек с изменённой ценой */
+.col-price.price-modified {
+  background: rgba(250, 204, 21, 0.15);
+}
+.dark-theme .col-price.price-modified {
+  background: rgba(250, 204, 21, 0.10);
+}
+
 /* Итого значение в строке */
 .estimate-total-value {
   font-weight: 600;

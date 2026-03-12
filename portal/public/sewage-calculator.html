@@ -460,6 +460,10 @@
         .estimate-system-icon.icon-k2 { background: linear-gradient(135deg, #0066CC 0%, #004999 100%); }
         .estimate-system-icon.icon-k3 { background: linear-gradient(135deg, #E04000 0%, #B83200 100%); }
         .estimate-system-icon.icon-finish { background: linear-gradient(135deg, #10b981 0%, #059669 100%); }
+
+        /* Подсветка ячеек с изменённой ценой */
+        .col-price.price-modified { background: rgba(250, 204, 21, 0.15); }
+        .dark-theme .col-price.price-modified { background: rgba(250, 204, 21, 0.10); }
     </style>
 </head>
 <body>
@@ -2675,14 +2679,26 @@
             if (isWork) totalWork += rowTotal;
             else totalMaterial += rowTotal;
 
+            // Определяем «дефолтную» цену (masterPrices → item.defaultPrice) для подсветки
+            var defPrice = 0;
+            try {
+                var mk = isWork ? 'masterPrices_works' : 'masterPrices_materials';
+                var mp = JSON.parse(localStorage.getItem(mk) || '{}');
+                if (mp[item.name]) defPrice = parseFloat(mp[item.name]) || 0;
+            } catch(e) {}
+            if (!defPrice && item.defaultPrice != null) defPrice = parseFloat(item.defaultPrice) || 0;
+            var isModified = price > 0 && defPrice > 0 && Math.abs(price - defPrice) > 0.01;
+            var modClass = isModified ? ' price-modified' : '';
+
             html += '<tr class="' + (isWork ? 'type-work' : 'type-material') + '">' +
                 '<td class="col-type">' + (isWork ? 'работа' : 'материал') + '</td>' +
                 '<td class="col-name">' + escHtml(item.name) + '</td>' +
                 '<td class="col-unit">' + escHtml(item.unit) + '</td>' +
                 '<td class="col-qty">' + qty + '</td>' +
-                '<td class="col-price"><input type="text" inputmode="decimal" class="estimate-price-input" ' +
-                    'data-price-key="' + escHtml(priceKey) + '" value="' + (price || '') + '" placeholder="—"></td>' +
-                '<td class="col-total">' + (rowTotal > 0 ? formatEstimateMoney(rowTotal) : '') + '</td>' +
+                '<td class="col-price' + modClass + '"><input type="text" inputmode="decimal" class="estimate-price-input" ' +
+                    'data-price-key="' + escHtml(priceKey) + '" data-qty="' + numQty + '" data-default-price="' + defPrice + '" ' +
+                    'value="' + (price || '') + '" placeholder="—"></td>' +
+                '<td class="col-total"><span class="estimate-total-value">' + (rowTotal > 0 ? formatEstimateMoney(rowTotal) : '') + '</span></td>' +
                 '</tr>';
         });
 
@@ -2814,25 +2830,63 @@
 
         el.innerHTML = html;
 
-        // Обработчики ввода цен
-        el.querySelectorAll('.estimate-price-input').forEach(function (inp) {
-            inp.addEventListener('input', function () {
-                var key = this.dataset.priceKey;
-                var val = this.value.replace(',', '.');
-                estimatePrices[key] = val;
-                // Пересчитать сумму в строке
-                var price = parseFloat(val) || 0;
-                var row = this.closest('tr');
-                if (row) {
-                    var qtyTd = row.querySelector('.col-qty');
-                    var totalTd = row.querySelector('.col-total');
-                    if (qtyTd && totalTd) {
-                        var qty = parseFloat(qtyTd.textContent) || 0;
-                        totalTd.textContent = price * qty > 0 ? formatEstimateMoney(price * qty) : '';
-                    }
+        // Обработчики ввода цен (делегирование на контейнер)
+        var priceDebounce = null;
+        el.addEventListener('input', function (e) {
+            if (!e.target.classList.contains('estimate-price-input')) return;
+            var inp = e.target;
+            sanitizePriceInput(inp);
+
+            var key = inp.dataset.priceKey;
+            var val = inp.value.trim();
+            estimatePrices[key] = val;
+
+            // Пересчитать сумму в строке
+            var price = parseFloat(val) || 0;
+            var qty = parseFloat(inp.dataset.qty) || 0;
+            var total = price * qty;
+            var row = inp.closest('tr');
+            if (row) {
+                var totalSpan = row.querySelector('.estimate-total-value');
+                if (totalSpan) totalSpan.textContent = total > 0 ? formatEstimateMoney(total) : '';
+            }
+
+            // Подсветка изменённой цены
+            var defPrice = parseFloat(inp.dataset.defaultPrice) || 0;
+            var priceTd = inp.closest('.col-price');
+            if (priceTd) {
+                if (price > 0 && defPrice > 0 && Math.abs(price - defPrice) > 0.01) {
+                    priceTd.classList.add('price-modified');
+                } else {
+                    priceTd.classList.remove('price-modified');
                 }
+            }
+
+            // Пересчитать итого по секции (tbody)
+            var tbody = inp.closest('tbody');
+            if (tbody) {
+                var sumWork = 0, sumMat = 0;
+                tbody.querySelectorAll('.estimate-price-input').forEach(function (i) {
+                    var p = parseFloat(i.value) || 0;
+                    var q = parseFloat(i.dataset.qty) || 0;
+                    var r = i.closest('tr');
+                    if (r && r.classList.contains('type-work')) sumWork += p * q;
+                    else sumMat += p * q;
+                });
+                var totals = tbody.querySelectorAll('.estimate-section-total-value');
+                if (totals.length >= 3) {
+                    totals[0].textContent = formatEstimateMoney(sumWork);
+                    totals[1].textContent = formatEstimateMoney(sumMat);
+                    totals[2].textContent = formatEstimateMoney(sumWork + sumMat);
+                }
+            }
+
+            // Debounced пересчёт глобальных итогов + автосохранение
+            clearTimeout(priceDebounce);
+            priceDebounce = setTimeout(function () {
                 sendEstimateTotals();
-            });
+                saveCalculationToSupabase();
+            }, 800);
         });
 
         sendEstimateTotals();
@@ -2902,9 +2956,244 @@
     }
 
     /* ─── Модальное окно редактирования цен ──────────────────────────── */
+
+    function loadMasterPrices(type) {
+        var key = type === 'works' ? 'masterPrices_works' : 'masterPrices_materials';
+        try { var raw = localStorage.getItem(key); return raw ? JSON.parse(raw) : {}; }
+        catch (e) { return {}; }
+    }
+
+    function saveMasterPrices(type, prices) {
+        var key = type === 'works' ? 'masterPrices_works' : 'masterPrices_materials';
+        try { localStorage.setItem(key, JSON.stringify(prices)); } catch (e) {}
+    }
+
+    function sanitizePriceInput(el) {
+        var val = el.value.replace(/,/g, '.').replace(/[^\d.]/g, '');
+        var parts = val.split('.');
+        if (parts.length > 2) val = parts[0] + '.' + parts.slice(1).join('');
+        el.value = val;
+    }
+
+    function getSewageItemGroup(name, itemType) {
+        var n = name.toLowerCase();
+        if (itemType === 'материал') {
+            if (/хомут|дюбель|гильз|патрубок|муфта соед|муфта rapid|ревизия|прочистка/.test(n)) return 'Прочее';
+            if (/тройник|отвод|крестовин|клапан/.test(n)) return 'Фасонные части';
+            if (/трубопровод|труб/.test(n)) return 'Трубопроводы';
+            if (/изоляц|теплоизоляц/.test(n)) return 'Изоляция';
+            if (/унитаз|умывальник|биде|ванна|мойка|смесител|сифон|подводка/.test(n)) return 'Санфаянс и комплектующие';
+            if (/воронк|трап|жироулов|насос|кабел/.test(n)) return 'Оборудование';
+            return 'Прочее';
+        }
+        // Работы
+        if (/трубопровод|монтаж труб/.test(n)) return 'Трубопроводы';
+        if (/теплоизоляц|изоляц/.test(n)) return 'Изоляция';
+        if (/унитаз|умывальник|биде|ванна|мойка|смесител|установка/.test(n)) return 'Санфаянс';
+        if (/воронк|трап|муфт|кабел/.test(n)) return 'Оборудование';
+        return 'Прочее';
+    }
+
+    // Собрать все уникальные позиции из текущего расчёта
+    function collectAllEstimateItems(itemType) {
+        if (!buildingStats || !buildingStats.length) return [];
+        var matLabels = { pp: 'ПП', pp_silent: 'ПП Бесшумный', pvc: 'НПВХ', sml: 'SML' };
+        var uniqueMap = {};
+
+        buildingStats.forEach(function (b, idx) {
+            var s = getSettings(idx);
+
+            // К1
+            var k1Items = collectFittingsForBuilding(idx);
+            var totalLen = calcTotalLengthM(b, activeScenario, idx);
+            if (totalLen > 0) {
+                var mat = matLabels[s.pipeType] || s.pipeType;
+                k1Items.unshift({ name: 'Трубопровод ' + mat + ' DN' + s.riserDiameter + ' мм (стояки)', unit: 'м.п.', qty: Math.round(totalLen * 10) / 10, type: 'материал' });
+            }
+            collectFromExpanded(expandItemsWithWork(k1Items), itemType, uniqueMap);
+
+            // К2
+            var k2Items = collectStormFittingsForBuilding(idx);
+            var k2Len = calcStormPipeLength(b, idx);
+            if (k2Len > 0) {
+                k2Items.unshift({ name: 'Трубопровод SML DN50 (фасадный стояк)', unit: 'м.п.', qty: Math.round(k2Len * 10) / 10, type: 'материал' });
+            }
+            collectFromExpanded(expandItemsWithWork(k2Items), itemType, uniqueMap);
+
+            // К3
+            var k3Items = collectK3FittingsForBuilding(idx);
+            if (k3Items.length > 0) collectFromExpanded(expandItemsWithWork(k3Items), itemType, uniqueMap);
+
+            // Отделка
+            var finItems = collectFinishingForBuilding(idx);
+            if (finItems.length > 0) collectFromExpanded(expandItemsWithWork(finItems), itemType, uniqueMap);
+        });
+
+        // Сортируем по группам → алфавит
+        var groupOrder = { 'Трубопроводы': 0, 'Фасонные части': 1, 'Изоляция': 2, 'Санфаянс': 3, 'Санфаянс и комплектующие': 3, 'Оборудование': 4, 'Прочее': 5 };
+        var items = Object.keys(uniqueMap).map(function (k) { return uniqueMap[k]; });
+        items.sort(function (a, b) {
+            var gA = groupOrder[a.group] !== undefined ? groupOrder[a.group] : 99;
+            var gB = groupOrder[b.group] !== undefined ? groupOrder[b.group] : 99;
+            if (gA !== gB) return gA - gB;
+            return a.name.localeCompare(b.name, 'ru');
+        });
+        return items;
+    }
+
+    function collectFromExpanded(expanded, itemType, uniqueMap) {
+        expanded.forEach(function (item) {
+            if (item.type !== itemType) return;
+            if (uniqueMap[item.name]) return;
+            uniqueMap[item.name] = {
+                name: item.name,
+                unit: item.unit,
+                group: getSewageItemGroup(item.name, itemType)
+            };
+        });
+    }
+
     function openPriceModal(type) {
-        // Заглушка: в будущем — модальное окно как в водоснабжении
-        alert('Редактирование стоимости ' + (type === 'works' ? 'работ' : 'материалов') + ' — в разработке');
+        var itemType = type === 'works' ? 'работа' : 'материал';
+        var title = type === 'works' ? 'Стоимость работ' : 'Стоимость материалов';
+        var items = collectAllEstimateItems(itemType);
+
+        if (items.length === 0) {
+            alert('Нет данных. Выполните расчёт для формирования сметы.');
+            return;
+        }
+
+        // Группируем
+        var groups = {};
+        items.forEach(function (item) {
+            if (!groups[item.group]) groups[item.group] = [];
+            groups[item.group].push(item);
+        });
+
+        var groupNames = [];
+        var seen = {};
+        items.forEach(function (item) {
+            if (!seen[item.group]) { groupNames.push(item.group); seen[item.group] = true; }
+        });
+
+        // Мастер-цены для подстановки
+        var masterPrices = loadMasterPrices(type);
+
+        // Генерируем строки таблицы с аккордеонами (все свёрнуты)
+        var tableRows = '';
+        var globalIdx = 0;
+        groupNames.forEach(function (groupName) {
+            var groupItems = groups[groupName];
+            if (!groupItems || !groupItems.length) return;
+            var groupId = groupName.replace(/\s+/g, '-');
+
+            tableRows += '<tr class="price-modal-group-row price-modal-accordion-toggle" data-group-id="' + escHtml(groupId) + '">' +
+                '<td colspan="3"><span class="price-accordion-chevron">&#9654;</span>' +
+                escHtml(groupName) + ' (' + groupItems.length + ')</td></tr>';
+
+            groupItems.forEach(function (item) {
+                var currentPrice = masterPrices[item.name] || '';
+                tableRows += '<tr class="price-modal-group-item" data-group="' + escHtml(groupId) + '" style="display:none;">' +
+                    '<td class="price-modal-name" style="text-align:left !important;padding-left:12px;">' + escHtml(item.name) + '</td>' +
+                    '<td class="price-modal-unit">' + escHtml(item.unit) + '</td>' +
+                    '<td class="price-modal-price"><input type="text" inputmode="decimal" class="estimate-price-input price-modal-input" ' +
+                        'data-item-name="' + escHtml(item.name) + '" data-idx="' + globalIdx + '" ' +
+                        'value="' + escHtml(currentPrice) + '" placeholder="—"></td></tr>';
+                globalIdx++;
+            });
+        });
+
+        // Создаём overlay
+        var overlay = document.createElement('div');
+        overlay.className = 'modal-overlay price-modal-overlay';
+        overlay.innerHTML =
+            '<div class="modal price-management-modal">' +
+                '<h3>' + title + '</h3>' +
+                '<p class="price-modal-subtitle">Изменения сохраняются в глобальный справочник и применяются к новым проектам.</p>' +
+                '<div class="price-modal-table-wrap"><table class="price-modal-table"><thead><tr>' +
+                    '<th class="price-modal-th-name">Наименование</th>' +
+                    '<th class="price-modal-th-unit">Ед.</th>' +
+                    '<th class="price-modal-th-price">Цена за ед. (руб.)</th>' +
+                '</tr></thead><tbody>' + tableRows + '</tbody></table></div>' +
+                '<label class="price-modal-checkbox-label">' +
+                    '<input type="checkbox" id="priceModalApplyAll"> Обновить во всём текущем проекте' +
+                '</label>' +
+                '<div class="modal-buttons">' +
+                    '<button class="btn-secondary price-modal-btn" id="priceModalCancel">Отмена</button>' +
+                    '<button class="btn-primary price-modal-btn" id="priceModalSave">Сохранить</button>' +
+                '</div>' +
+            '</div>';
+
+        document.body.appendChild(overlay);
+
+        var close = function () { overlay.remove(); };
+        overlay.querySelector('#priceModalCancel').addEventListener('click', close);
+        overlay.addEventListener('click', function (e) { if (e.target === overlay) close(); });
+
+        // Аккордеоны групп
+        overlay.querySelectorAll('.price-modal-accordion-toggle').forEach(function (row) {
+            row.addEventListener('click', function () {
+                var groupId = row.dataset.groupId;
+                var chevron = row.querySelector('.price-accordion-chevron');
+                var rows = overlay.querySelectorAll('.price-modal-group-item[data-group="' + groupId + '"]');
+                var isOpen = chevron.classList.contains('open');
+                if (isOpen) {
+                    chevron.classList.remove('open');
+                    rows.forEach(function (r) { r.style.display = 'none'; });
+                } else {
+                    chevron.classList.add('open');
+                    rows.forEach(function (r) { r.style.display = ''; });
+                }
+            });
+        });
+
+        // Санитизация
+        overlay.querySelectorAll('.price-modal-input').forEach(function (inp) {
+            inp.addEventListener('input', function () { sanitizePriceInput(inp); });
+        });
+
+        // Сохранение
+        overlay.querySelector('#priceModalSave').addEventListener('click', function () {
+            var mp = loadMasterPrices(type);
+            var applyAll = overlay.querySelector('#priceModalApplyAll').checked;
+            var updatedNames = {};
+
+            overlay.querySelectorAll('.price-modal-input').forEach(function (inp) {
+                var name = inp.dataset.itemName;
+                var val = inp.value.trim();
+                if (val && parseFloat(val) > 0) {
+                    mp[name] = val;
+                    updatedNames[name] = val;
+                } else {
+                    delete mp[name];
+                }
+            });
+
+            saveMasterPrices(type, mp);
+
+            // Если "Обновить во всём проекте" — пропатчить estimatePrices для всех priceKeys
+            if (applyAll) {
+                var el = document.getElementById('estimateContent');
+                if (el) {
+                    el.querySelectorAll('.estimate-price-input').forEach(function (inp) {
+                        var key = inp.dataset.priceKey;
+                        if (!key) return;
+                        // priceKey: "idx:system:w:name" or "idx:system:m:name"
+                        var prefix = itemType === 'работа' ? 'w:' : 'm:';
+                        Object.keys(updatedNames).forEach(function (name) {
+                            if (key.indexOf(prefix + name) !== -1) {
+                                estimatePrices[key] = updatedNames[name];
+                            }
+                        });
+                    });
+                }
+                renderEstimate();
+                sendEstimateTotals();
+                saveCalculationToSupabase();
+            }
+
+            close();
+        });
     }
 
     document.getElementById('btnEditWorkPrices').addEventListener('click', function () { openPriceModal('works'); });
