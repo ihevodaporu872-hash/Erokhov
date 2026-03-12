@@ -2228,8 +2228,54 @@
         return v ? Number(v).toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) + ' ₽' : '';
     }
 
+    // Разрешение цены: estimatePrices → masterPrices (localStorage) → defaultPrice → 0
+    function resolvePrice(priceKey, itemName, type, defaultPrice) {
+        var p = parseFloat(estimatePrices[priceKey]);
+        if (p) return p;
+        try {
+            var masterKey = type === 'работа' ? 'masterPrices_works' : 'masterPrices_materials';
+            var master = JSON.parse(localStorage.getItem(masterKey) || '{}');
+            if (master[itemName]) { p = parseFloat(master[itemName]); if (p) return p; }
+        } catch(e) {}
+        if (defaultPrice != null) { p = parseFloat(defaultPrice); if (p) return p; }
+        return 0;
+    }
+
+    // Генерация работы для позиции материала
+    function workNameFor(materialName) {
+        return 'Монтаж: ' + materialName;
+    }
+
+    // Развёртка items: для каждого материала без явного type генерируем пару работа+материал
+    function expandItemsWithWork(items) {
+        var result = [];
+        items.forEach(function (item) {
+            if (item.type === 'работа') {
+                result.push(item);
+            } else {
+                // Работа
+                result.push({
+                    name: workNameFor(item.name), unit: item.unit, qty: item.qty,
+                    note: item.note, group: item.group, type: 'работа',
+                    defaultPrice: item.defaultWorkPrice || null
+                });
+                // Материал
+                result.push({
+                    name: item.name, unit: item.unit, qty: item.qty,
+                    note: item.note, group: item.group, type: 'материал',
+                    defaultPrice: item.defaultPrice || null
+                });
+            }
+        });
+        return result;
+    }
+
     function renderEstimateTable(items, systemKey) {
         if (!items || !items.length) return '<p style="color:var(--gray-500);font-size:13px;padding:8px 0">Нет данных</p>';
+
+        // Развёртываем: материал → работа + материал
+        var expanded = expandItemsWithWork(items);
+
         var html = '<table class="estimate-table estimate-table-financial"><thead><tr>' +
             '<th class="col-type">Тип</th><th class="col-name">Наименование</th>' +
             '<th class="col-unit">Ед. изм.</th><th class="col-qty">Количество</th>' +
@@ -2237,38 +2283,43 @@
             '</tr></thead><tbody>';
 
         var totalWork = 0, totalMaterial = 0;
+
         // Группируем по group
         var groups = {};
-        items.forEach(function (item) {
+        var groupOrder = [];
+        expanded.forEach(function (item) {
             var g = item.group || '_default';
-            if (!groups[g]) groups[g] = [];
+            if (!groups[g]) { groups[g] = []; groupOrder.push(g); }
             groups[g].push(item);
         });
 
-        Object.keys(groups).forEach(function (g) {
+        var GROUP_LABELS = {
+            fixture: 'Фасонные изделия для подключения приборов',
+            k1c: 'К1С — Встроенные помещения',
+            service: 'Элементы обслуживания и прочистки',
+            devices: 'Приборы',
+            mixers: 'Смесители',
+            pipes: 'Трубы и фасонина'
+        };
+
+        groupOrder.forEach(function (g) {
             if (g !== '_default') {
-                var label = g === 'fixture' ? 'Фасонные изделия для подключения приборов'
-                    : g === 'k1c' ? 'К1С — Встроенные помещения'
-                    : g === 'service' ? 'Элементы обслуживания и прочистки'
-                    : g === 'devices' ? 'Приборы'
-                    : g === 'mixers' ? 'Смесители'
-                    : g === 'pipes' ? 'Трубы и фасонина'
-                    : g;
+                var label = GROUP_LABELS[g] || g;
                 html += '<tr class="group-row"><td colspan="6">' + escHtml(label) + '</td></tr>';
             }
             groups[g].forEach(function (item) {
-                var priceKey = systemKey + ':' + item.name;
-                var price = parseFloat(estimatePrices[priceKey]) || 0;
-                var rowTotal = price * item.qty;
-                var typeLabel = item.unit === 'м.п.' || item.unit === 'м' ? 'материал' : 'материал';
-                var typeClass = 'type-material';
-
-                if (item.type === 'работа') { typeLabel = 'работа'; typeClass = 'type-work'; totalWork += rowTotal; }
-                else { totalMaterial += rowTotal; }
-
+                var isWork = item.type === 'работа';
+                var priceKey = systemKey + ':' + (isWork ? 'w:' : 'm:') + item.name;
+                var price = resolvePrice(priceKey, item.name, item.type, item.defaultPrice);
                 var qty = typeof item.qty === 'number' ? (Math.round(item.qty * 10) / 10) : item.qty;
-                html += '<tr class="' + typeClass + '">' +
-                    '<td class="col-type">' + typeLabel + '</td>' +
+                var numQty = parseFloat(qty) || 0;
+                var rowTotal = price * numQty;
+
+                if (isWork) totalWork += rowTotal;
+                else totalMaterial += rowTotal;
+
+                html += '<tr class="' + (isWork ? 'type-work' : 'type-material') + '">' +
+                    '<td class="col-type">' + (isWork ? 'работа' : 'материал') + '</td>' +
                     '<td class="col-name">' + escHtml(item.name) + '</td>' +
                     '<td class="col-unit">' + escHtml(item.unit) + '</td>' +
                     '<td class="col-qty">' + qty + '</td>' +
@@ -2278,6 +2329,20 @@
                     '</tr>';
             });
         });
+
+        // Итого по таблице
+        var grandTotal = totalWork + totalMaterial;
+        if (grandTotal > 0 || expanded.length > 0) {
+            html += '<tr class="estimate-section-total-row">' +
+                '<td colspan="4" class="estimate-section-total-label">Работы:</td>' +
+                '<td colspan="2" class="estimate-section-total-value">' + formatEstimateMoney(totalWork) + '</td></tr>';
+            html += '<tr class="estimate-section-total-row">' +
+                '<td colspan="4" class="estimate-section-total-label">Материалы:</td>' +
+                '<td colspan="2" class="estimate-section-total-value">' + formatEstimateMoney(totalMaterial) + '</td></tr>';
+            html += '<tr class="estimate-section-total-row">' +
+                '<td colspan="4" class="estimate-section-total-label">Итого:</td>' +
+                '<td colspan="2" class="estimate-section-total-value">' + formatEstimateMoney(grandTotal) + '</td></tr>';
+        }
 
         html += '</tbody></table>';
         return html;
@@ -2315,10 +2380,6 @@
                     name: 'Трубопровод ' + mat + ' DN' + s.riserDiameter + ' мм (стояки)',
                     unit: 'м.п.', qty: Math.round(totalLen * 10) / 10, note: '', group: '', type: 'материал'
                 });
-                k1Items.unshift({
-                    name: 'Монтаж трубопровода ' + mat + ' DN' + s.riserDiameter,
-                    unit: 'м.п.', qty: Math.round(totalLen * 10) / 10, note: '', group: '', type: 'работа'
-                });
             }
 
             html += '<details class="estimate-details" open>' +
@@ -2332,10 +2393,6 @@
                 k2Items.unshift({
                     name: 'Трубопровод SML DN50 (фасадный стояк)',
                     unit: 'м.п.', qty: Math.round(k2PipeLen * 10) / 10, note: '', group: '', type: 'материал'
-                });
-                k2Items.unshift({
-                    name: 'Монтаж трубопровода SML DN50',
-                    unit: 'м.п.', qty: Math.round(k2PipeLen * 10) / 10, note: '', group: '', type: 'работа'
                 });
             }
 
@@ -2428,38 +2485,54 @@
     /* ─── Отправка итогов в портал ──────────────────────────────────────── */
     function sendEstimateTotals() {
         var totalWork = 0, totalMaterial = 0;
+        var matLabels = { pp: 'ПП', pp_silent: 'ПП Бесшумный', sml: 'SML' };
+
+        function sumItems(items, systemKey) {
+            var expanded = expandItemsWithWork(items);
+            expanded.forEach(function (item) {
+                var isWork = item.type === 'работа';
+                var priceKey = systemKey + ':' + (isWork ? 'w:' : 'm:') + item.name;
+                var price = resolvePrice(priceKey, item.name, item.type, item.defaultPrice);
+                var rowTotal = price * (parseFloat(item.qty) || 0);
+                if (isWork) totalWork += rowTotal;
+                else totalMaterial += rowTotal;
+            });
+        }
 
         if (buildingStats && buildingStats.length) {
             buildingStats.forEach(function (b, idx) {
+                var s = getSettings(idx);
+
                 // К1
                 var k1Items = collectFittingsForBuilding(idx);
                 var totalLen = calcTotalLengthM(b, activeScenario, idx);
                 if (totalLen > 0) {
-                    k1Items.push({ name: 'Монтаж трубопровода', unit: 'м.п.', qty: totalLen, type: 'работа' });
-                    k1Items.push({ name: 'Трубопровод', unit: 'м.п.', qty: totalLen, type: 'материал' });
+                    var mat = matLabels[s.pipeType] || s.pipeType;
+                    k1Items.unshift({
+                        name: 'Трубопровод ' + mat + ' DN' + s.riserDiameter + ' мм (стояки)',
+                        unit: 'м.п.', qty: Math.round(totalLen * 10) / 10, type: 'материал'
+                    });
                 }
-                k1Items.forEach(function (item) {
-                    var priceKey = idx + ':k1:' + item.name;
-                    var price = parseFloat(estimatePrices[priceKey]) || 0;
-                    var rowTotal = price * (item.qty || 0);
-                    if (item.type === 'работа') totalWork += rowTotal;
-                    else totalMaterial += rowTotal;
-                });
+                sumItems(k1Items, idx + ':k1');
 
                 // К2
                 var k2Items = collectStormFittingsForBuilding(idx);
                 var k2Len = calcStormPipeLength(b, idx);
                 if (k2Len > 0) {
-                    k2Items.push({ name: 'Монтаж К2', unit: 'м.п.', qty: k2Len, type: 'работа' });
-                    k2Items.push({ name: 'Труба К2', unit: 'м.п.', qty: k2Len, type: 'материал' });
+                    k2Items.unshift({
+                        name: 'Трубопровод SML DN50 (фасадный стояк)',
+                        unit: 'м.п.', qty: Math.round(k2Len * 10) / 10, type: 'материал'
+                    });
                 }
-                k2Items.forEach(function (item) {
-                    var priceKey = idx + ':k2:' + item.name;
-                    var price = parseFloat(estimatePrices[priceKey]) || 0;
-                    var rowTotal = price * (item.qty || 0);
-                    if (item.type === 'работа') totalWork += rowTotal;
-                    else totalMaterial += rowTotal;
-                });
+                sumItems(k2Items, idx + ':k2');
+
+                // К3
+                var k3Items = collectK3FittingsForBuilding(idx);
+                if (k3Items.length > 0) sumItems(k3Items, idx + ':k3');
+
+                // Отделка
+                var finItems = collectFinishingForBuilding(idx);
+                if (finItems.length > 0) sumItems(finItems, idx + ':finish');
             });
         }
 
