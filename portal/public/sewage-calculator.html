@@ -4408,20 +4408,47 @@
 
     var equipmentOffers = []; // пусто до загрузки файла
 
-    // ── Ключевые слова (семантический фильтр) ─────────────────────────
+    // ── БЕЛЫЙ СПИСОК: только эти ключевые слова проходят в импорт ────
+    // Канализационное оборудование — всё остальное игнорируется
+    var EQ_WHITELIST = [
+        'nspg', 'дренажный', 'дренажная', 'откачивающий', 'откачивающая',
+        'канализационный', 'канализационная', 'native rls', 'n-lift', 'w-lift', 'tmt32'
+    ];
+
+    // ── ЧЕРНЫЙ СПИСОК: установки водоснабжения/пожаротушения — НЕ канализация
+    var EQ_BLACKLIST = ['cor-4', 'co 2', 'co2', 'mvl', 'nlb', 'ffs-mb'];
+
+    // Проверка: строка проходит фильтр канализации?
+    function isWhitelistedLine(text) {
+        var low = text.toLowerCase();
+        // Сначала проверяем чёрный список — если совпало, сразу отбрасываем
+        for (var b = 0; b < EQ_BLACKLIST.length; b++) {
+            if (low.indexOf(EQ_BLACKLIST[b]) !== -1) return false;
+        }
+        // Затем проверяем белый список — хотя бы одно совпадение
+        for (var w = 0; w < EQ_WHITELIST.length; w++) {
+            if (low.indexOf(EQ_WHITELIST[w]) !== -1) return true;
+        }
+        return false;
+    }
+
+    // ── Группы оборудования (семантический фильтр) ──────────────────
     var EQ_KEYWORDS = [
-        { id: 'drain_pumps', label: 'Дренажные насосы', kw: ['NSPG', 'Насос дренажный', 'Grundfos', 'ГНОМ', 'Насос погружной'], targets: ['Насос дренажный'] },
-        { id: 'kns',         label: 'Насосные установки', kw: ['Wilo N-Lift', 'N-Lift', 'W-Lift', 'DrainLift', 'Native RLS', 'Откачивающая установка', 'насосная установка'], targets: ['Насосная установка Wilo N-Lift'] },
-        { id: 'grease',      label: 'Жироуловители', kw: ['Жироуловитель', 'Жироотделитель'], targets: ['Жироуловитель'] },
-        { id: 'valves',      label: 'Воздушные клапаны', kw: ['HL900', 'HL905', 'Воздушный клапан'], targets: ['Воздушный клапан HL905 DN\u00a0110'] },
-        { id: 'traps',       label: 'Трапы', kw: ['Трап', 'HL310', 'HL510'], targets: ['Трап (полимерный)'] },
-        { id: 'funnels',     label: 'Воронки', kw: ['Воронка кровельная', 'Воронка водосточн', 'HL62', 'HL64'], targets: ['Водоприёмная воронка'] },
-        { id: 'fire',        label: 'Противопожарные муфты', kw: ['Муфта противопожарная', 'ОГНЕЗА'], targets: ['Муфта противопожарная'] }
+        { id: 'drain_pumps', label: 'Дренажные насосы NSPG',  kw: ['Насос NSPG', 'NSPG'], targets: ['Насос дренажный'] },
+        { id: 'tmt',         label: 'Дренажный насос TMT32',  kw: ['TMT32'], targets: ['Насос дренажный'] },
+        { id: 'nlift',       label: 'Установка N-Lift',       kw: ['N-Lift'], targets: ['Насосная установка Wilo N-Lift'] },
+        { id: 'wlift',       label: 'Установка W-Lift',       kw: ['W-Lift'], targets: ['Насосная установка Wilo W-Lift'] },
+        { id: 'native_rls',  label: 'Установка Native RLS',   kw: ['Native RLS'], targets: ['Канализационная насосная установка'] },
+        { id: 'grease',      label: 'Жироуловители',           kw: ['Жироуловитель', 'Жироотделитель'], targets: ['Жироуловитель'] },
+        { id: 'valves',      label: 'Воздушные клапаны',       kw: ['HL900', 'HL905', 'Воздушный клапан'], targets: ['Воздушный клапан HL905 DN\u00a0110'] },
+        { id: 'traps',       label: 'Трапы',                   kw: ['Трап', 'HL310', 'HL510'], targets: ['Трап (полимерный)'] },
+        { id: 'funnels',     label: 'Воронки',                 kw: ['Воронка кровельная', 'Воронка водосточн', 'HL62', 'HL64'], targets: ['Водоприёмная воронка'] },
+        { id: 'fire',        label: 'Противопожарные муфты',   kw: ['Муфта противопожарная', 'ОГНЕЗА'], targets: ['Муфта противопожарная'] }
     ];
 
     var EQ_NOISE = /\b(комплект|в сборе|арт\.|DN\d+|PN\d+|Ду\s*\d+)\b/gi;
 
-    // ── Семантический матчер: один лучший результат ────────────────────
+    // ── Семантический матчер: один лучший результат (case-insensitive) ──
     function matchEquipmentByKeywords(name) {
         var low = name.toLowerCase();
         var cleanLow = name.replace(EQ_NOISE, '').trim().toLowerCase();
@@ -4652,8 +4679,15 @@
     }
 
     // Финализация позиции: извлечение наименования, кол-ва, цены из сырого текста
+    // Применяет Белый/Чёрный список перед парсингом
     function finalizeItem(item) {
         var text = item.rawText;
+
+        // 0. Фильтр: Белый/Чёрный список — только канализационное оборудование
+        if (!isWhitelistedLine(text)) {
+            console.log('[Parse] п.' + item.posNum + ': ПРОПУСК (не в белом списке) — "' + text.substring(0, 60) + '..."');
+            return null;
+        }
 
         // 1. Кол-во: якорный поиск — число ПЛОТНО перед «шт» / «компл»
         var qty = extractAnchoredQty(text);
@@ -4667,7 +4701,6 @@
         var name = text;
 
         // Обрезаем от позиции «кол-во + ед.изм.» и далее
-        // Ищем паттерн: число + шт/компл или шт/компл + число
         var unitCutPos = text.search(/(?:^|\s)\d{1,4}\s*(?:шт|компл)/i);
         if (unitCutPos < 0) unitCutPos = text.search(/(?:шт|компл)\s*\d{1,4}/i);
         if (unitCutPos > 5) {
@@ -4688,7 +4721,7 @@
         qty = parseInt(qty, 10);
         price = parseFloat(price);
 
-        console.log('[Parse] п.' + item.posNum + ': "' + name + '" | qty=' + qty + ' | price=' + price);
+        console.log('[Parse] п.' + item.posNum + ': ✓ "' + name + '" | qty=' + qty + ' | price=' + price);
 
         return { kpName: name, qty: qty, price: price };
     }
@@ -4842,9 +4875,10 @@
                     var qty = parseInt(cleanPdfPrice(row[colQty] || '0'), 10) || 0;
                     var price = cleanPdfPrice(row[colPrice] || '0');
                     if (name && name.length > 3 && qty > 0 && price > 0) {
+                        // Фильтр: только канализационное оборудование
+                        if (!isWhitelistedLine(name)) continue;
                         // Валидация: цена < 100 — подозрительно для оборудования
                         if (price < 100) {
-                            // Пробуем найти цену в других числовых столбцах
                             for (var cc = colPrice + 1; cc < row.length; cc++) {
                                 var altPrice = cleanPdfPrice(row[cc] || '0');
                                 if (altPrice >= 100) { price = altPrice; break; }
@@ -4873,10 +4907,10 @@
                     if (v > 0) nums.push(v);
                 }
                 if (nums.length >= 2) {
-                    // Обычно: ..., кол-во, цена, сумма — берём первое как qty, второе как price
+                    // Фильтр: только канализационное оборудование
+                    if (!isWhitelistedLine(name)) return;
                     var qty = nums[0] < 1000 ? parseInt(nums[0], 10) : 1;
                     var price = nums[0] < 1000 ? nums[1] : nums[0];
-                    // Валидация цены
                     if (price < 100 && nums.length >= 3) price = nums[nums.length - 2];
                     items.push({ kpName: name, qty: qty, price: price });
                 }
@@ -4981,22 +5015,16 @@
             });
         });
 
-        // Непривязанные — из файла, показываем как есть
-        unmatched.forEach(function (item) {
-            equipmentOffers.push({
-                id: 'eq_' + idx++,
-                groupLabel: '—',
-                lines: [item],
-                mappedName: '— не распознано —',
-                kpQty: item.qty,
-                calcQty: 0,
-                kpSum: item.price * item.qty,
-                kpAvgPrice: item.price,
-                masterPrice: 0,
-                matched: false,
-                confirmed: false
+        // Непривязанные к группам — логируем, но НЕ показываем в таблице
+        // (белый список уже отфильтровал мусор, но если позиция прошла фильтр
+        //  и не нашла группу — это может быть ошибка в EQ_KEYWORDS)
+        if (unmatched.length > 0) {
+            console.log('[Equipment] Не привязаны к группам (' + unmatched.length + '):');
+            unmatched.forEach(function (item) {
+                console.log('  — "' + item.kpName + '" qty=' + item.qty + ' price=' + item.price);
             });
-        });
+            eqLog('Не привязано к группам: ' + unmatched.length + ' поз. (см. консоль)');
+        }
 
         console.log('[Equipment] Итого групп: ' + equipmentOffers.length + ', из них подтверждено: ' + equipmentOffers.filter(function (e) { return e.confirmed; }).length);
         renderEquipmentTable();
