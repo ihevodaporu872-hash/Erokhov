@@ -475,9 +475,9 @@
             transition: border-color .2s, background .2s;
         }
         .eq-upload-zone:hover,
-        .eq-upload-zone.dragover {
+        .eq-upload-zone.drag-active {
             border-color: var(--accent-blue);
-            background: rgba(0,122,255,.04);
+            background: rgba(0,122,255,.06);
         }
         .eq-upload-inner { pointer-events: none; }
 
@@ -815,22 +815,22 @@
                         <div class="panel-section panel-section-output">
                             <div class="estimate-header">
                                 <h2 class="estimate-title">Импорт оборудования из счёта / КП</h2>
-                                <p class="estimate-subtitle">Загрузите файл — система автоматически найдёт и сопоставит позиции с расчётом</p>
+                                <p class="estimate-subtitle">Перетащите файл или нажмите на зону загрузки</p>
                             </div>
 
-                            <!-- Зона загрузки файла -->
+                            <!-- Зона загрузки: Drag & Drop + Click -->
                             <div class="eq-upload-zone" id="eqUploadZone">
                                 <div class="eq-upload-inner">
                                     <i class="bi bi-cloud-arrow-up" style="font-size:36px;color:var(--accent-blue);"></i>
-                                    <p style="margin:8px 0 4px;font-weight:600;">Перетащите PDF/Excel или нажмите для выбора</p>
-                                    <p class="note" style="margin:0;">Поддерживаются счета и КП от поставщиков оборудования (PDF, XLSX, CSV)</p>
-                                    <input type="file" id="eqFileInput" accept=".pdf,.xlsx,.xls,.csv,.json" style="display:none;">
+                                    <p style="margin:8px 0 4px;font-weight:600;">Перетащите файл сюда или нажмите</p>
+                                    <p class="note" style="margin:0;">JSON-файл со структурой [{kpName, qty, price}]</p>
                                 </div>
+                                <input type="file" id="eqFileInput" accept=".json" style="display:none;">
                             </div>
 
-                            <!-- Таблица сопоставления (скрыта до импорта) -->
+                            <!-- Таблица (скрыта, пока нет данных) -->
                             <div id="eqMatchContent" style="display:none;">
-                                <div style="display:flex;align-items:center;justify-content:space-between;margin:0 0 12px;">
+                                <div style="display:flex;align-items:center;justify-content:space-between;margin:16px 0 10px;">
                                     <h3 style="font-size:15px;font-weight:600;margin:0;" id="eqMatchTitle"></h3>
                                     <button id="eqClearImport" class="btn-secondary" style="padding:5px 14px;font-size:12px;border-radius:6px;">Очистить</button>
                                 </div>
@@ -838,24 +838,18 @@
                                     <table class="estimate-table estimate-table-financial" id="eqMatchTable">
                                         <thead>
                                             <tr>
-                                                <th style="width:10%;">Группа</th>
-                                                <th style="width:22%;">Наименование в КП</th>
-                                                <th style="width:18%;">Привязка в проекте</th>
-                                                <th style="width:6%;">Кол-во КП</th>
-                                                <th style="width:6%;">Кол-во расч.</th>
-                                                <th style="width:10%;">Сумма КП</th>
-                                                <th style="width:10%;">Мастер-цена</th>
-                                                <th style="width:7%;">Разница</th>
-                                                <th style="width:5%;">Срок</th>
-                                                <th style="width:6%;"></th>
+                                                <th style="width:30%;">Наименование в КП</th>
+                                                <th style="width:30%;">Найдено в проекте</th>
+                                                <th style="width:20%;">Кол-во (КП / Проект)</th>
+                                                <th style="width:20%;">Цена, руб.</th>
                                             </tr>
                                         </thead>
                                         <tbody id="eqMatchBody"></tbody>
                                     </table>
                                 </div>
 
-                                <div style="margin:16px 0;display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
-                                    <button id="eqApplyPrices" class="btn btn-primary btn-sm">Применить цены из КП</button>
+                                <div style="margin:16px 0;">
+                                    <button id="eqApplyPrices" class="btn btn-primary btn-sm">Принять цены</button>
                                 </div>
 
                                 <div class="eq-summary-block" id="eqSummary"></div>
@@ -4296,10 +4290,9 @@
         var eqOffers = equipmentOffers.length > 0
             ? equipmentOffers.map(function (eq) {
                 return {
-                    id: eq.id, groupId: eq.groupId, groupLabel: eq.groupLabel,
-                    name: eq.mappedName, kpAvgPrice: eq.kpAvgPrice, kpSum: eq.kpSum,
-                    kpQty: eq.kpQty, maxDelivery: eq.maxDelivery,
-                    lines: eq.lines, confirmed: eq.confirmed
+                    id: eq.id, groupLabel: eq.groupLabel,
+                    name: eq.mappedName, kpAvgPrice: eq.kpAvgPrice,
+                    kpQty: eq.kpQty, lines: eq.lines, confirmed: eq.confirmed
                 };
               })
             : undefined;
@@ -4367,27 +4360,22 @@
                 // Восстанавливаем оборудование из КП
                 if (saved.equipment_offers && saved.equipment_offers.length) {
                     equipmentOffers = saved.equipment_offers.map(function (eq, idx) {
-                        var group = null;
-                        EQUIPMENT_GROUPS.forEach(function (g) { if (g.id === eq.groupId) group = g; });
-                        var calcTargets = group ? findCalcTargets(group) : [];
-                        var calcQty = 0;
-                        calcTargets.forEach(function (ct) { calcQty += ct.qty; });
-                        var masterPrice = getEquipmentMasterPrice(eq.name);
+                        var calc = null;
+                        // Найти группу по label для пересчёта calcQty
+                        EQ_KEYWORDS.forEach(function (grp) {
+                            if (grp.label === eq.groupLabel) calc = findCalcTarget(grp);
+                        });
                         return {
                             id: eq.id || 'eq_' + idx,
-                            groupId: eq.groupId || null,
-                            groupLabel: eq.groupLabel || '— Не определено —',
-                            lines: eq.lines || [{ kpName: eq.name, qty: eq.kpQty, price: eq.kpAvgPrice || eq.kpPrice || 0 }],
+                            groupLabel: eq.groupLabel || '—',
+                            lines: eq.lines || [{ kpName: eq.name, qty: eq.kpQty, price: eq.kpAvgPrice || 0 }],
                             mappedName: eq.name,
-                            calcTargets: calcTargets,
-                            isAmbiguous: calcTargets.length > 1,
                             kpQty: eq.kpQty || 0,
-                            calcQty: calcQty,
-                            kpSum: eq.kpSum || (eq.kpAvgPrice || 0) * (eq.kpQty || 0),
-                            kpAvgPrice: eq.kpAvgPrice || eq.kpPrice || 0,
-                            masterPrice: masterPrice,
-                            maxDelivery: eq.maxDelivery || eq.deliveryDays || 0,
-                            matched: calcTargets.length > 0 || !!eq.name,
+                            calcQty: calc ? calc.qty : 0,
+                            kpSum: (eq.kpAvgPrice || 0) * (eq.kpQty || 0),
+                            kpAvgPrice: eq.kpAvgPrice || 0,
+                            masterPrice: getEquipmentMasterPrice(eq.name),
+                            matched: !!calc,
                             confirmed: eq.confirmed !== undefined ? eq.confirmed : true
                         };
                     });
@@ -4410,126 +4398,77 @@
     }
 
     /* ═══════════════════════════════════════════════════════════════════════
-       Импорт оборудования — семантический поиск по ключевым словам
+       Импорт оборудования — чистый парсинг только из файла
     ═══════════════════════════════════════════════════════════════════════ */
 
-    var equipmentOffers = []; // заполняется ТОЛЬКО из файла / JSON
+    var equipmentOffers = []; // пусто до загрузки файла
 
-    // ── Иерархия ключевых слов ────────────────────────────────────────
-    var EQUIPMENT_GROUPS = [
-        {
-            id: 'drain_pumps',
-            label: 'Дренажные насосы',
-            keywords: ['NSPG', 'Насос дренажный', 'Насос для загрязненной воды', 'Насос погружной', 'Grundfos', 'ГНОМ', 'дренажный насос'],
-            targets: ['Насос дренажный']
-        },
-        {
-            id: 'kns',
-            label: 'КНС / Установки',
-            keywords: ['Wilo N-Lift', 'N-Lift', 'W-Lift', 'DrainLift', 'Native RLS', 'Откачивающая установка', 'Канализационная установка', 'Канализационная станция', 'насосная установка'],
-            targets: ['Насосная установка Wilo N-Lift', 'Канализационная насосная установка']
-        },
-        {
-            id: 'grease',
-            label: 'Жироуловители',
-            keywords: ['Жироуловитель', 'Жироотделитель'],
-            targets: ['Жироуловитель']
-        },
-        {
-            id: 'valves',
-            label: 'Воздушные клапаны',
-            keywords: ['HL900', 'HL905', 'Воздушный клапан'],
-            targets: ['Воздушный клапан HL905 DN\u00a0110']
-        },
-        {
-            id: 'floor_traps',
-            label: 'Трапы',
-            keywords: ['Трап', 'HL310', 'HL510', 'HL3100'],
-            targets: ['Трап (полимерный)']
-        },
-        {
-            id: 'funnels',
-            label: 'Воронки',
-            keywords: ['Воронка кровельная', 'Воронка водосточн', 'водоприёмная воронка', 'HL62', 'HL64', 'HL68'],
-            targets: ['Водоприёмная воронка', 'Воронка конденсатная']
-        },
-        {
-            id: 'fire_sleeves',
-            label: 'Противопожарные муфты',
-            keywords: ['Муфта противопожарная', 'ОГНЕЗА'],
-            targets: ['Муфта противопожарная']
-        }
+    // ── Ключевые слова (семантический фильтр) ─────────────────────────
+    var EQ_KEYWORDS = [
+        { id: 'drain_pumps', label: 'Дренажные насосы', kw: ['NSPG', 'Насос дренажный', 'Grundfos', 'ГНОМ', 'Насос погружной'], targets: ['Насос дренажный'] },
+        { id: 'kns',         label: 'Насосные установки', kw: ['Wilo N-Lift', 'N-Lift', 'W-Lift', 'DrainLift', 'Native RLS', 'Откачивающая установка', 'насосная установка'], targets: ['Насосная установка Wilo N-Lift'] },
+        { id: 'grease',      label: 'Жироуловители', kw: ['Жироуловитель', 'Жироотделитель'], targets: ['Жироуловитель'] },
+        { id: 'valves',      label: 'Воздушные клапаны', kw: ['HL900', 'HL905', 'Воздушный клапан'], targets: ['Воздушный клапан HL905 DN\u00a0110'] },
+        { id: 'traps',       label: 'Трапы', kw: ['Трап', 'HL310', 'HL510'], targets: ['Трап (полимерный)'] },
+        { id: 'funnels',     label: 'Воронки', kw: ['Воронка кровельная', 'Воронка водосточн', 'HL62', 'HL64'], targets: ['Водоприёмная воронка'] },
+        { id: 'fire',        label: 'Противопожарные муфты', kw: ['Муфта противопожарная', 'ОГНЕЗА'], targets: ['Муфта противопожарная'] }
     ];
 
-    // Шум — игнорируем при поиске
-    var NOISE_WORDS = /\b(комплект|в сборе|арт\.|art\.|DN\d+|PN\d+|Ду\s*\d+|шт|м\.п\.|руб)\b/gi;
+    var EQ_NOISE = /\b(комплект|в сборе|арт\.|DN\d+|PN\d+|Ду\s*\d+)\b/gi;
 
-    // ── Семантический матчер ──────────────────────────────────────────
-    function matchEquipmentByKeywords(itemName) {
-        var clean = itemName.replace(NOISE_WORDS, '').trim();
-        var nameLow = itemName.toLowerCase();
-        var cleanLow = clean.toLowerCase();
+    // ── Семантический матчер: один лучший результат ────────────────────
+    function matchEquipmentByKeywords(name) {
+        var low = name.toLowerCase();
+        var cleanLow = name.replace(EQ_NOISE, '').trim().toLowerCase();
         var best = null;
-        var bestScore = 0;
+        var bestLen = 0;
 
-        EQUIPMENT_GROUPS.forEach(function (group) {
-            group.keywords.forEach(function (kw) {
+        EQ_KEYWORDS.forEach(function (grp) {
+            grp.kw.forEach(function (kw) {
                 var kwLow = kw.toLowerCase();
-                if (cleanLow.indexOf(kwLow) !== -1 || nameLow.indexOf(kwLow) !== -1) {
-                    if (kw.length > bestScore) {
-                        bestScore = kw.length;
-                        best = { group: group, score: kw.length, keyword: kw };
-                    }
+                if (low.indexOf(kwLow) !== -1 || cleanLow.indexOf(kwLow) !== -1) {
+                    if (kw.length > bestLen) { bestLen = kw.length; best = grp; }
                 }
             });
         });
 
-        return best; // null если ничего не нашлось
+        return best; // null = не распознано
     }
 
-    // ── Получить расчётные позиции по всем корпусам ──────────────────
+    // ── Расчётные позиции из проекта ──────────────────────────────────
     function getAllCalculatedItems() {
         if (!buildingStats || !buildingStats.length) return [];
         var acc = {};
         buildingStats.forEach(function (b, idx) {
-            collectK3FittingsForBuilding(idx).forEach(function (item) {
-                if (acc[item.name]) acc[item.name].qty += item.qty;
-                else acc[item.name] = { name: item.name, unit: item.unit, qty: item.qty };
+            collectK3FittingsForBuilding(idx).forEach(function (it) {
+                if (acc[it.name]) acc[it.name].qty += it.qty;
+                else acc[it.name] = { name: it.name, unit: it.unit, qty: it.qty };
             });
         });
         return Object.keys(acc).map(function (k) { return acc[k]; });
     }
 
-    function findCalcTargets(group) {
-        var allItems = getAllCalculatedItems();
-        var found = [];
-        group.targets.forEach(function (targetName) {
-            allItems.forEach(function (item) {
-                if (item.name.indexOf(targetName) !== -1) {
-                    var exists = false;
-                    found.forEach(function (f) { if (f.name === item.name) exists = true; });
-                    if (!exists) found.push(item);
-                }
+    function findCalcTarget(grp) {
+        var all = getAllCalculatedItems();
+        var found = null;
+        var totalQty = 0;
+        grp.targets.forEach(function (t) {
+            all.forEach(function (it) {
+                if (it.name.indexOf(t) !== -1) { found = it.name; totalQty += it.qty; }
             });
         });
-        return found;
+        return found ? { name: found, qty: totalQty } : null;
     }
 
     function getEquipmentMasterPrice(name) {
         var mp = loadMasterPrices('materials');
-        if (mp[name]) return parseFloat(mp[name]) || 0;
-        return 0;
+        return mp[name] ? (parseFloat(mp[name]) || 0) : 0;
     }
 
-    // ── Парсинг файла (заглушка — возвращает демо при невозможности) ──
-    function processEquipmentFile(file) {
-        // Реальный парсинг PDF/XLSX потребует pdf.js / SheetJS
-        // Для JSON-файлов — попробуем прочитать напрямую
-        return null; // null означает «нужно читать через FileReader»
-    }
-
+    // ── Чтение файла (Drag & Drop / Click) ────────────────────────────
     function readFileAndImport(file) {
         if (!file) return;
+        console.log('[Equipment] Файл прочитан:', file.name, '(' + file.size + ' байт)');
         var ext = file.name.split('.').pop().toLowerCase();
 
         if (ext === 'json') {
@@ -4537,245 +4476,144 @@
             reader.onload = function (e) {
                 try {
                     var data = JSON.parse(e.target.result);
-                    // Ожидаемый формат: массив [{kpName, qty, price, deliveryDays?}]
-                    if (Array.isArray(data)) {
-                        processEquipmentImport(data);
-                    } else if (data.items && Array.isArray(data.items)) {
-                        processEquipmentImport(data.items);
-                    } else {
-                        showSaveToast('Неверный формат JSON-файла', true);
-                    }
+                    var items = Array.isArray(data) ? data : (data.items || []);
+                    if (!items.length) { showSaveToast('Файл пуст', true); return; }
+                    console.log('[Equipment] Найдено позиций:', items.length);
+                    processEquipmentImport(items);
                 } catch (err) {
-                    showSaveToast('Ошибка чтения JSON: ' + err.message, true);
+                    console.error('[Equipment] Ошибка JSON:', err);
+                    showSaveToast('Ошибка чтения: ' + err.message, true);
                 }
             };
             reader.readAsText(file, 'UTF-8');
         } else {
-            // PDF/XLSX — пока не реализован реальный парсинг
-            showSaveToast('Парсинг ' + ext.toUpperCase() + ' в разработке. Используйте JSON.', true);
+            showSaveToast('Поддерживается только JSON. Сконвертируйте счёт.', true);
         }
     }
 
-    // ── Агрегация строк КП по семантическим группам ──────────────────
-    function processEquipmentImport(parsedItems) {
-        if (!parsedItems || !parsedItems.length) {
-            showSaveToast('Файл пуст или не содержит позиций', true);
-            return;
-        }
-
-        // 1. Каждой строке назначаем группу
+    // ── Агрегация и группировка ───────────────────────────────────────
+    function processEquipmentImport(items) {
         var grouped = {};
-        var ungrouped = [];
+        var unmatched = [];
 
-        parsedItems.forEach(function (item) {
-            var match = matchEquipmentByKeywords(item.kpName);
-            if (!match) {
-                ungrouped.push(item);
-                return;
+        items.forEach(function (item) {
+            var grp = matchEquipmentByKeywords(item.kpName);
+            if (!grp) { unmatched.push(item); return; }
+            if (!grouped[grp.id]) {
+                grouped[grp.id] = { grp: grp, lines: [], totalQty: 0, totalSum: 0 };
             }
-            var gid = match.group.id;
-            if (!grouped[gid]) {
-                grouped[gid] = {
-                    group: match.group,
-                    lines: [],
-                    totalQty: 0,
-                    totalSum: 0,
-                    maxDelivery: 0
-                };
-            }
-            grouped[gid].lines.push(item);
-            grouped[gid].totalQty += item.qty;
-            grouped[gid].totalSum += item.price * item.qty;
-            if ((item.deliveryDays || 0) > grouped[gid].maxDelivery) grouped[gid].maxDelivery = item.deliveryDays;
+            grouped[grp.id].lines.push(item);
+            grouped[grp.id].totalQty += item.qty;
+            grouped[grp.id].totalSum += item.price * item.qty;
         });
 
-        // 2. Строим equipmentOffers — ТОЛЬКО из того, что пришло из файла
         equipmentOffers = [];
         var idx = 0;
 
         Object.keys(grouped).forEach(function (gid) {
             var g = grouped[gid];
-            var calcTargets = findCalcTargets(g.group);
-            var calcQty = 0;
-            calcTargets.forEach(function (t) { calcQty += t.qty; });
-            var isAmbiguous = calcTargets.length > 1;
-            var selectedTarget = calcTargets.length > 0 ? calcTargets[0].name : '— нет в проекте —';
-            var masterPrice = calcTargets.length > 0 ? getEquipmentMasterPrice(selectedTarget) : 0;
+            var calc = findCalcTarget(g.grp);
             var avgPrice = g.totalQty > 0 ? Math.round(g.totalSum / g.totalQty) : 0;
+
+            console.log('[Equipment] Суммировано ' + g.grp.label + ': ' + g.totalQty + ' шт, ср. цена ' + avgPrice);
 
             equipmentOffers.push({
                 id: 'eq_' + idx++,
-                groupId: gid,
-                groupLabel: g.group.label,
+                groupLabel: g.grp.label,
                 lines: g.lines,
-                mappedName: selectedTarget,
-                calcTargets: calcTargets,
-                isAmbiguous: isAmbiguous,
+                mappedName: calc ? calc.name : '— нет в проекте —',
                 kpQty: g.totalQty,
-                calcQty: calcQty,
+                calcQty: calc ? calc.qty : 0,
                 kpSum: g.totalSum,
                 kpAvgPrice: avgPrice,
-                masterPrice: masterPrice,
-                maxDelivery: g.maxDelivery,
-                matched: calcTargets.length > 0,
-                confirmed: !isAmbiguous
+                masterPrice: calc ? getEquipmentMasterPrice(calc.name) : 0,
+                matched: !!calc,
+                confirmed: !!calc
             });
         });
 
-        // Непривязанные — тоже показываем (из файла, но без группы)
-        ungrouped.forEach(function (item) {
+        // Непривязанные — из файла, показываем как есть
+        unmatched.forEach(function (item) {
             equipmentOffers.push({
                 id: 'eq_' + idx++,
-                groupId: null,
                 groupLabel: '—',
                 lines: [item],
-                mappedName: '— нет привязки —',
-                calcTargets: [],
-                isAmbiguous: false,
+                mappedName: '— не распознано —',
                 kpQty: item.qty,
                 calcQty: 0,
                 kpSum: item.price * item.qty,
                 kpAvgPrice: item.price,
                 masterPrice: 0,
-                maxDelivery: item.deliveryDays || 0,
                 matched: false,
                 confirmed: false
             });
         });
 
+        console.log('[Equipment] Итого групп: ' + equipmentOffers.length + ', из них подтверждено: ' + equipmentOffers.filter(function (e) { return e.confirmed; }).length);
         renderEquipmentTable();
         saveEquipmentToSupabase();
     }
 
-    // ── Рендер таблицы — ТОЛЬКО из загруженных данных ──────────────────
+    // ── Рендер таблицы (4 колонки) ────────────────────────────────────
     function renderEquipmentTable() {
         var body = document.getElementById('eqMatchBody');
         var content = document.getElementById('eqMatchContent');
         var titleEl = document.getElementById('eqMatchTitle');
         if (!body || !content) return;
 
-        if (!equipmentOffers.length) {
-            content.style.display = 'none';
-            return;
-        }
+        if (!equipmentOffers.length) { content.style.display = 'none'; return; }
 
         content.style.display = '';
         var totalLines = 0;
         equipmentOffers.forEach(function (eq) { totalLines += eq.lines.length; });
-        if (titleEl) titleEl.textContent = 'Результат: ' + totalLines + ' поз. из файла \u2192 ' + equipmentOffers.length + ' групп';
+        if (titleEl) titleEl.textContent = totalLines + ' поз. из счёта \u2192 ' + equipmentOffers.length + ' групп';
 
         var html = '';
-        var totalKP = 0, totalMaster = 0;
+        var totalKP = 0;
 
         equipmentOffers.forEach(function (eq) {
-            var rowClass = '';
-            if (!eq.matched) rowClass = 'eq-match-none';
-            else if (eq.isAmbiguous && !eq.confirmed) rowClass = 'eq-match-ambiguous';
-            else if (eq.kpQty === eq.calcQty) rowClass = 'eq-match-ok';
-            else rowClass = 'eq-match-diff';
+            var rowClass = eq.confirmed ? 'eq-match-ok' : (eq.matched ? 'eq-match-diff' : 'eq-match-none');
 
-            // Колонка «Наименование в КП» — реальные строки из файла
+            // Колонка 1: Наименование в КП — точный текст из файла
             var nameHtml = '';
             if (eq.lines.length === 1) {
                 nameHtml = escHtml(eq.lines[0].kpName);
             } else {
-                nameHtml = '<strong>' + eq.lines.length + ' поз. (суммарно ' + eq.kpQty + ' шт)</strong>';
+                nameHtml = '<strong>' + escHtml(eq.groupLabel) + ' (агрегировано)</strong>';
                 nameHtml += '<div class="eq-kp-lines">';
                 eq.lines.forEach(function (l) {
-                    nameHtml += escHtml(l.kpName) + ' \u2014 ' + l.qty + '\u00a0шт \u00d7\u00a0' + formatEstimateMoney(l.price) + '<br>';
+                    nameHtml += escHtml(l.kpName) + ' \u2014 ' + l.qty + '\u00a0шт \u00d7 ' + formatEstimateMoney(l.price) + '<br>';
                 });
                 nameHtml += '</div>';
             }
 
-            // Привязка
-            var targetHtml = '';
-            if (eq.isAmbiguous && eq.calcTargets.length > 1) {
-                targetHtml = '<select class="eq-target-select" data-eq-id="' + eq.id + '">';
-                eq.calcTargets.forEach(function (ct) {
-                    var sel = ct.name === eq.mappedName ? ' selected' : '';
-                    targetHtml += '<option value="' + escHtml(ct.name) + '"' + sel + '>' + escHtml(ct.name) + ' (' + ct.qty + ')</option>';
-                });
-                targetHtml += '</select>';
-            } else {
-                targetHtml = escHtml(eq.mappedName);
-            }
+            // Колонка 3: Кол-во
+            var qtyHtml = eq.kpQty + ' / ' + (eq.matched ? eq.calcQty : '—');
 
-            // Разница
-            var diffHtml = '—';
-            if (eq.masterPrice > 0 && eq.kpAvgPrice > 0) {
-                var diff = eq.kpAvgPrice - eq.masterPrice;
-                var pct = ((diff / eq.masterPrice) * 100).toFixed(0);
-                diffHtml = diff > 0 ? '<span class="eq-diff-positive">+' + pct + '%</span>'
-                         : diff < 0 ? '<span class="eq-diff-negative">' + pct + '%</span>' : '0%';
-            }
-
-            // Статус
-            var statusHtml = '';
-            if (!eq.matched) statusHtml = '<span class="eq-status-icon" title="Нет в проекте">\u274c</span>';
-            else if (eq.isAmbiguous && !eq.confirmed) statusHtml = '<span class="eq-status-icon" title="Выберите привязку">\u26a0\ufe0f</span>';
-            else if (eq.kpQty === eq.calcQty) statusHtml = '<span class="eq-status-icon" title="Совпало">\u2705</span>';
-            else statusHtml = '<span class="eq-status-icon" title="Кол-во \u2260">\u26a0\ufe0f</span>';
+            // Колонка 4: Цена (средневзвешенная)
+            var priceHtml = formatEstimateMoney(eq.kpAvgPrice);
 
             html += '<tr class="' + rowClass + '">' +
-                '<td><span class="eq-group-badge">' + escHtml(eq.groupLabel) + '</span></td>' +
                 '<td>' + nameHtml + '</td>' +
-                '<td>' + targetHtml + '</td>' +
-                '<td style="text-align:center;">' + eq.kpQty + '</td>' +
-                '<td style="text-align:center;">' + (eq.matched ? eq.calcQty : '—') + '</td>' +
-                '<td style="text-align:right;">' + formatEstimateMoney(eq.kpSum) + '</td>' +
-                '<td style="text-align:right;">' + (eq.masterPrice > 0 ? formatEstimateMoney(eq.masterPrice * eq.kpQty) : '—') + '</td>' +
-                '<td style="text-align:center;">' + diffHtml + '</td>' +
-                '<td style="text-align:center;">' + (eq.maxDelivery > 0 ? eq.maxDelivery + '\u00a0дн.' : '—') + '</td>' +
-                '<td style="text-align:center;">' + statusHtml + '</td>' +
+                '<td>' + escHtml(eq.mappedName) + '</td>' +
+                '<td style="text-align:center;">' + qtyHtml + '</td>' +
+                '<td style="text-align:right;">' + priceHtml + '</td>' +
                 '</tr>';
 
             totalKP += eq.kpSum;
-            if (eq.masterPrice > 0) totalMaster += eq.masterPrice * eq.kpQty;
         });
 
         body.innerHTML = html;
 
-        // Dropdown-обработчики
-        body.querySelectorAll('.eq-target-select').forEach(function (sel) {
-            sel.addEventListener('change', function () {
-                var eqId = this.dataset.eqId;
-                var newTarget = this.value;
-                equipmentOffers.forEach(function (eq) {
-                    if (eq.id === eqId) {
-                        eq.mappedName = newTarget;
-                        eq.masterPrice = getEquipmentMasterPrice(newTarget);
-                        eq.confirmed = true;
-                        eq.calcTargets.forEach(function (ct) {
-                            if (ct.name === newTarget) eq.calcQty = ct.qty;
-                        });
-                    }
-                });
-                renderEquipmentTable();
-            });
-        });
-
         // Сводка
         var summaryEl = document.getElementById('eqSummary');
         if (summaryEl) {
-            var diffTotal = totalKP - totalMaster;
-            var diffClass = diffTotal > 0 ? 'overspend' : diffTotal < 0 ? 'saving' : '';
-            var diffLabel = diffTotal > 0 ? 'Перерасход' : diffTotal < 0 ? 'Экономия' : 'Совпадение';
-            var confirmedCount = 0;
-            equipmentOffers.forEach(function (eq) { if (eq.matched && eq.confirmed) confirmedCount++; });
-
+            var confirmedCount = equipmentOffers.filter(function (e) { return e.confirmed; }).length;
             summaryEl.innerHTML =
                 '<div class="eq-summary-item">' +
                     '<span class="eq-summary-label">Итого по счёту</span>' +
                     '<span class="eq-summary-value">' + formatEstimateMoney(totalKP) + '</span>' +
                 '</div>' +
-                (totalMaster > 0 ? '<div class="eq-summary-item">' +
-                    '<span class="eq-summary-label">Мастер-цены</span>' +
-                    '<span class="eq-summary-value">' + formatEstimateMoney(totalMaster) + '</span>' +
-                '</div>' +
-                '<div class="eq-summary-item">' +
-                    '<span class="eq-summary-label">' + diffLabel + '</span>' +
-                    '<span class="eq-summary-value ' + diffClass + '">' + formatEstimateMoney(Math.abs(diffTotal)) + '</span>' +
-                '</div>' : '') +
                 '<div class="eq-summary-item">' +
                     '<span class="eq-summary-label">Подтверждено</span>' +
                     '<span class="eq-summary-value">' + confirmedCount + ' / ' + equipmentOffers.length + '</span>' +
@@ -4783,7 +4621,7 @@
         }
     }
 
-    // ── Применить цены (только подтверждённые) ────────────────────────
+    // ── Принять цены (только confirmed) ───────────────────────────────
     function applyEquipmentPrices() {
         if (!equipmentOffers.length) return;
         var applied = 0;
@@ -4807,18 +4645,15 @@
             applied++;
         });
 
-        if (applied === 0) {
-            showSaveToast('Нет подтверждённых позиций', true);
-            return;
-        }
-
+        if (!applied) { showSaveToast('Нет подтверждённых позиций', true); return; }
+        console.log('[Equipment] Принято цен: ' + applied);
         renderEstimate();
         sendEstimateTotals();
         saveCalculationToSupabase();
-        showSaveToast('Применено: ' + applied + ' поз.');
+        showSaveToast('Принято: ' + applied + ' поз.');
     }
 
-    // ── Сохранение в Supabase ─────────────────────────────────────────
+    // ── Supabase ──────────────────────────────────────────────────────
     function saveEquipmentToSupabase() {
         if (!portalProjectId) return;
         var payload = collectSewageState();
@@ -4826,47 +4661,63 @@
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ data_json: JSON.stringify(payload) })
-        }).then(function (res) {
-            if (!res.ok) throw new Error('HTTP ' + res.status);
-        }).catch(function (err) {
-            console.error('Ошибка сохранения оборудования:', err);
-        });
+        }).catch(function (err) { console.error('[Equipment] Save error:', err); });
     }
 
-    // ── Обработчики UI ───────────────────────────────────────────────
-    (function initEquipmentHandlers() {
+    // ── initEquipmentInterface: Drag & Drop + Click ───────────────────
+    (function initEquipmentInterface() {
         var zone = document.getElementById('eqUploadZone');
         var fileInput = document.getElementById('eqFileInput');
         var applyBtn = document.getElementById('eqApplyPrices');
         var clearBtn = document.getElementById('eqClearImport');
 
-        if (zone && fileInput) {
-            zone.addEventListener('click', function () { fileInput.click(); });
-            zone.addEventListener('dragover', function (e) { e.preventDefault(); zone.classList.add('dragover'); });
-            zone.addEventListener('dragleave', function () { zone.classList.remove('dragover'); });
-            zone.addEventListener('drop', function (e) {
-                e.preventDefault();
-                zone.classList.remove('dragover');
-                if (e.dataTransfer.files.length) readFileAndImport(e.dataTransfer.files[0]);
-            });
-            fileInput.addEventListener('change', function () {
-                if (fileInput.files.length) readFileAndImport(fileInput.files[0]);
-            });
-        }
+        if (!zone || !fileInput) { console.warn('[Equipment] Upload zone not found'); return; }
 
-        if (applyBtn) {
-            applyBtn.addEventListener('click', function () { applyEquipmentPrices(); });
-        }
+        // Клик → открыть выбор файла
+        zone.addEventListener('click', function (e) {
+            if (e.target === fileInput) return; // не зацикливать
+            fileInput.click();
+        });
 
-        if (clearBtn) {
-            clearBtn.addEventListener('click', function () {
-                equipmentOffers = [];
-                var content = document.getElementById('eqMatchContent');
-                if (content) content.style.display = 'none';
-                var summary = document.getElementById('eqSummary');
-                if (summary) summary.innerHTML = '';
-            });
-        }
+        // Жёсткий preventDefault на все drag-события
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(function (evt) {
+            zone.addEventListener(evt, function (e) { e.preventDefault(); e.stopPropagation(); });
+        });
+
+        // Подсветка при перетаскивании
+        zone.addEventListener('dragenter', function () { zone.classList.add('drag-active'); });
+        zone.addEventListener('dragover', function () { zone.classList.add('drag-active'); });
+        zone.addEventListener('dragleave', function () { zone.classList.remove('drag-active'); });
+
+        // Drop
+        zone.addEventListener('drop', function (e) {
+            zone.classList.remove('drag-active');
+            var files = e.dataTransfer && e.dataTransfer.files;
+            if (files && files.length) {
+                console.log('[Equipment] Файл получен через drop:', files[0].name);
+                readFileAndImport(files[0]);
+            }
+        });
+
+        // Выбор через input
+        fileInput.addEventListener('change', function () {
+            if (fileInput.files && fileInput.files.length) {
+                console.log('[Equipment] Файл выбран через input:', fileInput.files[0].name);
+                readFileAndImport(fileInput.files[0]);
+                fileInput.value = ''; // сброс, чтобы можно было загрузить тот же файл повторно
+            }
+        });
+
+        // Принять цены
+        if (applyBtn) applyBtn.addEventListener('click', applyEquipmentPrices);
+
+        // Очистить
+        if (clearBtn) clearBtn.addEventListener('click', function () {
+            equipmentOffers = [];
+            document.getElementById('eqMatchContent').style.display = 'none';
+            document.getElementById('eqSummary').innerHTML = '';
+            console.log('[Equipment] Импорт очищен');
+        });
     })();
 
     /* ─── postMessage от портала ─────────────────────────────────────────── */
