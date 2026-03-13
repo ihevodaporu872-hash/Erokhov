@@ -4629,51 +4629,137 @@
         return price;
     }
 
-    // ── Построчный парсер текста счёта ───────────────────────────────
-    // Логика:
-    //   1. Номер позиции (1-3 цифры) в начале строки
-    //   2. Количество: якорный поиск — число ПЛОТНО перед «шт»/«компл»
-    //   3. Цена: интеллектуальный поиск — меньшее из двух больших чисел
-    //   4. Наименование: текст между номером позиции и числовыми полями
-    function parseTextToItems(text) {
+    // ── Препроцессинг PDF-текста: склейка разорванных строк ────────
+    // PDF часто разбивает одну позицию на несколько строк.
+    // Логика: если строка НЕ начинается с номера позиции (1-3 цифры + пробел),
+    // и начинается с маленькой буквы, цифры артикула или спецсимвола — склеиваем.
+    function preprocessPdfText(text) {
         var lines = text.split(/\n/);
-        var items = [];
+        var merged = [];
+        var posStartRe = /^\s*\d{1,3}\s{2,}\S/; // начало новой позиции
 
-        // Для многострочных позиций: буфер текущей позиции
+        for (var i = 0; i < lines.length; i++) {
+            var line = lines[i];
+            var trimmed = line.trim();
+            if (!trimmed) { merged.push(''); continue; }
+
+            // Это начало новой позиции?
+            if (posStartRe.test(line)) {
+                merged.push(line);
+            } else if (merged.length > 0 && merged[merged.length - 1].trim()) {
+                // Склеиваем с предыдущей строкой (продолжение наименования/артикула)
+                merged[merged.length - 1] += ' ' + trimmed;
+            } else {
+                merged.push(line);
+            }
+        }
+
+        var result = merged.join('\n');
+        console.log('[Preprocess] Склеено строк: ' + lines.length + ' → ' + merged.length);
+        return result;
+    }
+
+    // ── Парсер текста счёта → [{kpName, qty, price}] ────────────────
+    // Двухпроходный алгоритм:
+    //   Проход 1: Построчный — ищем строки с номером позиции
+    //   Проход 2: Полнотекстовый — ищем по ключевым словам белого списка
+    function parseTextToItems(text) {
+        // Препроцессинг: склеиваем разорванные строки
+        var preprocessed = preprocessPdfText(text);
+        var lines = preprocessed.split(/\n/);
+
+        // ─── Проход 1: Построчный поиск позиций ─────────────────────
+        var items = [];
         var currentItem = null;
 
         lines.forEach(function (line) {
             var trimmed = line.trim();
             if (!trimmed) return;
 
-            // Проверяем, начинается ли строка с номера позиции (1-3 цифры + пробелы + текст)
-            var posMatch = trimmed.match(/^(\d{1,3})\s{2,}(.+)/);
-            if (!posMatch) {
-                // Может быть продолжение предыдущей позиции (многострочное наименование)
-                if (currentItem && trimmed.length > 3) {
-                    currentItem.rawText += ' ' + trimmed;
-                }
-                return;
-            }
+            // Начало позиции: номер (1-3 цифры) + пробел(ы) + текст
+            // Допускаем даже 1 пробел (PDF иногда жмёт)
+            var posMatch = trimmed.match(/^(\d{1,3})\s+(.{5,})/);
+            if (!posMatch) return;
 
-            // Финализируем предыдущий item
+            // Финализируем предыдущий
             if (currentItem) {
                 var parsed = finalizeItem(currentItem);
                 if (parsed) items.push(parsed);
             }
 
-            // Начинаем новую позицию
             currentItem = {
                 posNum: parseInt(posMatch[1], 10),
                 rawText: posMatch[2]
             };
         });
 
-        // Последний элемент
         if (currentItem) {
             var parsed = finalizeItem(currentItem);
             if (parsed) items.push(parsed);
         }
+
+        // ─── Проход 2: Полнотекстовый поиск по белому списку ────────
+        // Если проход 1 нашёл мало — ищем по всему тексту вхождения ключевых слов
+        if (items.length === 0) {
+            console.log('[Parse] Проход 1 не нашёл позиций, запуск полнотекстового поиска...');
+            eqLog('Построчный парсинг: 0 поз. Запуск полнотекстового поиска...');
+            items = fullTextSearch(preprocessed);
+        }
+
+        return items;
+    }
+
+    // ── Полнотекстовый поиск по белому списку ───────────────────────
+    // Ищет вхождения ключевых слов, затем расширяет контекст вокруг них
+    // для извлечения qty и price
+    function fullTextSearch(text) {
+        var items = [];
+        var textLow = text.toLowerCase();
+
+        EQ_WHITELIST.forEach(function (kw) {
+            var startPos = 0;
+            var kwLow = kw.toLowerCase();
+
+            while (true) {
+                var idx = textLow.indexOf(kwLow, startPos);
+                if (idx === -1) break;
+                startPos = idx + kwLow.length;
+
+                // Чёрный список — пропускаем
+                var contextStart = Math.max(0, idx - 100);
+                var contextEnd = Math.min(text.length, idx + 300);
+                var context = text.substring(contextStart, contextEnd);
+                var contextLow = context.toLowerCase();
+
+                var blacklisted = false;
+                for (var b = 0; b < EQ_BLACKLIST.length; b++) {
+                    if (contextLow.indexOf(EQ_BLACKLIST[b]) !== -1) { blacklisted = true; break; }
+                }
+                if (blacklisted) continue;
+
+                // Извлекаем qty и price из контекста
+                var qty = extractAnchoredQty(context);
+                var price = extractSmartPrice(context, qty);
+
+                if (qty > 0 && price > 0) {
+                    // Извлекаем наименование: текст от ключевого слова до qty/price
+                    var kwIdx = context.toLowerCase().indexOf(kwLow);
+                    var nameStart = Math.max(0, kwIdx - 50);
+                    var nameChunk = context.substring(nameStart, kwIdx + kwLow.length + 50);
+                    // Обрезаем до единицы измерения
+                    var unitCut = nameChunk.search(/\s+\d{1,4}\s*(?:шт|компл)/i);
+                    if (unitCut > 3) nameChunk = nameChunk.substring(0, unitCut);
+                    // Убираем числа и лишнее
+                    nameChunk = nameChunk.replace(/^\s*\d{1,3}\s+/, '').replace(/\s+\d+\s*$/, '').trim();
+
+                    if (nameChunk.length >= 3) {
+                        console.log('[FullText] Найдено: "' + nameChunk + '" | qty=' + qty + ' | price=' + price);
+                        eqLog('Полнотекст: ' + nameChunk + ' | ' + qty + ' шт | ' + formatEstimateMoney(price));
+                        items.push({ kpName: nameChunk, qty: parseInt(qty, 10), price: parseFloat(price) });
+                    }
+                }
+            }
+        });
 
         return items;
     }
@@ -4683,19 +4769,32 @@
     function finalizeItem(item) {
         var text = item.rawText;
 
+        // Отладка: логируем каждую строку с ключевым словом из белого списка
+        var hasWhitelistWord = isWhitelistedLine(text);
+        if (hasWhitelistWord) {
+            console.log('[Parse] Проверяю строку:', 'п.' + item.posNum, '"' + text + '"');
+        }
+
         // 0. Фильтр: Белый/Чёрный список — только канализационное оборудование
-        if (!isWhitelistedLine(text)) {
-            console.log('[Parse] п.' + item.posNum + ': ПРОПУСК (не в белом списке) — "' + text.substring(0, 60) + '..."');
+        if (!hasWhitelistWord) {
             return null;
         }
 
         // 1. Кол-во: якорный поиск — число ПЛОТНО перед «шт» / «компл»
         var qty = extractAnchoredQty(text);
-        if (qty <= 0) return null;
+        if (qty <= 0) {
+            console.log('[Parse] п.' + item.posNum + ': ✗ qty=0 (не найден якорь шт/компл) — "' + text.substring(0, 80) + '"');
+            eqLog('п.' + item.posNum + ': qty не найден — ' + text.substring(0, 60));
+            return null;
+        }
 
         // 2. Цена: интеллектуальный поиск
         var price = extractSmartPrice(text, qty);
-        if (price <= 0) return null;
+        if (price <= 0) {
+            console.log('[Parse] п.' + item.posNum + ': ✗ price=0 — "' + text.substring(0, 80) + '"');
+            eqLog('п.' + item.posNum + ': цена не найдена — ' + text.substring(0, 60));
+            return null;
+        }
 
         // 3. Наименование: текст до единицы измерения или до кластера цен
         var name = text;
@@ -4722,6 +4821,7 @@
         price = parseFloat(price);
 
         console.log('[Parse] п.' + item.posNum + ': ✓ "' + name + '" | qty=' + qty + ' | price=' + price);
+        eqLog('п.' + item.posNum + ': ' + name + ' | ' + qty + ' шт | ' + formatEstimateMoney(price));
 
         return { kpName: name, qty: qty, price: price };
     }
@@ -4786,13 +4886,13 @@
 
                     if (items.length === 0) {
                         eqLog('Не удалось распознать позиции. Проверьте формат счёта.');
+                        eqLog('─── Первые 500 символов извлечённого текста ───');
+                        eqLog(allText.substring(0, 500));
+                        eqLog('─── конец превью ───');
+                        console.log('[Equipment] Полный извлечённый текст:', allText);
                         showSaveToast('Позиции не найдены в PDF', true);
                         return;
                     }
-
-                    items.forEach(function (it) {
-                        eqLog('  → ' + it.kpName + ' | ' + it.qty + ' шт | ' + it.price + ' руб.');
-                    });
 
                     processEquipmentImport(items);
                 });
@@ -4834,13 +4934,14 @@
 
                 if (items.length === 0) {
                     eqLog('Не удалось распознать позиции.');
+                    var csvPreview = XLSX.utils.sheet_to_csv(sheet, { FS: '  ' });
+                    eqLog('─── Первые 500 символов текста ───');
+                    eqLog(csvPreview.substring(0, 500));
+                    eqLog('─── конец превью ───');
+                    console.log('[Equipment] Полный текст Excel:', csvPreview);
                     showSaveToast('Позиции не найдены в Excel', true);
                     return;
                 }
-
-                items.forEach(function (it) {
-                    eqLog('  → ' + it.kpName + ' | ' + it.qty + ' шт | ' + it.price + ' руб.');
-                });
 
                 processEquipmentImport(items);
             } catch (err) {
