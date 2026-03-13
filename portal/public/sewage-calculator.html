@@ -484,9 +484,21 @@
         /* Строки таблицы сопоставления */
         #eqMatchTable tbody tr.eq-match-ok { background: rgba(16,185,129,.10); }
         #eqMatchTable tbody tr.eq-match-diff { background: rgba(250,204,21,.10); }
+        #eqMatchTable tbody tr.eq-match-ambiguous { background: rgba(249,115,22,.12); }
+        #eqMatchTable tbody tr.eq-match-none { background: rgba(220,38,38,.06); }
         #eqMatchTable td { font-size: 13px; padding: 6px 8px; vertical-align: middle; }
         #eqMatchTable .eq-diff-positive { color: #dc2626; font-weight: 600; }
         #eqMatchTable .eq-diff-negative { color: #059669; font-weight: 600; }
+        #eqMatchTable .eq-kp-lines { font-size: 12px; color: var(--gray-500); margin-top: 2px; }
+        #eqMatchTable .eq-group-badge {
+            display: inline-block; padding: 2px 8px; border-radius: 6px; font-size: 11px; font-weight: 600;
+            background: var(--gray-100); color: var(--gray-700); white-space: nowrap;
+        }
+        #eqMatchTable .eq-status-icon { font-size: 16px; }
+        #eqMatchTable select.eq-target-select {
+            width: 100%; padding: 4px 6px; border: 1px solid var(--gray-200);
+            border-radius: 6px; font-size: 12px; background: var(--bg-card); color: var(--gray-900);
+        }
 
         /* Итоговая сводка */
         .eq-summary-block {
@@ -823,20 +835,21 @@
 
                             <!-- Таблица сопоставления -->
                             <div id="eqMatchContent" style="display:none;">
-                                <h3 style="font-size:15px;font-weight:600;margin:0 0 12px;">Результат сопоставления</h3>
+                                <h3 style="font-size:15px;font-weight:600;margin:0 0 12px;">Результат семантического сопоставления</h3>
                                 <div class="table-responsive">
                                     <table class="estimate-table estimate-table-financial" id="eqMatchTable">
                                         <thead>
                                             <tr>
-                                                <th style="width:22%;">Позиция из КП</th>
-                                                <th style="width:20%;">Привязка в проекте</th>
-                                                <th style="width:8%;">Артикул</th>
+                                                <th style="width:10%;">Группа</th>
+                                                <th style="width:18%;">Позиции из КП (объединены)</th>
+                                                <th style="width:18%;">Привязка в проекте</th>
                                                 <th style="width:7%;">Кол-во (КП)</th>
-                                                <th style="width:7%;">Кол-во (расчёт)</th>
-                                                <th style="width:10%;">Цена из КП</th>
+                                                <th style="width:7%;">Кол-во (расч.)</th>
+                                                <th style="width:10%;">Сумма КП</th>
                                                 <th style="width:10%;">Мастер-цена</th>
                                                 <th style="width:8%;">Разница</th>
-                                                <th style="width:8%;">Срок пост.</th>
+                                                <th style="width:6%;">Ср. срок</th>
+                                                <th style="width:6%;">Статус</th>
                                             </tr>
                                         </thead>
                                         <tbody id="eqMatchBody"></tbody>
@@ -4286,7 +4299,12 @@
         });
         var eqOffers = equipmentOffers.length > 0
             ? equipmentOffers.map(function (eq) {
-                return { id: eq.id, name: eq.mappedName, kpPrice: eq.kpPrice, article: eq.article, kpQty: eq.kpQty, deliveryDays: eq.deliveryDays };
+                return {
+                    id: eq.id, groupId: eq.groupId, groupLabel: eq.groupLabel,
+                    name: eq.mappedName, kpAvgPrice: eq.kpAvgPrice, kpSum: eq.kpSum,
+                    kpQty: eq.kpQty, maxDelivery: eq.maxDelivery,
+                    lines: eq.lines, confirmed: eq.confirmed
+                };
               })
             : undefined;
         return {
@@ -4353,19 +4371,28 @@
                 // Восстанавливаем оборудование из КП
                 if (saved.equipment_offers && saved.equipment_offers.length) {
                     equipmentOffers = saved.equipment_offers.map(function (eq, idx) {
-                        var calcQty = getCalculatedQty(eq.name);
+                        var group = null;
+                        EQUIPMENT_GROUPS.forEach(function (g) { if (g.id === eq.groupId) group = g; });
+                        var calcTargets = group ? findCalcTargets(group) : [];
+                        var calcQty = 0;
+                        calcTargets.forEach(function (ct) { calcQty += ct.qty; });
                         var masterPrice = getEquipmentMasterPrice(eq.name);
                         return {
                             id: eq.id || 'eq_' + idx,
-                            kpName: eq.name,
+                            groupId: eq.groupId || null,
+                            groupLabel: eq.groupLabel || '— Не определено —',
+                            lines: eq.lines || [{ kpName: eq.name, qty: eq.kpQty, price: eq.kpAvgPrice || eq.kpPrice || 0 }],
                             mappedName: eq.name,
-                            article: eq.article || '',
+                            calcTargets: calcTargets,
+                            isAmbiguous: calcTargets.length > 1,
                             kpQty: eq.kpQty || 0,
                             calcQty: calcQty,
-                            kpPrice: eq.kpPrice || 0,
+                            kpSum: eq.kpSum || (eq.kpAvgPrice || 0) * (eq.kpQty || 0),
+                            kpAvgPrice: eq.kpAvgPrice || eq.kpPrice || 0,
                             masterPrice: masterPrice,
-                            deliveryDays: eq.deliveryDays || 0,
-                            matched: true
+                            maxDelivery: eq.maxDelivery || eq.deliveryDays || 0,
+                            matched: calcTargets.length > 0 || !!eq.name,
+                            confirmed: eq.confirmed !== undefined ? eq.confirmed : true
                         };
                     });
                     renderEquipmentTable();
@@ -4387,65 +4414,116 @@
     }
 
     /* ═══════════════════════════════════════════════════════════════════════
-       Умный импорт оборудования
+       Умный импорт оборудования — семантический поиск
     ═══════════════════════════════════════════════════════════════════════ */
 
-    var equipmentOffers = []; // [{id, kpName, mappedName, article, kpQty, calcQty, kpPrice, masterPrice, deliveryDays}]
+    var equipmentOffers = []; // агрегированные группы после сопоставления
 
-    // Маппинг-словарь: ключевое слово из КП → позиция в проекте
-    var equipmentMapping = {
-        'NSPG':         { target: 'Насос дренажный',                          article: 'NSPG' },
-        'W-Lift':       { target: 'Канализационная насосная установка',       article: 'W-Lift' },
-        'N-Lift':       { target: 'Канализационная насосная установка',       article: 'N-Lift' },
-        'Wilo N-Lift':  { target: 'Насосная установка Wilo N-Lift',           article: 'N-Lift' },
-        'Wilo DrainLift': { target: 'Канализационная насосная установка',     article: 'DrainLift' },
-        'Жироулов':     { target: 'Жироуловитель',                           article: 'ЖУ' },
-        'Grundfos':     { target: 'Насос дренажный',                          article: 'Grundfos' },
-        'ГНОМ':         { target: 'Насос дренажный',                          article: 'ГНОМ' },
-        'Трап HL':      { target: 'Трап (полимерный)',                        article: 'HL' },
-        'HL900':        { target: 'Воздушный клапан HL905 DN\u00a0110',       article: 'HL900' },
-        'Воронка кров': { target: 'Водоприёмная воронка',                     article: 'ВК' }
-    };
-
-    // Имитация парсинга PDF/Excel (образец «Билд Инжиниринг»)
-    function processEquipmentFile(file) {
-        // Для реального парсинга нужен pdf.js / SheetJS — здесь имитируем результат
-        return getDemoEquipmentData();
-    }
-
-    function getDemoEquipmentData() {
-        return [
-            { kpName: 'Wilo N-Lift 4-15 (насосная установка)',      article: 'N-Lift 4-15',      qty: 1,  price: 187500, deliveryDays: 21 },
-            { kpName: 'Жироуловитель «Пятый Элемент» ОЖ-30',       article: 'ОЖ-30',            qty: 1,  price: 42000,  deliveryDays: 14 },
-            { kpName: 'Wilo NSPG 9/8 (дренажный насос)',            article: 'NSPG 9/8',         qty: 2,  price: 24500,  deliveryDays: 7  },
-            { kpName: 'Трап HL310NPr (решётка 115x115)',            article: 'HL310NPr',         qty: 4,  price: 3200,   deliveryDays: 3  },
-            { kpName: 'Воздушный клапан HL900NECO DN110',           article: 'HL900NECO',        qty: 2,  price: 1850,   deliveryDays: 3  },
-            { kpName: 'Воронка кровельная HL62.1/1',                article: 'HL62.1/1',         qty: 6,  price: 4600,   deliveryDays: 5  }
-        ];
-    }
-
-    // Сопоставить позицию КП с маппингом
-    function matchEquipmentItem(kpName) {
-        var keys = Object.keys(equipmentMapping);
-        for (var i = 0; i < keys.length; i++) {
-            if (kpName.indexOf(keys[i]) !== -1) {
-                return equipmentMapping[keys[i]];
-            }
+    // ── Иерархия ключевых слов (Keyword Ranking) ──────────────────────
+    var EQUIPMENT_GROUPS = [
+        {
+            id: 'drain_pumps',
+            label: 'Дренажные насосы',
+            keywords: ['NSPG', 'Насос дренажный', 'Насос для загрязненной воды', 'Насос погружной', 'Grundfos', 'ГНОМ', 'дренажный насос'],
+            targets: ['Насос дренажный']
+        },
+        {
+            id: 'kns',
+            label: 'Откачивающие установки / КНС',
+            keywords: ['N-Lift', 'W-Lift', 'DrainLift', 'Откачивающая установка', 'Канализационная установка', 'Канализационная станция', 'насосная установка', 'Wilo N-Lift'],
+            targets: ['Насосная установка Wilo N-Lift', 'Канализационная насосная установка']
+        },
+        {
+            id: 'grease',
+            label: 'Жироуловители',
+            keywords: ['Жироуловитель', 'Жироотделитель', 'жироулов'],
+            targets: ['Жироуловитель']
+        },
+        {
+            id: 'valves_traps',
+            label: 'Клапаны и трапы',
+            keywords: ['HL900', 'HL905', 'Воздушный клапан', 'клапан воздушн'],
+            targets: ['Воздушный клапан HL905 DN\u00a0110']
+        },
+        {
+            id: 'floor_traps',
+            label: 'Трапы',
+            keywords: ['Трап', 'HL310', 'HL510', 'HL3100', 'трап канализ'],
+            targets: ['Трап (полимерный)']
+        },
+        {
+            id: 'funnels',
+            label: 'Воронки',
+            keywords: ['Воронка кровельная', 'Воронка водосточн', 'водоприёмная воронка', 'HL62', 'HL64', 'HL68'],
+            targets: ['Водоприёмная воронка', 'Воронка конденсатная']
+        },
+        {
+            id: 'fire_sleeves',
+            label: 'Противопожарные муфты',
+            keywords: ['Муфта противопожарная', 'ОГНЕЗА', 'противопожарн'],
+            targets: ['Муфта противопожарная']
         }
-        return null;
+    ];
+
+    // Шум, который игнорируем при поиске ключевых слов
+    var NOISE_WORDS = /\b(комплект|в сборе|арт\.|art\.|DN\d+|PN\d+|Ду\s*\d+|шт|м\.п\.|руб)\b/gi;
+
+    // ── Семантический поиск по ключевым словам ────────────────────────
+    function matchEquipmentByKeywords(itemName) {
+        var clean = itemName.replace(NOISE_WORDS, '').trim();
+        var matches = [];
+
+        EQUIPMENT_GROUPS.forEach(function (group) {
+            var score = 0;
+            var matchedKw = '';
+            group.keywords.forEach(function (kw) {
+                if (clean.toLowerCase().indexOf(kw.toLowerCase()) !== -1 || itemName.toLowerCase().indexOf(kw.toLowerCase()) !== -1) {
+                    var kwScore = kw.length; // длиннее ключевое слово = точнее совпадение
+                    if (kwScore > score) {
+                        score = kwScore;
+                        matchedKw = kw;
+                    }
+                }
+            });
+            if (score > 0) {
+                matches.push({ group: group, score: score, keyword: matchedKw });
+            }
+        });
+
+        // Сортировка по score (длиннее ключевое слово = лучше совпадение)
+        matches.sort(function (a, b) { return b.score - a.score; });
+        return matches;
     }
 
-    // Подсчитать расчётное количество позиции по всем корпусам
-    function getCalculatedQty(targetName) {
-        if (!buildingStats || !buildingStats.length) return 0;
-        var total = 0;
+    // ── Получить все расчётные позиции по всем корпусам ───────────────
+    function getAllCalculatedItems() {
+        if (!buildingStats || !buildingStats.length) return [];
+        var acc = {};
         buildingStats.forEach(function (b, idx) {
-            var k3Items = collectK3FittingsForBuilding(idx);
-            k3Items.forEach(function (item) {
-                if (item.name.indexOf(targetName) !== -1) total += item.qty;
+            var items = collectK3FittingsForBuilding(idx);
+            items.forEach(function (item) {
+                if (acc[item.name]) acc[item.name].qty += item.qty;
+                else acc[item.name] = { name: item.name, unit: item.unit, qty: item.qty };
             });
         });
-        return total;
+        return Object.keys(acc).map(function (k) { return acc[k]; });
+    }
+
+    // Найти все расчётные позиции, подходящие под targets группы
+    function findCalcTargets(group) {
+        var allItems = getAllCalculatedItems();
+        var found = [];
+        group.targets.forEach(function (targetName) {
+            allItems.forEach(function (item) {
+                if (item.name.indexOf(targetName) !== -1) {
+                    // Не дублировать
+                    var exists = false;
+                    found.forEach(function (f) { if (f.name === item.name) exists = true; });
+                    if (!exists) found.push(item);
+                }
+            });
+        });
+        return found;
     }
 
     // Получить мастер-цену для позиции оборудования
@@ -4455,27 +4533,125 @@
         return 0;
     }
 
-    // Обработка загруженных данных (из файла или демо)
-    function processEquipmentImport(parsedItems) {
-        equipmentOffers = [];
+    // ── Демо-данные (имитация счёта №1503 «Билд Инжиниринг») ──────────
+    function processEquipmentFile(file) {
+        return getDemoEquipmentData();
+    }
 
-        parsedItems.forEach(function (item, idx) {
-            var mapping = matchEquipmentItem(item.kpName);
-            var targetName = mapping ? mapping.target : '— нет привязки —';
-            var calcQty = mapping ? getCalculatedQty(mapping.target) : 0;
-            var masterPrice = mapping ? getEquipmentMasterPrice(mapping.target) : 0;
+    function getDemoEquipmentData() {
+        return [
+            // 3 строки NSPG → должны объединиться в одну группу «Дренажные насосы»
+            { kpName: 'Насос NSPG DF50-10.1.05.2.D (приямок)',       qty: 1, price: 28700, deliveryDays: 7  },
+            { kpName: 'Насос NSPG 6-8 (дренаж подвала)',             qty: 6, price: 18200, deliveryDays: 7  },
+            { kpName: 'Насос NSPG DF50 (резерв)',                    qty: 1, price: 31500, deliveryDays: 10 },
+            // КНС
+            { kpName: 'Wilo N-Lift 4-15 (откачивающая установка)',   qty: 1, price: 187500, deliveryDays: 21 },
+            { kpName: 'W-Lift 750/2 (комплект, в сборе)',            qty: 1, price: 94800,  deliveryDays: 14 },
+            // Жироуловители
+            { kpName: 'Жироуловитель «Пятый Элемент» ОЖ-30',        qty: 1, price: 42000,  deliveryDays: 14 },
+            // Трапы
+            { kpName: 'Трап HL310NPr (решётка 115x115, арт. 310)',   qty: 4, price: 3200,   deliveryDays: 3  },
+            { kpName: 'Трап HL510NPr (DN50/75, прямой выпуск)',      qty: 2, price: 4100,   deliveryDays: 3  },
+            // Клапаны
+            { kpName: 'Воздушный клапан HL900NECO DN110',            qty: 2, price: 1850,   deliveryDays: 3  },
+            // Воронки
+            { kpName: 'Воронка кровельная HL62.1/1 (вертик.)',       qty: 4, price: 4600,   deliveryDays: 5  },
+            { kpName: 'Воронка кровельная HL64H/1 (горизонт.)',      qty: 2, price: 5200,   deliveryDays: 5  }
+        ];
+    }
+
+    // ── Агрегация: группировка строк КП по категориям ──────────────────
+    function processEquipmentImport(parsedItems) {
+        // 1. Каждой строке назначить группу через семантический поиск
+        var tagged = parsedItems.map(function (item) {
+            var matches = matchEquipmentByKeywords(item.kpName);
+            return {
+                raw: item,
+                matches: matches,
+                bestGroup: matches.length > 0 ? matches[0].group : null,
+                keyword: matches.length > 0 ? matches[0].keyword : ''
+            };
+        });
+
+        // 2. Группируем по bestGroup.id, суммируем кол-во и сумму
+        var grouped = {};
+        var ungrouped = [];
+
+        tagged.forEach(function (t) {
+            if (!t.bestGroup) {
+                ungrouped.push(t);
+                return;
+            }
+            var gid = t.bestGroup.id;
+            if (!grouped[gid]) {
+                grouped[gid] = {
+                    group: t.bestGroup,
+                    lines: [],         // исходные строки
+                    totalQty: 0,
+                    totalSum: 0,
+                    maxDelivery: 0,
+                    allMatches: t.matches  // для ambiguity detection
+                };
+            }
+            grouped[gid].lines.push(t.raw);
+            grouped[gid].totalQty += t.raw.qty;
+            grouped[gid].totalSum += t.raw.price * t.raw.qty;
+            if (t.raw.deliveryDays > grouped[gid].maxDelivery) grouped[gid].maxDelivery = t.raw.deliveryDays;
+        });
+
+        // 3. Строим equipmentOffers
+        equipmentOffers = [];
+        var idx = 0;
+
+        Object.keys(grouped).forEach(function (gid) {
+            var g = grouped[gid];
+            var calcTargets = findCalcTargets(g.group);
+            var calcQty = 0;
+            calcTargets.forEach(function (t) { calcQty += t.qty; });
+            var isAmbiguous = calcTargets.length > 1;
+            var selectedTarget = calcTargets.length > 0 ? calcTargets[0].name : '— нет в проекте —';
+            var masterPrice = calcTargets.length > 0 ? getEquipmentMasterPrice(selectedTarget) : 0;
+
+            // Средневзвешенная цена за единицу
+            var avgPrice = g.totalQty > 0 ? Math.round(g.totalSum / g.totalQty) : 0;
 
             equipmentOffers.push({
-                id: 'eq_' + idx,
-                kpName: item.kpName,
-                mappedName: targetName,
-                article: item.article || (mapping ? mapping.article : ''),
-                kpQty: item.qty,
+                id: 'eq_' + idx++,
+                groupId: gid,
+                groupLabel: g.group.label,
+                lines: g.lines,
+                mappedName: selectedTarget,
+                calcTargets: calcTargets,
+                isAmbiguous: isAmbiguous,
+                kpQty: g.totalQty,
                 calcQty: calcQty,
-                kpPrice: item.price,
+                kpSum: g.totalSum,
+                kpAvgPrice: avgPrice,
                 masterPrice: masterPrice,
-                deliveryDays: item.deliveryDays || 0,
-                matched: !!mapping
+                maxDelivery: g.maxDelivery,
+                matched: calcTargets.length > 0,
+                confirmed: !isAmbiguous  // однозначные сразу подтверждены
+            });
+        });
+
+        // Непривязанные строки
+        ungrouped.forEach(function (t) {
+            equipmentOffers.push({
+                id: 'eq_' + idx++,
+                groupId: null,
+                groupLabel: '— Не определено —',
+                lines: [t.raw],
+                mappedName: '— нет привязки —',
+                calcTargets: [],
+                isAmbiguous: false,
+                kpQty: t.raw.qty,
+                calcQty: 0,
+                kpSum: t.raw.price * t.raw.qty,
+                kpAvgPrice: t.raw.price,
+                masterPrice: 0,
+                maxDelivery: t.raw.deliveryDays || 0,
+                matched: false,
+                confirmed: false
             });
         });
 
@@ -4483,7 +4659,7 @@
         saveEquipmentToSupabase();
     }
 
-    // Отрисовка таблицы сопоставления
+    // ── Отрисовка таблицы сопоставления ────────────────────────────────
     function renderEquipmentTable() {
         var body = document.getElementById('eqMatchBody');
         var content = document.getElementById('eqMatchContent');
@@ -4494,36 +4670,91 @@
         var totalKP = 0, totalMaster = 0;
 
         equipmentOffers.forEach(function (eq) {
-            var qtyMatch = eq.matched && eq.kpQty === eq.calcQty;
-            var rowClass = qtyMatch ? 'eq-match-ok' : (eq.matched ? 'eq-match-diff' : '');
-            var diff = eq.kpPrice - (eq.masterPrice || eq.kpPrice);
-            var diffHtml = '';
-            if (eq.masterPrice > 0) {
-                var pct = ((diff / eq.masterPrice) * 100).toFixed(0);
-                diffHtml = diff > 0
-                    ? '<span class="eq-diff-positive">+' + formatEstimateMoney(diff) + ' (' + pct + '%)</span>'
-                    : diff < 0
-                        ? '<span class="eq-diff-negative">' + formatEstimateMoney(diff) + ' (' + pct + '%)</span>'
-                        : '—';
+            // Определяем класс строки
+            var rowClass = '';
+            if (!eq.matched) rowClass = 'eq-match-none';
+            else if (eq.isAmbiguous && !eq.confirmed) rowClass = 'eq-match-ambiguous';
+            else if (eq.kpQty === eq.calcQty) rowClass = 'eq-match-ok';
+            else rowClass = 'eq-match-diff';
+
+            // Исходные строки КП (свёрнутый список)
+            var linesHtml = '';
+            if (eq.lines.length > 1) {
+                linesHtml = '<div class="eq-kp-lines">';
+                eq.lines.forEach(function (l) {
+                    linesHtml += escHtml(l.kpName) + ' (' + l.qty + ' шт × ' + formatEstimateMoney(l.price) + ')<br>';
+                });
+                linesHtml += '</div>';
             }
 
+            // Привязка: dropdown если ambiguous, текст если однозначно
+            var targetHtml = '';
+            if (eq.isAmbiguous && eq.calcTargets.length > 1) {
+                targetHtml = '<select class="eq-target-select" data-eq-id="' + eq.id + '">';
+                eq.calcTargets.forEach(function (ct) {
+                    var sel = ct.name === eq.mappedName ? ' selected' : '';
+                    targetHtml += '<option value="' + escHtml(ct.name) + '"' + sel + '>' + escHtml(ct.name) + ' (' + ct.qty + ' шт)</option>';
+                });
+                targetHtml += '</select>';
+            } else {
+                targetHtml = escHtml(eq.mappedName);
+            }
+
+            // Разница цен
+            var diffHtml = '—';
+            if (eq.masterPrice > 0 && eq.kpAvgPrice > 0) {
+                var diff = eq.kpAvgPrice - eq.masterPrice;
+                var pct = ((diff / eq.masterPrice) * 100).toFixed(0);
+                if (diff > 0) diffHtml = '<span class="eq-diff-positive">+' + pct + '%</span>';
+                else if (diff < 0) diffHtml = '<span class="eq-diff-negative">' + pct + '%</span>';
+                else diffHtml = '0%';
+            }
+
+            // Статус-иконка
+            var statusHtml = '';
+            if (!eq.matched) statusHtml = '<span class="eq-status-icon" title="Не найдено в проекте">&#10060;</span>';
+            else if (eq.isAmbiguous && !eq.confirmed) statusHtml = '<span class="eq-status-icon" title="Выберите привязку">&#9888;&#65039;</span>';
+            else if (eq.kpQty === eq.calcQty) statusHtml = '<span class="eq-status-icon" title="Совпадение">&#9989;</span>';
+            else statusHtml = '<span class="eq-status-icon" title="Количество отличается">&#9888;&#65039;</span>';
+
             html += '<tr class="' + rowClass + '">' +
-                '<td>' + escHtml(eq.kpName) + '</td>' +
-                '<td>' + escHtml(eq.mappedName) + '</td>' +
-                '<td>' + escHtml(eq.article) + '</td>' +
+                '<td><span class="eq-group-badge">' + escHtml(eq.groupLabel) + '</span></td>' +
+                '<td>' + (eq.lines.length === 1 ? escHtml(eq.lines[0].kpName) : escHtml(eq.groupLabel) + ' (' + eq.lines.length + ' поз.)') + linesHtml + '</td>' +
+                '<td>' + targetHtml + '</td>' +
                 '<td style="text-align:center;">' + eq.kpQty + '</td>' +
                 '<td style="text-align:center;">' + (eq.matched ? eq.calcQty : '—') + '</td>' +
-                '<td style="text-align:right;">' + formatEstimateMoney(eq.kpPrice) + '</td>' +
-                '<td style="text-align:right;">' + (eq.masterPrice > 0 ? formatEstimateMoney(eq.masterPrice) : '—') + '</td>' +
+                '<td style="text-align:right;">' + formatEstimateMoney(eq.kpSum) + '</td>' +
+                '<td style="text-align:right;">' + (eq.masterPrice > 0 ? formatEstimateMoney(eq.masterPrice * eq.kpQty) : '—') + '</td>' +
                 '<td style="text-align:center;">' + diffHtml + '</td>' +
-                '<td style="text-align:center;">' + (eq.deliveryDays > 0 ? eq.deliveryDays + ' дн.' : '—') + '</td>' +
+                '<td style="text-align:center;">' + (eq.maxDelivery > 0 ? eq.maxDelivery + ' дн.' : '—') + '</td>' +
+                '<td style="text-align:center;">' + statusHtml + '</td>' +
                 '</tr>';
 
-            totalKP += eq.kpPrice * eq.kpQty;
+            totalKP += eq.kpSum;
             if (eq.masterPrice > 0) totalMaster += eq.masterPrice * eq.kpQty;
         });
 
         body.innerHTML = html;
+
+        // Обработчики dropdown для ручного подтверждения привязки
+        body.querySelectorAll('.eq-target-select').forEach(function (sel) {
+            sel.addEventListener('change', function () {
+                var eqId = this.dataset.eqId;
+                var newTarget = this.value;
+                equipmentOffers.forEach(function (eq) {
+                    if (eq.id === eqId) {
+                        eq.mappedName = newTarget;
+                        eq.masterPrice = getEquipmentMasterPrice(newTarget);
+                        eq.confirmed = true;
+                        // Пересчитать calcQty для выбранного target
+                        eq.calcTargets.forEach(function (ct) {
+                            if (ct.name === newTarget) eq.calcQty = ct.qty;
+                        });
+                    }
+                });
+                renderEquipmentTable();
+            });
+        });
 
         // Итоговая сводка
         var summaryEl = document.getElementById('eqSummary');
@@ -4531,6 +4762,10 @@
             var diffTotal = totalKP - totalMaster;
             var diffClass = diffTotal > 0 ? 'overspend' : diffTotal < 0 ? 'saving' : '';
             var diffLabel = diffTotal > 0 ? 'Перерасход' : diffTotal < 0 ? 'Экономия' : 'Совпадение';
+            var confirmedCount = 0;
+            equipmentOffers.forEach(function (eq) { if (eq.matched && eq.confirmed) confirmedCount++; });
+            var totalCount = equipmentOffers.length;
+
             summaryEl.innerHTML =
                 '<div class="eq-summary-item">' +
                     '<span class="eq-summary-label">Итого по КП</span>' +
@@ -4543,49 +4778,55 @@
                 (totalMaster > 0 ? '<div class="eq-summary-item">' +
                     '<span class="eq-summary-label">' + diffLabel + '</span>' +
                     '<span class="eq-summary-value ' + diffClass + '">' + formatEstimateMoney(Math.abs(diffTotal)) + '</span>' +
-                '</div>' : '');
+                '</div>' : '') +
+                '<div class="eq-summary-item">' +
+                    '<span class="eq-summary-label">Подтверждено</span>' +
+                    '<span class="eq-summary-value">' + confirmedCount + ' / ' + totalCount + '</span>' +
+                '</div>';
         }
     }
 
-    // Применить цены из КП в estimatePrices
+    // ── Применить цены из КП (только подтверждённые) ──────────────────
     function applyEquipmentPrices() {
         if (!equipmentOffers.length) return;
+        var applied = 0;
 
         equipmentOffers.forEach(function (eq) {
-            if (!eq.matched || !eq.kpPrice) return;
+            if (!eq.matched || !eq.confirmed || !eq.kpAvgPrice) return;
 
-            // Сохраняем в masterPrices для будущих проектов
+            // Сохраняем средневзвешенную цену в masterPrices
             var mp = loadMasterPrices('materials');
-            mp[eq.mappedName] = String(eq.kpPrice);
+            mp[eq.mappedName] = String(eq.kpAvgPrice);
             saveMasterPrices('materials', mp);
 
-            // Обновляем estimatePrices для текущего проекта (все priceKeys с этим именем)
+            // Обновляем estimatePrices для текущего проекта
             var el = document.getElementById('estimateContent');
             if (el) {
                 el.querySelectorAll('.estimate-price-input').forEach(function (inp) {
                     var key = inp.dataset.priceKey || '';
                     if (key.indexOf('m:' + eq.mappedName) !== -1) {
-                        estimatePrices[key] = String(eq.kpPrice);
+                        estimatePrices[key] = String(eq.kpAvgPrice);
                     }
                 });
             }
+            applied++;
         });
+
+        if (applied === 0) {
+            showSaveToast('Нет подтверждённых позиций для применения', true);
+            return;
+        }
 
         renderEstimate();
         sendEstimateTotals();
         saveCalculationToSupabase();
-        showSaveToast('Цены из КП применены');
+        showSaveToast('Применено: ' + applied + ' поз.');
     }
 
-    // Сохранение matchedEquipment в Supabase
+    // ── Сохранение оборудования в Supabase ────────────────────────────
     function saveEquipmentToSupabase() {
         if (!portalProjectId) return;
-        var offerData = equipmentOffers.map(function (eq) {
-            return { id: eq.id, name: eq.mappedName, kpPrice: eq.kpPrice, article: eq.article, kpQty: eq.kpQty, deliveryDays: eq.deliveryDays };
-        });
-        // Сохраняем через общий collectSewageState (оборудование добавим в payload)
         var payload = collectSewageState();
-        payload.equipment_offers = offerData;
         fetch('/api/calculations/' + portalProjectId + '/sewage', {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
@@ -4627,8 +4868,7 @@
 
         if (demoBtn) {
             demoBtn.addEventListener('click', function () {
-                var parsed = getDemoEquipmentData();
-                processEquipmentImport(parsed);
+                processEquipmentImport(getDemoEquipmentData());
             });
         }
 
