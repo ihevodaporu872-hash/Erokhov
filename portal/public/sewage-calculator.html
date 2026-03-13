@@ -4499,25 +4499,114 @@
         return cleanPdfPrice(s);
     }
 
-    // Извлечь все «ценоподобные» числа из строки: числа с разделителями тысяч и десятичной частью
-    // Возвращает массив чисел, отсортированных по убыванию
+    // Извлечь все «ценоподобные» числа из строки (с десятичной частью ,XX / .XX)
+    // Поддерживает: "38 368,20", "495 113,38", "1 019 833,22", "187 500,00"
+    // Возвращает массив { val, pos } отсортированный по позиции в строке (слева направо)
     function extractPriceCandidates(text) {
-        // Паттерн: число с пробелами-разделителями тысяч и запятой/точкой для дробной части
-        // Примеры: "38 368,20", "495 113,38", "1 019 833,22", "187 500,00"
-        var priceRe = /(?:^|\s)((?:\d{1,3}[\s\u00a0])*\d{1,3}[.,]\d{2})(?:\s|$)/g;
+        // Паттерн: число с возможными пробелами-разделителями тысяч + запятая/точка + 2 цифры
+        var priceRe = /((?:\d{1,3}[\s\u00a0])*\d{1,3}[.,]\d{2})/g;
         var candidates = [];
         var m;
         while ((m = priceRe.exec(text)) !== null) {
             var val = cleanPdfPrice(m[1]);
-            if (val > 0) candidates.push(val);
+            if (val > 0) candidates.push({ val: val, pos: m.index });
         }
-        return candidates.sort(function (a, b) { return b - a; });
+        return candidates;
     }
 
-    // Построчно сканирует текст и ищет паттерны:
+    // ── Якорный поиск количества ─────────────────────────────────────
+    // Строгая привязка: число ПЛОТНО перед «шт» / «компл» / «комплект»
+    // Паттерн: (\d+)\s*(?:шт|компл) — исключает цифры из артикулов (134, 517 и т.п.)
+    // Также поддерживает обратный порядок: «шт» / «компл» + число (для некоторых PDF-форматов)
+    function extractAnchoredQty(text) {
+        // Приоритет 1: число перед единицей: "6 шт", "1 компл"
+        var m1 = text.match(/(?:^|[\s\t])(\d{1,4})\s*(?:шт|компл(?:ект)?)\b/i);
+        if (m1) return parseInt(m1[1], 10);
+
+        // Приоритет 2: единица перед числом: "шт 6", "компл 1"
+        var m2 = text.match(/(?:шт|компл(?:ект)?)\s*[.\s]*(\d{1,4})(?:\s|$)/i);
+        if (m2) return parseInt(m2[1], 10);
+
+        return 0;
+    }
+
+    // ── Интеллектуальный поиск цены ─────────────────────────────────
+    // Стратегия: собираем все ценоподобные числа в правой части строки.
+    // Если два больших числа — меньшее = цена за единицу, большее = сумма.
+    // Если price < 100 для оборудования — это ошибка, ищем следующий кандидат.
+    function extractSmartPrice(text, qty) {
+        var candidates = extractPriceCandidates(text);
+        if (candidates.length === 0) return 0;
+
+        // Сортируем по убыванию значения
+        var byValue = candidates.map(function (c) { return c.val; }).sort(function (a, b) { return b - a; });
+
+        // Убираем дубликаты (цена = сумма при qty=1)
+        var unique = [];
+        byValue.forEach(function (v) {
+            if (unique.length === 0 || Math.abs(unique[unique.length - 1] - v) / Math.max(v, 1) > 0.001) {
+                unique.push(v);
+            }
+        });
+
+        var price = 0;
+
+        if (unique.length >= 2) {
+            // Два или более числа: наибольшее = сумма, следующее = цена за единицу
+            // Но проверяем: если второе × qty ≈ первое — подтверждаем
+            var sum = unique[0];
+            var candidate = unique[1];
+
+            // Проверяем совпадение: candidate * qty ≈ sum (допуск 2%)
+            if (qty > 0 && Math.abs(candidate * qty - sum) / sum < 0.02) {
+                price = candidate; // Подтверждено: candidate — цена за единицу
+            } else {
+                // Не совпадает — берём меньшее из двух как цену (большее — сумма)
+                price = candidate;
+            }
+        } else if (unique.length === 1) {
+            // Одно число: если qty=1, это и цена и сумма одновременно
+            price = unique[0];
+        }
+
+        // Валидация: если price < 100 — ошибка парсинга для оборудования
+        // Ищем следующее число >= 100, которое не является суммой
+        if (price < 100) {
+            for (var i = 0; i < unique.length; i++) {
+                if (unique[i] >= 100) {
+                    // Это сумма? (сумма ≈ какой-то кандидат × qty)
+                    var looksLikeSum = false;
+                    if (qty > 1) {
+                        for (var j = i + 1; j < unique.length; j++) {
+                            if (unique[j] >= 100 && Math.abs(unique[i] - unique[j] * qty) / unique[i] < 0.02) {
+                                looksLikeSum = true;
+                                break;
+                            }
+                        }
+                    }
+                    if (!looksLikeSum) {
+                        price = unique[i];
+                        break;
+                    }
+                }
+            }
+        }
+
+        // Последний шанс: если всё ещё < 100, берём любое >= 100
+        if (price < 100) {
+            for (var k = 0; k < unique.length; k++) {
+                if (unique[k] >= 100) { price = unique[k]; break; }
+            }
+        }
+
+        return price;
+    }
+
+    // ── Построчный парсер текста счёта ───────────────────────────────
+    // Логика:
     //   1. Номер позиции (1-3 цифры) в начале строки
-    //   2. Количество: число ПЛОТНО перед «шт» / «компл» / «комплект»
-    //   3. Цена: второе по величине «ценоподобное» число (первое = сумма, второе = цена за ед.)
+    //   2. Количество: якорный поиск — число ПЛОТНО перед «шт»/«компл»
+    //   3. Цена: интеллектуальный поиск — меньшее из двух больших чисел
     //   4. Наименование: текст между номером позиции и числовыми полями
     function parseTextToItems(text) {
         var lines = text.split(/\n/);
@@ -4530,17 +4619,17 @@
             var trimmed = line.trim();
             if (!trimmed) return;
 
-            // Проверяем, начинается ли строка с номера позиции (1-3 цифры + пробел + текст)
+            // Проверяем, начинается ли строка с номера позиции (1-3 цифры + пробелы + текст)
             var posMatch = trimmed.match(/^(\d{1,3})\s{2,}(.+)/);
             if (!posMatch) {
-                // Это может быть продолжение предыдущей позиции (многострочное наименование)
+                // Может быть продолжение предыдущей позиции (многострочное наименование)
                 if (currentItem && trimmed.length > 3) {
                     currentItem.rawText += ' ' + trimmed;
                 }
                 return;
             }
 
-            // Если был предыдущий item — финализируем его
+            // Финализируем предыдущий item
             if (currentItem) {
                 var parsed = finalizeItem(currentItem);
                 if (parsed) items.push(parsed);
@@ -4566,79 +4655,40 @@
     function finalizeItem(item) {
         var text = item.rawText;
 
-        // 1. Кол-во: ищем число ПЛОТНО перед «шт» / «компл» / «комплект»
-        //    Паттерн: число (1-5 цифр) + необязательные пробелы + единица измерения
-        //    Важно: НЕ захватываем артикулы типа "134" из "DF50-10.1.05.2.D"
-        var qtyMatch = text.match(/(?:^|\s)(\d{1,5})\s*(?:шт|компл(?:ект)?)\b/i);
-        var qty = qtyMatch ? parseInt(qtyMatch[1], 10) : 0;
+        // 1. Кол-во: якорный поиск — число ПЛОТНО перед «шт» / «компл»
+        var qty = extractAnchoredQty(text);
+        if (qty <= 0) return null;
 
-        // 2. Все ценоподобные числа (с десятичной частью ,XX)
-        var prices = extractPriceCandidates(text);
-
-        // Цена за единицу: если есть ≥2 ценоподобных чисел, берём ВТОРОЕ по величине
-        // (первое = сумма строки, второе = цена за единицу)
-        // Если только одно — берём его как цену
-        var price = 0;
-        if (prices.length >= 2) {
-            price = prices[1]; // второе по величине = цена за единицу
-        } else if (prices.length === 1) {
-            price = prices[0];
-        }
-
-        // 3. Валидация: qty и price должны быть разумными
-        if (qty <= 0 || price <= 0) return null;
-
-        // Валидация: если price < 100 — скорее всего ошибка парсинга для оборудования
-        // (насосы/установки не стоят < 100 руб.)
-        // Пробуем взять другое число из кандидатов
-        if (price < 100 && prices.length > 0) {
-            // Берём наибольшее число, которое не является суммой (сумма = цена × кол-во)
-            for (var i = 0; i < prices.length; i++) {
-                if (prices[i] >= 100) {
-                    // Проверяем: это не сумма? (сумма ≈ цена × qty)
-                    var isSum = false;
-                    for (var j = i + 1; j < prices.length; j++) {
-                        if (Math.abs(prices[i] - prices[j] * qty) / prices[i] < 0.01) {
-                            isSum = true; break;
-                        }
-                    }
-                    if (!isSum) { price = prices[i]; break; }
-                }
-            }
-        }
-
-        // Если после всех попыток price всё ещё < 100, но есть кандидаты >= 100 — берём первый >= 100
-        if (price < 100) {
-            for (var k = 0; k < prices.length; k++) {
-                if (prices[k] >= 100) { price = prices[k]; break; }
-            }
-        }
-
+        // 2. Цена: интеллектуальный поиск
+        var price = extractSmartPrice(text, qty);
         if (price <= 0) return null;
 
-        // 4. Наименование: убираем числовую «хвост» (цены, кол-во, ед.изм.)
-        //    Берём текст до первого вхождения единицы измерения или до кластера цен
+        // 3. Наименование: текст до единицы измерения или до кластера цен
         var name = text;
-        // Обрезаем от единицы измерения и далее
-        var unitPos = text.search(/\s+(?:шт|компл(?:ект)?)\s/i);
-        if (unitPos > 5) {
-            name = text.substring(0, unitPos).trim();
+
+        // Обрезаем от позиции «кол-во + ед.изм.» и далее
+        // Ищем паттерн: число + шт/компл или шт/компл + число
+        var unitCutPos = text.search(/(?:^|\s)\d{1,4}\s*(?:шт|компл)/i);
+        if (unitCutPos < 0) unitCutPos = text.search(/(?:шт|компл)\s*\d{1,4}/i);
+        if (unitCutPos > 5) {
+            name = text.substring(0, unitCutPos).trim();
         } else {
             // Если не нашли единицу — обрезаем от первого ценоподобного числа
-            var pricePos = text.search(/\s\d{1,3}[\s\u00a0]\d{3}[.,]/);
-            if (pricePos < 0) pricePos = text.search(/\s\d{3,}[.,]\d{2}/);
+            var pricePos = text.search(/(?:\d{1,3}[\s\u00a0]\d{3}[.,]|\d{3,}[.,]\d{2})/);
             if (pricePos > 5) {
                 name = text.substring(0, pricePos).trim();
             }
         }
 
-        // Убираем концевые цифры/артикулы из наименования
+        // Убираем концевые голые цифры (артикулы, остатки номеров)
         name = name.replace(/\s+\d+\s*$/, '').trim();
         if (name.length < 3) return null;
 
-        // 5. Принудительное приведение типов
+        // 4. Принудительное приведение типов
         qty = parseInt(qty, 10);
         price = parseFloat(price);
+
+        console.log('[Parse] п.' + item.posNum + ': "' + name + '" | qty=' + qty + ' | price=' + price);
 
         return { kpName: name, qty: qty, price: price };
     }
@@ -4894,6 +4944,17 @@
             grouped[grp.id].totalSum += parseFloat(item.price) * parseInt(item.qty, 10);
         });
 
+        // Валидация NSPG: сумма qty по позициям с NSPG должна быть 13 (для счёта 1503)
+        if (grouped['drain_pumps']) {
+            var nspgGroup = grouped['drain_pumps'];
+            var nspgDetail = nspgGroup.lines.map(function (l) { return l.qty; }).join(' + ');
+            console.log('[Equipment] NSPG агрегация: ' + nspgDetail + ' = ' + nspgGroup.totalQty);
+            if (nspgGroup.totalQty !== 13) {
+                console.warn('[Equipment] ВНИМАНИЕ: NSPG итого = ' + nspgGroup.totalQty + ', ожидалось 13. Проверьте парсинг qty!');
+                eqLog('⚠ NSPG: суммарное кол-во = ' + nspgGroup.totalQty + ' (ожидалось 13). Детали: ' + nspgDetail);
+            }
+        }
+
         equipmentOffers = [];
         var idx = 0;
 
@@ -4903,6 +4964,7 @@
             var avgPrice = g.totalQty > 0 ? Math.round(g.totalSum / g.totalQty) : 0;
 
             console.log('[Equipment] Суммировано ' + g.grp.label + ': ' + g.totalQty + ' шт, ср. цена ' + avgPrice);
+            eqLog('Группа «' + g.grp.label + '»: ' + g.totalQty + ' шт, ср. цена ' + formatEstimateMoney(avgPrice));
 
             equipmentOffers.push({
                 id: 'eq_' + idx++,
