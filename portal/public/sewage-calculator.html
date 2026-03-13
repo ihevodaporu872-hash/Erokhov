@@ -921,6 +921,7 @@
                                 <div class="estimate-price-buttons">
                                     <button id="btnEditWorkPrices" class="btn-secondary">Редактировать стоимость работ</button>
                                     <button id="btnEditMaterialPrices" class="btn-secondary">Редактировать стоимость материалов</button>
+                                    <button id="btnExportEstimateExcel" class="btn-export-excel"><i class="bi bi-file-earmark-excel-fill"></i>Экспорт сметы в Excel</button>
                                 </div>
                             </div>
                             <div id="estimateContent">
@@ -3288,6 +3289,181 @@
 
     document.getElementById('btnEditWorkPrices').addEventListener('click', function () { openPriceModal('works'); });
     document.getElementById('btnEditMaterialPrices').addEventListener('click', function () { openPriceModal('materials'); });
+    document.getElementById('btnExportEstimateExcel').addEventListener('click', exportEstimateToExcel);
+
+    /* ─── Экспорт сметы в Excel (SheetJS) ─────────────────────────────────── */
+    function exportEstimateToExcel() {
+        if (!buildingStats || !buildingStats.length) {
+            alert('Нет данных. Выполните расчёт для формирования сметы.');
+            return;
+        }
+
+        var matLabels = { pp: 'ПП', pp_silent: 'ПП Бесшумный', pvc: 'НПВХ', sml: 'SML' };
+        var wb = XLSX.utils.book_new();
+
+        // Массив строк для листа: каждая строка — массив ячеек
+        var rows = [];
+        var grandTotalWork = 0, grandTotalMaterial = 0;
+
+        // ── Заголовок документа ──
+        rows.push(['Смета по системам водоотведения']);
+        rows.push([]);
+
+        // ── Шапка таблицы ──
+        var header = ['Тип', 'Наименование', 'Ед. изм.', 'Количество', 'Цена за ед. (руб.)', 'Итого (руб.)'];
+        rows.push(header);
+
+        // ── Сбор данных по корпусам ──
+        buildingStats.forEach(function (b, idx) {
+            var bName = b.name || ('Корпус ' + (b.num || idx + 1));
+            var s = getSettings(idx);
+
+            // Разделитель: название корпуса
+            rows.push([]);
+            rows.push([bName]);
+
+            // К1 — Бытовая канализация
+            var k1Items = collectFittingsForBuilding(idx);
+            var totalLen = calcTotalLengthM(b, activeScenario, idx);
+            if (totalLen > 0) {
+                var mat = matLabels[s.pipeType] || s.pipeType;
+                k1Items.unshift({
+                    name: 'Трубопровод ' + mat + ' DN' + s.riserDiameter + ' мм (стояки)',
+                    unit: 'м.п.', qty: Math.round(totalLen * 10) / 10, type: 'материал'
+                });
+            }
+            var k1Totals = addSectionToRows(rows, 'К1 — Бытовая канализация', k1Items, idx + ':k1');
+            grandTotalWork += k1Totals.work;
+            grandTotalMaterial += k1Totals.material;
+
+            // К2 — Дождевая канализация
+            var k2Items = collectStormFittingsForBuilding(idx);
+            var k2Len = calcStormPipeLength(b, idx);
+            if (k2Len > 0) {
+                k2Items.unshift({
+                    name: 'Трубопровод SML DN50 (фасадный стояк)',
+                    unit: 'м.п.', qty: Math.round(k2Len * 10) / 10, type: 'материал'
+                });
+            }
+            if (k2Items.length > 0) {
+                var k2Totals = addSectionToRows(rows, 'К2 — Дождевая канализация', k2Items, idx + ':k2');
+                grandTotalWork += k2Totals.work;
+                grandTotalMaterial += k2Totals.material;
+            }
+
+            // К3 — Производственная канализация
+            var k3Items = collectK3FittingsForBuilding(idx);
+            if (k3Items.length > 0) {
+                var k3Totals = addSectionToRows(rows, 'К3 — Производственная канализация', k3Items, idx + ':k3');
+                grandTotalWork += k3Totals.work;
+                grandTotalMaterial += k3Totals.material;
+            }
+
+            // Отделка квартир
+            var finItems = collectFinishingForBuilding(idx);
+            if (finItems.length > 0) {
+                var finTotals = addSectionToRows(rows, 'Отделка квартир', finItems, idx + ':finish');
+                grandTotalWork += finTotals.work;
+                grandTotalMaterial += finTotals.material;
+            }
+        });
+
+        // ── Оборудование (из импорта счёта) ──
+        var confirmedEquipment = equipmentOffers.filter(function (e) { return e.confirmed; });
+        var eqTotal = 0;
+        if (confirmedEquipment.length > 0) {
+            rows.push([]);
+            rows.push(['Оборудование (из счёта поставщика)']);
+            confirmedEquipment.forEach(function (eq) {
+                var rowTotal = (eq.kpAvgPrice || 0) * (eq.kpQty || 0);
+                eqTotal += rowTotal;
+                rows.push([
+                    'материал',
+                    eq.groupLabel || eq.mappedName || '—',
+                    'шт',
+                    eq.kpQty || 0,
+                    eq.kpAvgPrice || 0,
+                    rowTotal
+                ]);
+            });
+            rows.push(['', '', '', '', 'Итого оборудование:', eqTotal]);
+        }
+
+        // ── Итоги ──
+        rows.push([]);
+        var grandTotal = grandTotalWork + grandTotalMaterial + eqTotal;
+        rows.push(['', '', '', '', 'Работы:', grandTotalWork]);
+        rows.push(['', '', '', '', 'Материалы:', grandTotalMaterial]);
+        if (eqTotal > 0) {
+            rows.push(['', '', '', '', 'Оборудование:', eqTotal]);
+        }
+        rows.push(['', '', '', '', 'ИТОГО:', grandTotal]);
+        var nds = Math.round(grandTotal * 0.2 * 100) / 100;
+        rows.push(['', '', '', '', 'НДС (20%):', nds]);
+        rows.push(['', '', '', '', 'ИТОГО с НДС:', grandTotal + nds]);
+
+        // ── Создаём лист ──
+        var ws = XLSX.utils.aoa_to_sheet(rows);
+
+        // ── Ширины колонок ──
+        ws['!cols'] = [
+            { wch: 12 },  // Тип
+            { wch: 40 },  // Наименование
+            { wch: 10 },  // Ед. изм.
+            { wch: 12 },  // Количество
+            { wch: 18 },  // Цена за ед.
+            { wch: 18 }   // Итого
+        ];
+
+        XLSX.utils.book_append_sheet(wb, ws, 'Смета ВК');
+
+        // ── Имя файла ──
+        var today = new Date();
+        var dateStr = today.getFullYear() + '-' +
+            String(today.getMonth() + 1).padStart(2, '0') + '-' +
+            String(today.getDate()).padStart(2, '0');
+        var projName = (buildingStats[0] && buildingStats[0].name) ? buildingStats[0].name : 'Объект';
+        projName = projName.replace(/[\/\\?*:\[\]]/g, '_');
+        var fileName = 'Смета_ВК_' + projName + '_' + dateStr + '.xlsx';
+
+        XLSX.writeFile(wb, fileName);
+    }
+
+    // Вспомогательная: добавляет раздел сметы в массив rows и возвращает итоги
+    function addSectionToRows(rows, sectionTitle, items, systemKey) {
+        var expanded = expandItemsWithWork(items);
+        if (!expanded || !expanded.length) return { work: 0, material: 0 };
+
+        rows.push(['  ' + sectionTitle]);
+
+        var totalWork = 0, totalMaterial = 0;
+
+        expanded.forEach(function (item) {
+            var isWork = item.type === 'работа';
+            var priceKey = systemKey + ':' + (isWork ? 'w:' : 'm:') + item.name;
+            var price = resolvePrice(priceKey, item.name, item.type, item.defaultPrice);
+            var qty = typeof item.qty === 'number' ? (Math.round(item.qty * 10) / 10) : (parseFloat(item.qty) || 0);
+            var rowTotal = price * qty;
+
+            if (isWork) totalWork += rowTotal;
+            else totalMaterial += rowTotal;
+
+            rows.push([
+                isWork ? 'работа' : 'материал',
+                item.name,
+                item.unit || '',
+                qty,
+                price,
+                rowTotal
+            ]);
+        });
+
+        rows.push(['', '', '', '', 'Работы:', totalWork]);
+        rows.push(['', '', '', '', 'Материалы:', totalMaterial]);
+        rows.push(['', '', '', '', 'Итого раздел:', totalWork + totalMaterial]);
+
+        return { work: totalWork, material: totalMaterial };
+    }
 
     /* ─── Экспорт в CSV (UTF-8 BOM для Excel) ────────────────────────────── */
     function exportToExcel() {
