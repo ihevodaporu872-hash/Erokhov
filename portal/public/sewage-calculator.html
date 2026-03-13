@@ -9,6 +9,10 @@
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
     <link rel="stylesheet" href="css/water-styles.css">
+    <!-- PDF.js для парсинга PDF в браузере -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <!-- SheetJS (xlsx) для чтения Excel -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
         /* ── Адаптация для встраивания в портал ──────────────────────────── */
         body           { margin: 0; padding: 0; background: transparent; }
@@ -822,11 +826,12 @@
                             <div class="eq-upload-zone" id="eqUploadZone">
                                 <div class="eq-upload-inner">
                                     <i class="bi bi-cloud-arrow-up" style="font-size:36px;color:var(--accent-blue);"></i>
-                                    <p style="margin:8px 0 4px;font-weight:600;">Перетащите файл сюда или нажмите</p>
-                                    <p class="note" style="margin:0;">JSON-файл со структурой [{kpName, qty, price}]</p>
+                                    <p style="margin:8px 0 4px;font-weight:600;">Перетащите счёт в формате PDF или Excel</p>
+                                    <p class="note" style="margin:0;">Поддерживаются PDF, XLS, XLSX и JSON</p>
                                 </div>
-                                <input type="file" id="eqFileInput" accept=".json" style="display:none;">
+                                <input type="file" id="eqFileInput" accept=".pdf,.xls,.xlsx,.json" style="display:none;">
                             </div>
+                            <div id="eqParseLog" style="display:none;margin:8px 0;padding:10px 14px;background:var(--gray-50);border-radius:8px;font-size:12px;font-family:monospace;color:var(--gray-600);max-height:120px;overflow-y:auto;white-space:pre-wrap;"></div>
 
                             <!-- Таблица (скрыта, пока нет данных) -->
                             <div id="eqMatchContent" style="display:none;">
@@ -4465,29 +4470,299 @@
         return mp[name] ? (parseFloat(mp[name]) || 0) : 0;
     }
 
-    // ── Чтение файла (Drag & Drop / Click) ────────────────────────────
+    // ── Лог парсинга (отображается под зоной загрузки) ──────────────
+    function eqLog(msg) {
+        console.log('[Equipment] ' + msg);
+        var logEl = document.getElementById('eqParseLog');
+        if (logEl) {
+            logEl.style.display = '';
+            logEl.textContent += msg + '\n';
+            logEl.scrollTop = logEl.scrollHeight;
+        }
+    }
+
+    function eqLogClear() {
+        var logEl = document.getElementById('eqParseLog');
+        if (logEl) { logEl.textContent = ''; logEl.style.display = 'none'; }
+    }
+
+    // ── Универсальный парсер текста счёта → [{kpName, qty, price}] ────
+    // Построчно сканирует текст и ищет паттерны:
+    //   Количество: цифра рядом со "шт", "компл", "комплект" или столбец qty
+    //   Цена: крупное число (>100) с разделителями тысяч и десятичными
+    //   Наименование: текст между номером позиции и числовыми полями
+    function parseTextToItems(text) {
+        var lines = text.split(/\n/);
+        var items = [];
+
+        // Паттерн строки табличного счёта:
+        // [номер позиции]  [наименование]  [ед.]  [кол-во]  [цена]  [сумма]
+        // Примеры:
+        //   7  Насос NSPG DF50-10.1.05.2.D  шт  6  38 368,20  230 209,20
+        //   11 Откачивающая установка Wilo N-Lift ...  компл  1  187 500,00  187 500,00
+
+        // Паттерн: начало строки — номер (1-3 цифры), затем текст, затем числа
+        var rowPattern = /^\s*(\d{1,3})\s+(.+?)\s+(шт|компл|комплект|м\.п\.|м|кг)\s+(\d+)\s+([\d\s]+[.,]\d{2})\s+([\d\s]+[.,]\d{2})/i;
+
+        // Альтернативный паттерн: без единицы измерения, просто число+цена+сумма
+        var rowAlt = /^\s*(\d{1,3})\s+(.+?)\s+(\d+)\s+([\d\s]+[.,]\d{2})\s+([\d\s]+[.,]\d{2})/;
+
+        lines.forEach(function (line) {
+            var m = line.match(rowPattern);
+            if (m) {
+                var name = m[2].trim();
+                var qty = parseInt(m[4], 10);
+                var price = parseRuPrice(m[5]);
+                if (name && qty > 0 && price > 0) {
+                    items.push({ kpName: name, qty: qty, price: price });
+                }
+                return;
+            }
+
+            // Альтернативный паттерн
+            m = line.match(rowAlt);
+            if (m) {
+                var name2 = m[2].trim();
+                var qty2 = parseInt(m[3], 10);
+                var price2 = parseRuPrice(m[4]);
+                if (name2 && qty2 > 0 && price2 > 0 && price2 > 50) {
+                    items.push({ kpName: name2, qty: qty2, price: price2 });
+                }
+            }
+        });
+
+        return items;
+    }
+
+    // Парсинг русской цены: "38 368,20" → 38368.20
+    function parseRuPrice(s) {
+        if (!s) return 0;
+        var clean = s.replace(/\s/g, '').replace(',', '.');
+        return parseFloat(clean) || 0;
+    }
+
+    // ── PDF парсинг через pdf.js ──────────────────────────────────────
+    function readPdfFile(file) {
+        eqLog('Чтение PDF: ' + file.name);
+
+        var reader = new FileReader();
+        reader.onload = function (e) {
+            var typedArray = new Uint8Array(e.target.result);
+
+            // pdf.js workerSrc
+            if (typeof pdfjsLib !== 'undefined' && !pdfjsLib.GlobalWorkerOptions.workerSrc) {
+                pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+            }
+
+            pdfjsLib.getDocument(typedArray).promise.then(function (pdf) {
+                eqLog('PDF загружен, страниц: ' + pdf.numPages);
+                var allText = '';
+                var pagePromises = [];
+
+                for (var i = 1; i <= pdf.numPages; i++) {
+                    pagePromises.push(
+                        pdf.getPage(i).then(function (page) {
+                            return page.getTextContent().then(function (content) {
+                                // Собираем текст, группируя по Y-координате для сохранения строк
+                                var lineMap = {};
+                                content.items.forEach(function (item) {
+                                    var y = Math.round(item.transform[5]); // Y-координата
+                                    if (!lineMap[y]) lineMap[y] = [];
+                                    lineMap[y].push({ x: item.transform[4], str: item.str });
+                                });
+
+                                // Сортируем по Y (сверху вниз), внутри строки по X
+                                var yKeys = Object.keys(lineMap).map(Number).sort(function (a, b) { return b - a; });
+                                var pageText = '';
+                                yKeys.forEach(function (y) {
+                                    var parts = lineMap[y].sort(function (a, b) { return a.x - b.x; });
+                                    var lineStr = '';
+                                    var prevX = 0;
+                                    parts.forEach(function (p) {
+                                        // Вставляем пробел если большой разрыв между элементами
+                                        if (lineStr && p.x - prevX > 10) lineStr += '  ';
+                                        lineStr += p.str;
+                                        prevX = p.x + p.str.length * 5;
+                                    });
+                                    pageText += lineStr + '\n';
+                                });
+
+                                return pageText;
+                            });
+                        })
+                    );
+                }
+
+                Promise.all(pagePromises).then(function (pages) {
+                    allText = pages.join('\n');
+                    eqLog('Извлечено текста: ' + allText.length + ' символов');
+                    var items = parseTextToItems(allText);
+                    eqLog('Распознано позиций: ' + items.length);
+
+                    if (items.length === 0) {
+                        eqLog('Не удалось распознать позиции. Проверьте формат счёта.');
+                        showSaveToast('Позиции не найдены в PDF', true);
+                        return;
+                    }
+
+                    items.forEach(function (it) {
+                        eqLog('  → ' + it.kpName + ' | ' + it.qty + ' шт | ' + it.price + ' руб.');
+                    });
+
+                    processEquipmentImport(items);
+                });
+            }).catch(function (err) {
+                console.error('[Equipment] PDF error:', err);
+                eqLog('Ошибка чтения PDF: ' + err.message);
+                showSaveToast('Ошибка чтения PDF', true);
+            });
+        };
+        reader.readAsArrayBuffer(file);
+    }
+
+    // ── Excel парсинг через SheetJS (xlsx) ────────────────────────────
+    function readExcelFile(file) {
+        eqLog('Чтение Excel: ' + file.name);
+
+        var reader = new FileReader();
+        reader.onload = function (e) {
+            try {
+                var data = new Uint8Array(e.target.result);
+                var workbook = XLSX.read(data, { type: 'array' });
+                var sheetName = workbook.SheetNames[0];
+                eqLog('Лист: ' + sheetName);
+
+                var sheet = workbook.Sheets[sheetName];
+                // Конвертируем в массив строк (каждая строка — массив ячеек)
+                var rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+                eqLog('Строк в таблице: ' + rows.length);
+
+                var items = parseExcelRows(rows);
+                eqLog('Распознано позиций: ' + items.length);
+
+                if (items.length === 0) {
+                    // Пробуем как текст
+                    var text = XLSX.utils.sheet_to_csv(sheet, { FS: '  ' });
+                    items = parseTextToItems(text);
+                    eqLog('Fallback текстовый парсинг: ' + items.length + ' поз.');
+                }
+
+                if (items.length === 0) {
+                    eqLog('Не удалось распознать позиции.');
+                    showSaveToast('Позиции не найдены в Excel', true);
+                    return;
+                }
+
+                items.forEach(function (it) {
+                    eqLog('  → ' + it.kpName + ' | ' + it.qty + ' шт | ' + it.price + ' руб.');
+                });
+
+                processEquipmentImport(items);
+            } catch (err) {
+                console.error('[Equipment] Excel error:', err);
+                eqLog('Ошибка чтения Excel: ' + err.message);
+                showSaveToast('Ошибка чтения Excel', true);
+            }
+        };
+        reader.readAsArrayBuffer(file);
+    }
+
+    // Парсинг строк Excel-таблицы
+    // Ищем колонки: номер, наименование, ед.изм, кол-во, цена, сумма
+    function parseExcelRows(rows) {
+        var items = [];
+        // Ищем строку заголовка для определения колонок
+        var colName = -1, colQty = -1, colPrice = -1;
+
+        for (var h = 0; h < Math.min(rows.length, 15); h++) {
+            var hdr = rows[h].map(function (c) { return String(c).toLowerCase(); });
+            for (var c = 0; c < hdr.length; c++) {
+                if (/наименован|описание|товар|номенклатур/i.test(hdr[c])) colName = c;
+                if (/кол[-\s]?во|количество/i.test(hdr[c])) colQty = c;
+                if (/цена[^а-я]*руб|цена\b|стоимость/i.test(hdr[c]) && colPrice === -1) colPrice = c;
+            }
+            if (colName >= 0 && colQty >= 0 && colPrice >= 0) {
+                eqLog('Заголовки найдены в строке ' + (h + 1) + ': наименование=' + (colName + 1) + ', кол-во=' + (colQty + 1) + ', цена=' + (colPrice + 1));
+                // Парсим данные после заголовка
+                for (var r = h + 1; r < rows.length; r++) {
+                    var row = rows[r];
+                    var name = String(row[colName] || '').trim();
+                    var qty = parseFloat(String(row[colQty] || '0').replace(/\s/g, '').replace(',', '.')) || 0;
+                    var price = parseFloat(String(row[colPrice] || '0').replace(/\s/g, '').replace(',', '.')) || 0;
+                    if (name && name.length > 3 && qty > 0 && price > 0) {
+                        items.push({ kpName: name, qty: qty, price: price });
+                    }
+                }
+                break;
+            }
+        }
+
+        // Если заголовки не найдены — пробуем эвристику:
+        // [0]=номер, [1]=наименование, [2..]=числа
+        if (items.length === 0) {
+            rows.forEach(function (row) {
+                if (row.length < 4) return;
+                var num = parseFloat(row[0]);
+                if (!num || num < 1 || num > 200 || num !== Math.floor(num)) return;
+                var name = String(row[1] || '').trim();
+                if (name.length < 3) return;
+                // Ищем кол-во и цену среди числовых ячеек
+                var nums = [];
+                for (var i = 2; i < row.length; i++) {
+                    var v = parseFloat(String(row[i]).replace(/\s/g, '').replace(',', '.'));
+                    if (v > 0) nums.push(v);
+                }
+                if (nums.length >= 2) {
+                    // Обычно: ..., кол-во, цена, сумма — берём первое как qty, второе как price
+                    var qty = nums[0] < 1000 ? nums[0] : 1;
+                    var price = nums[0] < 1000 ? nums[1] : nums[0];
+                    items.push({ kpName: name, qty: qty, price: price });
+                }
+            });
+        }
+
+        return items;
+    }
+
+    // ── Главная функция чтения файла ──────────────────────────────────
     function readFileAndImport(file) {
         if (!file) return;
-        console.log('[Equipment] Файл прочитан:', file.name, '(' + file.size + ' байт)');
+        eqLogClear();
+        eqLog('Файл: ' + file.name + ' (' + Math.round(file.size / 1024) + ' КБ)');
+
         var ext = file.name.split('.').pop().toLowerCase();
 
-        if (ext === 'json') {
+        if (ext === 'pdf') {
+            if (typeof pdfjsLib === 'undefined') {
+                eqLog('Ошибка: pdf.js не загружен');
+                showSaveToast('Библиотека pdf.js не загружена', true);
+                return;
+            }
+            readPdfFile(file);
+        } else if (ext === 'xls' || ext === 'xlsx') {
+            if (typeof XLSX === 'undefined') {
+                eqLog('Ошибка: xlsx.js не загружен');
+                showSaveToast('Библиотека xlsx.js не загружена', true);
+                return;
+            }
+            readExcelFile(file);
+        } else if (ext === 'json') {
             var reader = new FileReader();
             reader.onload = function (e) {
                 try {
                     var data = JSON.parse(e.target.result);
                     var items = Array.isArray(data) ? data : (data.items || []);
+                    eqLog('JSON: ' + items.length + ' позиций');
                     if (!items.length) { showSaveToast('Файл пуст', true); return; }
-                    console.log('[Equipment] Найдено позиций:', items.length);
                     processEquipmentImport(items);
                 } catch (err) {
-                    console.error('[Equipment] Ошибка JSON:', err);
-                    showSaveToast('Ошибка чтения: ' + err.message, true);
+                    eqLog('Ошибка JSON: ' + err.message);
+                    showSaveToast('Ошибка чтения JSON', true);
                 }
             };
             reader.readAsText(file, 'UTF-8');
         } else {
-            showSaveToast('Поддерживается только JSON. Сконвертируйте счёт.', true);
+            showSaveToast('Формат не поддерживается: ' + ext, true);
         }
     }
 
