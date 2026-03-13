@@ -464,6 +464,46 @@
         /* Подсветка ячеек с изменённой ценой */
         .col-price.price-modified { background: rgba(250, 204, 21, 0.15); }
         .dark-theme .col-price.price-modified { background: rgba(250, 204, 21, 0.10); }
+
+        /* ── Оборудование: Зона загрузки ── */
+        .eq-upload-zone {
+            border: 2px dashed var(--gray-200);
+            border-radius: 12px;
+            padding: 32px 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: border-color .2s, background .2s;
+        }
+        .eq-upload-zone:hover,
+        .eq-upload-zone.dragover {
+            border-color: var(--accent-blue);
+            background: rgba(0,122,255,.04);
+        }
+        .eq-upload-inner { pointer-events: none; }
+
+        /* Строки таблицы сопоставления */
+        #eqMatchTable tbody tr.eq-match-ok { background: rgba(16,185,129,.10); }
+        #eqMatchTable tbody tr.eq-match-diff { background: rgba(250,204,21,.10); }
+        #eqMatchTable td { font-size: 13px; padding: 6px 8px; vertical-align: middle; }
+        #eqMatchTable .eq-diff-positive { color: #dc2626; font-weight: 600; }
+        #eqMatchTable .eq-diff-negative { color: #059669; font-weight: 600; }
+
+        /* Итоговая сводка */
+        .eq-summary-block {
+            background: var(--bg-card);
+            border: 1px solid var(--gray-200);
+            border-radius: 10px;
+            padding: 16px 20px;
+            display: flex;
+            gap: 32px;
+            flex-wrap: wrap;
+            font-size: 14px;
+        }
+        .eq-summary-item { display: flex; flex-direction: column; gap: 2px; }
+        .eq-summary-label { color: var(--gray-500); font-size: 12px; }
+        .eq-summary-value { font-weight: 700; font-size: 18px; }
+        .eq-summary-value.saving { color: #059669; }
+        .eq-summary-value.overspend { color: #dc2626; }
     </style>
 </head>
 <body>
@@ -759,16 +799,58 @@
 
                 <!-- ========== ОБОРУДОВАНИЕ ========== -->
                 <div class="tab-panel" id="tab-equipment">
-                    <div class="placeholder-container">
-                        <div class="placeholder-content">
-                            <div class="placeholder-icon">
-                                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                                    <circle cx="12" cy="12" r="3"/>
-                                    <path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/>
-                                </svg>
+                    <div class="control-panel">
+                        <div class="panel-section panel-section-output">
+                            <div class="estimate-header">
+                                <h2 class="estimate-title">Умный импорт оборудования</h2>
+                                <p class="estimate-subtitle">Загрузите коммерческое предложение для автоматического сопоставления с расчётом</p>
                             </div>
-                            <h2>Раздел в разработке</h2>
-                            <p class="note">Здесь будет подбор оборудования: жироуловители, канализационные насосные станции (КНС), трапы, ревизионные колодцы, отводные трубопроводы.</p>
+
+                            <!-- Зона загрузки файла -->
+                            <div class="eq-upload-zone" id="eqUploadZone">
+                                <div class="eq-upload-inner">
+                                    <i class="bi bi-cloud-arrow-up" style="font-size:36px;color:var(--accent-blue);"></i>
+                                    <p style="margin:8px 0 4px;font-weight:600;">Перетащите PDF/Excel или нажмите</p>
+                                    <p class="note" style="margin:0;">Поддерживаются счета и КП от поставщиков оборудования</p>
+                                    <input type="file" id="eqFileInput" accept=".pdf,.xlsx,.xls,.csv" style="display:none;">
+                                </div>
+                            </div>
+
+                            <!-- Демо-кнопка для имитации загрузки -->
+                            <div style="margin:12px 0 20px;text-align:center;">
+                                <button id="eqLoadDemo" class="btn btn-primary btn-sm">Загрузить образец КП «Билд Инжиниринг»</button>
+                            </div>
+
+                            <!-- Таблица сопоставления -->
+                            <div id="eqMatchContent" style="display:none;">
+                                <h3 style="font-size:15px;font-weight:600;margin:0 0 12px;">Результат сопоставления</h3>
+                                <div class="table-responsive">
+                                    <table class="estimate-table estimate-table-financial" id="eqMatchTable">
+                                        <thead>
+                                            <tr>
+                                                <th style="width:22%;">Позиция из КП</th>
+                                                <th style="width:20%;">Привязка в проекте</th>
+                                                <th style="width:8%;">Артикул</th>
+                                                <th style="width:7%;">Кол-во (КП)</th>
+                                                <th style="width:7%;">Кол-во (расчёт)</th>
+                                                <th style="width:10%;">Цена из КП</th>
+                                                <th style="width:10%;">Мастер-цена</th>
+                                                <th style="width:8%;">Разница</th>
+                                                <th style="width:8%;">Срок пост.</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="eqMatchBody"></tbody>
+                                    </table>
+                                </div>
+
+                                <div style="margin:16px 0;display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
+                                    <button id="eqApplyPrices" class="btn btn-primary btn-sm">Применить цены из КП</button>
+                                    <button id="eqClearImport" class="btn-secondary" style="padding:7px 20px;font-size:13px;border-radius:8px;">Очистить импорт</button>
+                                </div>
+
+                                <!-- Итоговая сводка -->
+                                <div class="eq-summary-block" id="eqSummary"></div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -4202,13 +4284,19 @@
         Object.keys(stormSettings).forEach(function (k) {
             storm[k] = JSON.parse(JSON.stringify(stormSettings[k]));
         });
+        var eqOffers = equipmentOffers.length > 0
+            ? equipmentOffers.map(function (eq) {
+                return { id: eq.id, name: eq.mappedName, kpPrice: eq.kpPrice, article: eq.article, kpQty: eq.kpQty, deliveryDays: eq.deliveryDays };
+              })
+            : undefined;
         return {
             activeScenario: activeScenario,
             buildingSettings: settings,
             k3Settings: k3,
             stormSettings: storm,
             stormInsulation: stormInsulation,
-            estimatePrices: estimatePrices
+            estimatePrices: estimatePrices,
+            equipment_offers: eqOffers
         };
     }
 
@@ -4262,6 +4350,26 @@
                 if (saved.estimatePrices) {
                     estimatePrices = saved.estimatePrices;
                 }
+                // Восстанавливаем оборудование из КП
+                if (saved.equipment_offers && saved.equipment_offers.length) {
+                    equipmentOffers = saved.equipment_offers.map(function (eq, idx) {
+                        var calcQty = getCalculatedQty(eq.name);
+                        var masterPrice = getEquipmentMasterPrice(eq.name);
+                        return {
+                            id: eq.id || 'eq_' + idx,
+                            kpName: eq.name,
+                            mappedName: eq.name,
+                            article: eq.article || '',
+                            kpQty: eq.kpQty || 0,
+                            calcQty: calcQty,
+                            kpPrice: eq.kpPrice || 0,
+                            masterPrice: masterPrice,
+                            deliveryDays: eq.deliveryDays || 0,
+                            matched: true
+                        };
+                    });
+                    renderEquipmentTable();
+                }
 
                 // Перерисовываем интерфейс с восстановленными данными
                 renderBuildingAccordions();
@@ -4277,6 +4385,265 @@
                 console.error('Ошибка загрузки расчёта:', err);
             });
     }
+
+    /* ═══════════════════════════════════════════════════════════════════════
+       Умный импорт оборудования
+    ═══════════════════════════════════════════════════════════════════════ */
+
+    var equipmentOffers = []; // [{id, kpName, mappedName, article, kpQty, calcQty, kpPrice, masterPrice, deliveryDays}]
+
+    // Маппинг-словарь: ключевое слово из КП → позиция в проекте
+    var equipmentMapping = {
+        'NSPG':         { target: 'Насос дренажный',                          article: 'NSPG' },
+        'W-Lift':       { target: 'Канализационная насосная установка',       article: 'W-Lift' },
+        'N-Lift':       { target: 'Канализационная насосная установка',       article: 'N-Lift' },
+        'Wilo N-Lift':  { target: 'Насосная установка Wilo N-Lift',           article: 'N-Lift' },
+        'Wilo DrainLift': { target: 'Канализационная насосная установка',     article: 'DrainLift' },
+        'Жироулов':     { target: 'Жироуловитель',                           article: 'ЖУ' },
+        'Grundfos':     { target: 'Насос дренажный',                          article: 'Grundfos' },
+        'ГНОМ':         { target: 'Насос дренажный',                          article: 'ГНОМ' },
+        'Трап HL':      { target: 'Трап (полимерный)',                        article: 'HL' },
+        'HL900':        { target: 'Воздушный клапан HL905 DN\u00a0110',       article: 'HL900' },
+        'Воронка кров': { target: 'Водоприёмная воронка',                     article: 'ВК' }
+    };
+
+    // Имитация парсинга PDF/Excel (образец «Билд Инжиниринг»)
+    function processEquipmentFile(file) {
+        // Для реального парсинга нужен pdf.js / SheetJS — здесь имитируем результат
+        return getDemoEquipmentData();
+    }
+
+    function getDemoEquipmentData() {
+        return [
+            { kpName: 'Wilo N-Lift 4-15 (насосная установка)',      article: 'N-Lift 4-15',      qty: 1,  price: 187500, deliveryDays: 21 },
+            { kpName: 'Жироуловитель «Пятый Элемент» ОЖ-30',       article: 'ОЖ-30',            qty: 1,  price: 42000,  deliveryDays: 14 },
+            { kpName: 'Wilo NSPG 9/8 (дренажный насос)',            article: 'NSPG 9/8',         qty: 2,  price: 24500,  deliveryDays: 7  },
+            { kpName: 'Трап HL310NPr (решётка 115x115)',            article: 'HL310NPr',         qty: 4,  price: 3200,   deliveryDays: 3  },
+            { kpName: 'Воздушный клапан HL900NECO DN110',           article: 'HL900NECO',        qty: 2,  price: 1850,   deliveryDays: 3  },
+            { kpName: 'Воронка кровельная HL62.1/1',                article: 'HL62.1/1',         qty: 6,  price: 4600,   deliveryDays: 5  }
+        ];
+    }
+
+    // Сопоставить позицию КП с маппингом
+    function matchEquipmentItem(kpName) {
+        var keys = Object.keys(equipmentMapping);
+        for (var i = 0; i < keys.length; i++) {
+            if (kpName.indexOf(keys[i]) !== -1) {
+                return equipmentMapping[keys[i]];
+            }
+        }
+        return null;
+    }
+
+    // Подсчитать расчётное количество позиции по всем корпусам
+    function getCalculatedQty(targetName) {
+        if (!buildingStats || !buildingStats.length) return 0;
+        var total = 0;
+        buildingStats.forEach(function (b, idx) {
+            var k3Items = collectK3FittingsForBuilding(idx);
+            k3Items.forEach(function (item) {
+                if (item.name.indexOf(targetName) !== -1) total += item.qty;
+            });
+        });
+        return total;
+    }
+
+    // Получить мастер-цену для позиции оборудования
+    function getEquipmentMasterPrice(name) {
+        var mp = loadMasterPrices('materials');
+        if (mp[name]) return parseFloat(mp[name]) || 0;
+        return 0;
+    }
+
+    // Обработка загруженных данных (из файла или демо)
+    function processEquipmentImport(parsedItems) {
+        equipmentOffers = [];
+
+        parsedItems.forEach(function (item, idx) {
+            var mapping = matchEquipmentItem(item.kpName);
+            var targetName = mapping ? mapping.target : '— нет привязки —';
+            var calcQty = mapping ? getCalculatedQty(mapping.target) : 0;
+            var masterPrice = mapping ? getEquipmentMasterPrice(mapping.target) : 0;
+
+            equipmentOffers.push({
+                id: 'eq_' + idx,
+                kpName: item.kpName,
+                mappedName: targetName,
+                article: item.article || (mapping ? mapping.article : ''),
+                kpQty: item.qty,
+                calcQty: calcQty,
+                kpPrice: item.price,
+                masterPrice: masterPrice,
+                deliveryDays: item.deliveryDays || 0,
+                matched: !!mapping
+            });
+        });
+
+        renderEquipmentTable();
+        saveEquipmentToSupabase();
+    }
+
+    // Отрисовка таблицы сопоставления
+    function renderEquipmentTable() {
+        var body = document.getElementById('eqMatchBody');
+        var content = document.getElementById('eqMatchContent');
+        if (!body || !content) return;
+
+        content.style.display = '';
+        var html = '';
+        var totalKP = 0, totalMaster = 0;
+
+        equipmentOffers.forEach(function (eq) {
+            var qtyMatch = eq.matched && eq.kpQty === eq.calcQty;
+            var rowClass = qtyMatch ? 'eq-match-ok' : (eq.matched ? 'eq-match-diff' : '');
+            var diff = eq.kpPrice - (eq.masterPrice || eq.kpPrice);
+            var diffHtml = '';
+            if (eq.masterPrice > 0) {
+                var pct = ((diff / eq.masterPrice) * 100).toFixed(0);
+                diffHtml = diff > 0
+                    ? '<span class="eq-diff-positive">+' + formatEstimateMoney(diff) + ' (' + pct + '%)</span>'
+                    : diff < 0
+                        ? '<span class="eq-diff-negative">' + formatEstimateMoney(diff) + ' (' + pct + '%)</span>'
+                        : '—';
+            }
+
+            html += '<tr class="' + rowClass + '">' +
+                '<td>' + escHtml(eq.kpName) + '</td>' +
+                '<td>' + escHtml(eq.mappedName) + '</td>' +
+                '<td>' + escHtml(eq.article) + '</td>' +
+                '<td style="text-align:center;">' + eq.kpQty + '</td>' +
+                '<td style="text-align:center;">' + (eq.matched ? eq.calcQty : '—') + '</td>' +
+                '<td style="text-align:right;">' + formatEstimateMoney(eq.kpPrice) + '</td>' +
+                '<td style="text-align:right;">' + (eq.masterPrice > 0 ? formatEstimateMoney(eq.masterPrice) : '—') + '</td>' +
+                '<td style="text-align:center;">' + diffHtml + '</td>' +
+                '<td style="text-align:center;">' + (eq.deliveryDays > 0 ? eq.deliveryDays + ' дн.' : '—') + '</td>' +
+                '</tr>';
+
+            totalKP += eq.kpPrice * eq.kpQty;
+            if (eq.masterPrice > 0) totalMaster += eq.masterPrice * eq.kpQty;
+        });
+
+        body.innerHTML = html;
+
+        // Итоговая сводка
+        var summaryEl = document.getElementById('eqSummary');
+        if (summaryEl) {
+            var diffTotal = totalKP - totalMaster;
+            var diffClass = diffTotal > 0 ? 'overspend' : diffTotal < 0 ? 'saving' : '';
+            var diffLabel = diffTotal > 0 ? 'Перерасход' : diffTotal < 0 ? 'Экономия' : 'Совпадение';
+            summaryEl.innerHTML =
+                '<div class="eq-summary-item">' +
+                    '<span class="eq-summary-label">Итого по КП</span>' +
+                    '<span class="eq-summary-value">' + formatEstimateMoney(totalKP) + '</span>' +
+                '</div>' +
+                '<div class="eq-summary-item">' +
+                    '<span class="eq-summary-label">Итого мастер-цены</span>' +
+                    '<span class="eq-summary-value">' + (totalMaster > 0 ? formatEstimateMoney(totalMaster) : '— не заданы —') + '</span>' +
+                '</div>' +
+                (totalMaster > 0 ? '<div class="eq-summary-item">' +
+                    '<span class="eq-summary-label">' + diffLabel + '</span>' +
+                    '<span class="eq-summary-value ' + diffClass + '">' + formatEstimateMoney(Math.abs(diffTotal)) + '</span>' +
+                '</div>' : '');
+        }
+    }
+
+    // Применить цены из КП в estimatePrices
+    function applyEquipmentPrices() {
+        if (!equipmentOffers.length) return;
+
+        equipmentOffers.forEach(function (eq) {
+            if (!eq.matched || !eq.kpPrice) return;
+
+            // Сохраняем в masterPrices для будущих проектов
+            var mp = loadMasterPrices('materials');
+            mp[eq.mappedName] = String(eq.kpPrice);
+            saveMasterPrices('materials', mp);
+
+            // Обновляем estimatePrices для текущего проекта (все priceKeys с этим именем)
+            var el = document.getElementById('estimateContent');
+            if (el) {
+                el.querySelectorAll('.estimate-price-input').forEach(function (inp) {
+                    var key = inp.dataset.priceKey || '';
+                    if (key.indexOf('m:' + eq.mappedName) !== -1) {
+                        estimatePrices[key] = String(eq.kpPrice);
+                    }
+                });
+            }
+        });
+
+        renderEstimate();
+        sendEstimateTotals();
+        saveCalculationToSupabase();
+        showSaveToast('Цены из КП применены');
+    }
+
+    // Сохранение matchedEquipment в Supabase
+    function saveEquipmentToSupabase() {
+        if (!portalProjectId) return;
+        var offerData = equipmentOffers.map(function (eq) {
+            return { id: eq.id, name: eq.mappedName, kpPrice: eq.kpPrice, article: eq.article, kpQty: eq.kpQty, deliveryDays: eq.deliveryDays };
+        });
+        // Сохраняем через общий collectSewageState (оборудование добавим в payload)
+        var payload = collectSewageState();
+        payload.equipment_offers = offerData;
+        fetch('/api/calculations/' + portalProjectId + '/sewage', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ data_json: JSON.stringify(payload) })
+        }).then(function (res) {
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+        }).catch(function (err) {
+            console.error('Ошибка сохранения оборудования:', err);
+        });
+    }
+
+    // ── Обработчики UI оборудования ──
+    (function initEquipmentHandlers() {
+        var zone = document.getElementById('eqUploadZone');
+        var fileInput = document.getElementById('eqFileInput');
+        var demoBtn = document.getElementById('eqLoadDemo');
+        var applyBtn = document.getElementById('eqApplyPrices');
+        var clearBtn = document.getElementById('eqClearImport');
+
+        if (zone && fileInput) {
+            zone.addEventListener('click', function () { fileInput.click(); });
+            zone.addEventListener('dragover', function (e) { e.preventDefault(); zone.classList.add('dragover'); });
+            zone.addEventListener('dragleave', function () { zone.classList.remove('dragover'); });
+            zone.addEventListener('drop', function (e) {
+                e.preventDefault();
+                zone.classList.remove('dragover');
+                if (e.dataTransfer.files.length) {
+                    var parsed = processEquipmentFile(e.dataTransfer.files[0]);
+                    processEquipmentImport(parsed);
+                }
+            });
+            fileInput.addEventListener('change', function () {
+                if (fileInput.files.length) {
+                    var parsed = processEquipmentFile(fileInput.files[0]);
+                    processEquipmentImport(parsed);
+                }
+            });
+        }
+
+        if (demoBtn) {
+            demoBtn.addEventListener('click', function () {
+                var parsed = getDemoEquipmentData();
+                processEquipmentImport(parsed);
+            });
+        }
+
+        if (applyBtn) {
+            applyBtn.addEventListener('click', function () { applyEquipmentPrices(); });
+        }
+
+        if (clearBtn) {
+            clearBtn.addEventListener('click', function () {
+                equipmentOffers = [];
+                var content = document.getElementById('eqMatchContent');
+                if (content) content.style.display = 'none';
+            });
+        }
+    })();
 
     /* ─── postMessage от портала ─────────────────────────────────────────── */
     window.addEventListener('message', function (event) {
