@@ -643,7 +643,7 @@ export function computeMopAverageLength(L, n, r, gamma = 1.0) {
  * @returns {Object} { n, L, r, mPerApt, lengthV1, lengthT3 }
  */
 export function computeMopPexLengthsForSection(section) {
-  const defaultResult = { n: 0, L: 0, r: 0.5, mPerApt: 0, lengthV1: 0, lengthT3: 0, lengthT4: 0 };
+  const defaultResult = { n: 0, L: 0, r: 0.5, mPerApt: 0, lengthV1: 0, lengthT3: 0, lengthT4: 0, puiLength: 0 };
 
   if (!section) return defaultResult;
 
@@ -656,7 +656,7 @@ export function computeMopPexLengthsForSection(section) {
   const n = getSectionFlatsCount(section);
 
   if (n <= 0 || L <= 0) {
-    return { n, L, r, mPerApt: 0, lengthV1: 0, lengthT3: 0, lengthT4: 0 };
+    return { n, L, r, mPerApt: 0, lengthV1: 0, lengthT3: 0, lengthT4: 0, puiLength: 0 };
   }
 
   // Константы
@@ -671,6 +671,14 @@ export function computeMopPexLengthsForSection(section) {
   // Длина на секцию для одной системы (В1 или Т3)
   const lengthPerSystem = mPerApt * n;
 
+  // ПУИ: +7 м на каждую систему (ХВС/ГВС) на этаж
+  // 4м удаление от коллекторной + 1.5м подъем к смесителю + 1.5м запас
+  const PUI_LENGTH_PER_SYSTEM = 7;
+  const puiEnabled = !!section.puiEnabled;
+  // Количество типовых этажей (≥2) с квартирами
+  const typicalFloors = Object.keys(section.apts || {}).filter(f => +f >= 2 && section.apts[f] > 0).length;
+  const puiLength = puiEnabled ? PUI_LENGTH_PER_SYSTEM * typicalFloors : 0;
+
   // Верхний розлив: Т3 увеличивается на 15% (учет опуска с чердака)
   const isTop = section.distributionType === 'top';
   const t3Coeff = isTop ? 1.15 : 1.0;
@@ -684,9 +692,10 @@ export function computeMopPexLengthsForSection(section) {
     L,
     r,
     mPerApt: Math.round(mPerApt * 100) / 100,
-    lengthV1: Math.round(lengthPerSystem * 100) / 100,
-    lengthT3: Math.round(lengthPerSystem * t3Coeff * 100) / 100,
-    lengthT4
+    lengthV1: Math.round((lengthPerSystem + puiLength) * 100) / 100,
+    lengthT3: Math.round((lengthPerSystem * t3Coeff + puiLength) * 100) / 100,
+    lengthT4,
+    puiLength
   };
 }
 

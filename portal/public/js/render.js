@@ -348,10 +348,14 @@ function renderMopBlockForSection(si) {
           <span class="mop-label">Длина труб Т3 (DN${dn}):</span>
           <span class="mop-value">${result.lengthT3.toFixed(2)} м</span>
         </div>
+        ${result.puiLength > 0 ? `<div class="mop-result-row" style="color:#0d6efd;">
+          <span class="mop-label">В т.ч. ПУИ (+${result.puiLength} м на систему):</span>
+          <span class="mop-value">+${result.puiLength * 2} м (В1 + Т3)</span>
+        </div>` : ''}
       </div>
 
       <div class="note" style="margin-top: 8px;">
-        Расчёт по формуле: m = (d̄ + h) × n, где d̄ — средняя длина до квартиры, h = 1.8 м (опуск), n — кол-во квартир.
+        Расчёт по формуле: m = (d̄ + h) × n${sec.puiEnabled ? ' + 7м×этаж (ПУИ)' : ''}, где d̄ — средняя длина до квартиры, h = 1.8 м (опуск), n — кол-во квартир.
       </div>
     </div>
   `;
@@ -584,7 +588,7 @@ export function renderFloorsTable(floorsData) {
 
     const aptsCell = tr.insertCell(-1);
     if (row.hasPUI && row.aptsTotal > 0) {
-      aptsCell.innerHTML = `${row.aptsTotal} <span style="color:#0d6efd;font-size:11px;font-weight:500">(+1 ПУИ)</span>`;
+      aptsCell.innerHTML = `${row.aptsTotal} <span style="color:#0d6efd;font-size:11px;font-weight:500;cursor:help" title="Учтён узел учёта ПУИ и +7м трубы ХВС/ГВС">(+1 ПУИ)</span>`;
     } else {
       aptsCell.textContent = row.aptsTotal;
     }
@@ -2373,6 +2377,86 @@ export function renderFittingsBlock(totalApartments, ivptEnabled, zonesData, tot
                 <thead><tr><th>Система</th><th class="name-col">Наименование</th><th class="unit-col">Ед. изм.</th><th class="qty-col">Количество</th></tr></thead>
                 <tbody>${summaryRowsHtml}</tbody>
                 <tfoot><tr class="total-row"><td colspan="3"><strong>Итого по зданию</strong></td><td class="qty-col"><strong>${totalRentalUnitsDisplay}</strong></td></tr></tfoot>
+              </table>
+            </div>
+          </div>
+        </details>
+      </div>
+    `;
+  }
+
+  // === Узлы учёта МОП (ПУИ — помещение уборочного инвентаря) ===
+  const puiWaterMeterItems = [
+    { name: 'Кран шаровый Ду 15', unit: 'шт' },
+    { name: 'Фильтр сетчатый косой Ду 15', unit: 'шт' },
+    { name: 'Счетчик воды Ду 15', unit: 'шт' },
+    { name: 'Клапан обратный Ду 15', unit: 'шт' },
+    { name: 'Редуктор давления Ду 15', unit: 'шт' },
+  ];
+
+  const puiBySection = new Map(); // sectionIndex -> typicalFloors
+  let totalPuiNodes = 0;
+
+  if (sections && sections.length > 0) {
+    sections.forEach((sec, si) => {
+      if (sec.puiEnabled) {
+        const typFloors = Object.keys(sec.apts || {}).filter(f => +f >= 2 && sec.apts[f] > 0).length;
+        if (typFloors > 0) {
+          puiBySection.set(si, typFloors);
+          totalPuiNodes += typFloors;
+        }
+      }
+    });
+  }
+
+  if (totalPuiNodes > 0) {
+    hasData = true;
+    const totalPuiUnitsDisplay = totalPuiNodes * 2; // ×2 (ХВС + ГВС)
+
+    let puiSectionsHtml = '';
+    puiBySection.forEach((floors, si) => {
+      const sectionUnitsDisplay = floors * 2;
+
+      let rowsHtml = '';
+      puiWaterMeterItems.forEach(item => {
+        rowsHtml += `<tr><td class="sys-cell sys-cell--V1">В1</td><td class="name-col">${item.name}</td><td class="unit-col">${item.unit}</td><td class="col-qty num-col">${floors}</td></tr>`;
+      });
+      puiWaterMeterItems.forEach(item => {
+        rowsHtml += `<tr><td class="sys-cell sys-cell--T3">Т3</td><td class="name-col">${item.name}</td><td class="unit-col">${item.unit}</td><td class="col-qty num-col">${floors}</td></tr>`;
+      });
+
+      puiSectionsHtml += `
+        <details class="fittings-details" style="margin: 8px 0;">
+          <summary>Корпус ${si + 1} — ${floors} этажей (итого: ${sectionUnitsDisplay} шт)</summary>
+          <table class="results-table">
+            <thead><tr><th>Система</th><th class="name-col">Наименование</th><th class="unit-col">Ед. изм.</th><th class="qty-col">Количество</th></tr></thead>
+            <tbody>${rowsHtml}</tbody>
+            <tfoot><tr class="total-row"><td colspan="3"><strong>Итого по корпусу ${si + 1}</strong></td><td class="qty-col"><strong>${sectionUnitsDisplay}</strong></td></tr></tfoot>
+          </table>
+        </details>
+      `;
+    });
+
+    let puiSummaryHtml = '';
+    puiWaterMeterItems.forEach(item => {
+      puiSummaryHtml += `<tr><td class="sys-cell sys-cell--V1">В1</td><td class="name-col">${item.name}</td><td class="unit-col">${item.unit}</td><td class="col-qty num-col">${totalPuiNodes}</td></tr>`;
+    });
+    puiWaterMeterItems.forEach(item => {
+      puiSummaryHtml += `<tr><td class="sys-cell sys-cell--T3">Т3</td><td class="name-col">${item.name}</td><td class="unit-col">${item.unit}</td><td class="col-qty num-col">${totalPuiNodes}</td></tr>`;
+    });
+
+    html += `
+      <div class="fittings-section">
+        <details class="fittings-details">
+          <summary>Узлы учёта МОП — ПУИ (итого: ${totalPuiUnitsDisplay} шт)</summary>
+          <div class="fittings-subsections" style="padding: 12px;">
+            ${puiSectionsHtml}
+            <div class="pipeline-summary" style="margin-top: 12px;">
+              <h4>Сводка по зданию</h4>
+              <table class="results-table summary-table">
+                <thead><tr><th>Система</th><th class="name-col">Наименование</th><th class="unit-col">Ед. изм.</th><th class="qty-col">Количество</th></tr></thead>
+                <tbody>${puiSummaryHtml}</tbody>
+                <tfoot><tr class="total-row"><td colspan="3"><strong>Итого по зданию</strong></td><td class="qty-col"><strong>${totalPuiUnitsDisplay}</strong></td></tr></tfoot>
               </table>
             </div>
           </div>
