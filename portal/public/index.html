@@ -920,6 +920,15 @@
         .aw-bar-material { background: #10b981; }
         .aw-bar-total { background: #8b5cf6; }
 
+        /* Flash-эффект при обновлении аналитики */
+        @keyframes analytics-flash {
+            0%   { background-color: rgba(59,130,246,.15); }
+            100% { background-color: transparent; }
+        }
+        .aw-flash .aw-value {
+            animation: analytics-flash .8s ease-out;
+        }
+
         /* Карточка системы (детализация) */
         .analytics-sys-card {
             border: 1px solid var(--border-color);
@@ -2745,6 +2754,14 @@
                 totalAll: data.totalAll || 0
             };
             renderAnalytics();
+
+            // Flash-эффект: подсвечиваем обновлённые виджеты
+            document.querySelectorAll('.analytics-widget').forEach(w => {
+                w.classList.remove('aw-flash');
+                void w.offsetWidth; // reflow для перезапуска анимации
+                w.classList.add('aw-flash');
+            });
+
             // Кэшируем для сравнения проектов
             if (typeof cacheEstimateTotalsForComparison === 'function') {
                 cacheEstimateTotalsForComparison(data);

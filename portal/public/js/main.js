@@ -2389,6 +2389,10 @@ window.onload = () => {
   initEstimatePriceHandlers((allPrices) => {
     setEstimatePrices(allPrices);
     onStateChange();
+    // Синхронизация финансовой аналитики в портале при каждом изменении цены
+    if (window.parent !== window) {
+      sendEstimateTotals();
+    }
   });
 
   // Устанавливаем renderer для вкладки "Визуализация"
@@ -2472,6 +2476,10 @@ window.onload = () => {
       setEstimatePrices(updatedPrices);
       onStateChange();
       renderEstimate();
+      // Синхронизация финансовой аналитики в портале
+      if (window.parent !== window) {
+        sendEstimateTotals();
+      }
     });
   }
 
