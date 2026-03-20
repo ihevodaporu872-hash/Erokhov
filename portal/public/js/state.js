@@ -75,6 +75,7 @@ export function makeDefaultSection() {
     floorsLocked: false,
     apts: {},
     ivptEnabled: false,
+    puiEnabled: false,
     rent: { enabled: false, qty: 1 },
     commercialUnits: 1,
     kuuVariant: 'collector',
@@ -136,6 +137,10 @@ export function loadCalculatorState(data) {
       // Миграция: ivptEnabled из глобального параметра в per-section
       if (sec.ivptEnabled === undefined) {
         sec.ivptEnabled = !!(data.params && data.params.ivptEnabled);
+      }
+      // Миграция: puiEnabled (ПУИ на этажах)
+      if (sec.puiEnabled === undefined) {
+        sec.puiEnabled = false;
       }
       // Миграция: commercialUnits из rent.qty
       if (sec.commercialUnits === undefined) {
@@ -212,6 +217,13 @@ export function toggleSectionIvpt(si) {
   if (!sections[si]) return;
   sections[si].ivptEnabled = !sections[si].ivptEnabled;
   calculatorParams.ivptEnabled = sections.some(s => s.ivptEnabled);
+  notifyStateChange();
+}
+
+// Переключение ПУИ (помещение уборочного инвентаря) для корпуса
+export function toggleSectionPui(si) {
+  if (!sections[si]) return;
+  sections[si].puiEnabled = !sections[si].puiEnabled;
   notifyStateChange();
 }
 

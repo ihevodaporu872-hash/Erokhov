@@ -79,10 +79,12 @@ export function sectionZoneForFloor(section, floor) {
 }
 
 // Форматирование коллекторов (минимум 2 выхода на коллектор)
-export function formatCollectors(unitsPerSection, risersPerSection) {
-  if (risersPerSection <= 0 || unitsPerSection <= 0) return '—';
-  const base = Math.floor(unitsPerSection / risersPerSection);
-  const rem = unitsPerSection % risersPerSection;
+// hasPUI — добавляет +1 выход (ПУИ) к общему количеству на этаже
+export function formatCollectors(unitsPerSection, risersPerSection, hasPUI) {
+  const totalUnits = unitsPerSection + (hasPUI ? 1 : 0);
+  if (risersPerSection <= 0 || totalUnits <= 0) return '—';
+  const base = Math.floor(totalUnits / risersPerSection);
+  const rem = totalUnits % risersPerSection;
   const map = {};
   for (let i = 0; i < risersPerSection; i++) {
     let n = i < rem ? base + 1 : base;
@@ -94,17 +96,20 @@ export function formatCollectors(unitsPerSection, risersPerSection) {
   }
   // Если все стояки без квартир
   if (Object.keys(map).length === 0) return '—';
-  return Object.keys(map)
+  let result = Object.keys(map)
     .map(k => ({ k: +k, c: map[k] }))
     .sort((a, b) => b.k - a.k)
     .map(x => `${x.c}×${x.k} вых.`)
     .join(' + ');
+  if (hasPUI) result += ' (+1 ПУИ)';
+  return result;
 }
 
 // Расчёт распределения коллекторов по количеству выходов для зоны
 // Возвращает объект: { 2: 10, 4: 1, 5: 89 } — 10 коллекторов на 2 выхода, и т.д.
-// Логика: для каждого этажа n = max(квартир, стояков), минимум 2
-export function computeCollectorsDistribution(section, zone, zoneFrom, zoneTo) {
+// Логика: для каждого этажа n = max(квартир + ПУИ, стояков), минимум 2
+// hasPUI — добавляет +1 выход на каждый типовой этаж (этаж >= 2)
+export function computeCollectorsDistribution(section, zone, zoneFrom, zoneTo, hasPUI) {
   const risersPerSection = Math.max(1, +zone.risers || 1);
   const distribution = {}; // { n: count }
 
@@ -113,8 +118,11 @@ export function computeCollectorsDistribution(section, zone, zoneFrom, zoneTo) {
     const aptsPerSec = section.apts[f] || 0;
     if (aptsPerSec <= 0) continue; // пропускаем этажи без квартир
 
-    // Количество выходов = max(квартир, стояков), минимум 2
-    let n = Math.max(aptsPerSec, risersPerSection);
+    // Общее количество выходов = квартиры + ПУИ
+    const totalUnits = aptsPerSec + (hasPUI ? 1 : 0);
+
+    // Количество выходов = max(totalUnits, стояков), минимум 2
+    let n = Math.max(totalUnits, risersPerSection);
     if (n < 2) n = 2;
 
     // Добавляем 1 коллектор с n выходами
@@ -139,12 +147,12 @@ export function formatCollectorsDistribution(distribution) {
 
 // Автоподбор n для коллекторов зоны (максимальное количество выходов)
 // Используется для BOM и других расчётов, где нужен один максимум
-export function computeAutoNForZone(section, zone) {
+export function computeAutoNForZone(section, zone, hasPUI) {
   const to = Math.min(+zone.to || 0, section.floors);
   const risersPerSection = Math.max(1, +zone.risers || 1);
   let nMax = 2; // минимум 2 выхода
   for (let f = 2; f <= to; f++) {
-    const aptsPerSec = section.apts[f] || 0;
+    const aptsPerSec = (section.apts[f] || 0) + (hasPUI ? 1 : 0);
     const nFloor = Math.max(aptsPerSec || 0, risersPerSection);
     if (nFloor > nMax) nMax = nFloor;
   }
@@ -152,11 +160,11 @@ export function computeAutoNForZone(section, zone) {
 }
 
 // Автоподбор n для коллекторов зоны с учётом диапазона этажей
-export function computeAutoNForZoneRange(section, zone, zoneFrom, zoneTo) {
+export function computeAutoNForZoneRange(section, zone, zoneFrom, zoneTo, hasPUI) {
   const risersPerSection = Math.max(1, +zone.risers || 1);
   let nMax = 2; // минимум 2 выхода
   for (let f = Math.max(2, zoneFrom); f <= zoneTo; f++) {
-    const aptsPerSec = section.apts[f] || 0;
+    const aptsPerSec = (section.apts[f] || 0) + (hasPUI ? 1 : 0);
     const nFloor = Math.max(aptsPerSec || 0, risersPerSection);
     if (nFloor > nMax) nMax = nFloor;
   }
@@ -216,11 +224,15 @@ export function computeFloorsData(sections, h1, hn) {
         risersTotalAtFloor += risersPerSection;
 
         const unitsForCollectors = (f === 1 ? (sec.rent.enabled ? (sec.commercialUnits || 0) : 0) : (sec.apts[f] || 0));
-        collCellText = formatCollectors(unitsForCollectors, risersPerSection);
+        const hasPUI = !!(f >= 2 && sec.puiEnabled);
+        collCellText = formatCollectors(unitsForCollectors, risersPerSection, hasPUI);
       }
 
       return { zoneCellText, dnCellText, collCellText };
     });
+
+    // Проверяем, есть ли ПУИ хотя бы в одном корпусе на этом этаже
+    const anyPUI = f >= 2 && sections.some(sec => sec.puiEnabled && (sec.apts[f] || 0) > 0);
 
     const anyData = (aptsTotal > 0 || rentTotal > 0);
     const anyZoneCovers = sections.some(sec => sectionZoneForFloor(sec, f));
@@ -233,6 +245,7 @@ export function computeFloorsData(sections, h1, hn) {
       sectionsInfo,
       aptsTotal,
       rentTotal,
+      hasPUI: anyPUI,
       risersTotalAtFloor
     });
   }
@@ -303,13 +316,14 @@ export function computeZonesData(sections, h1, hn, ivptEnabled) {
         byAlbum[aKey] += aptsInZone;
       }
 
-      // Автоподбор n с учётом диапазона этажей зоны
-      const nAuto = computeAutoNForZoneRange(sec, z, zoneFrom, zoneTo);
+      // Автоподбор n с учётом диапазона этажей зоны (с учётом ПУИ)
+      const hasPUI = !!sec.puiEnabled;
+      const nAuto = computeAutoNForZoneRange(sec, z, zoneFrom, zoneTo, hasPUI);
       const secIvpt = !!(sections[si] && sections[si].ivptEnabled);
       const bom = materializeKuuBom(aKey, aptsInZone, { n: nAuto, ivptEnabled: secIvpt });
 
-      // Распределение коллекторов по количеству выходов для зоны
-      const collectorsDistribution = computeCollectorsDistribution(sec, z, zoneFrom, zoneTo);
+      // Распределение коллекторов по количеству выходов для зоны (с учётом ПУИ)
+      const collectorsDistribution = computeCollectorsDistribution(sec, z, zoneFrom, zoneTo, hasPUI);
 
       zonesData.push({
         sectionIndex: si,

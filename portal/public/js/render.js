@@ -449,6 +449,12 @@ export function renderSectionsBlocks() {
             placeholder="Узлы"
             oninput="window.app.setCommercialUnits(${si}, +this.value)">
         </div>
+        <div>
+          <button class="uvp-toggle ${sec.puiEnabled ? 'active' : ''}"
+                  onclick="window.app.togglePui(${si})">
+            <i class="bi bi-droplet"></i> ${sec.puiEnabled ? 'ПУИ включён' : 'Учесть ПУИ'}
+          </button>
+        </div>
       </div>
 
       <div class="kuu-cards-block">
@@ -576,7 +582,12 @@ export function renderFloorsTable(floorsData) {
       tr.insertCell(-1).textContent = info.collCellText;
     });
 
-    tr.insertCell(-1).textContent = row.aptsTotal;
+    const aptsCell = tr.insertCell(-1);
+    if (row.hasPUI && row.aptsTotal > 0) {
+      aptsCell.innerHTML = `${row.aptsTotal} <span style="color:#0d6efd;font-size:11px;font-weight:500">(+1 ПУИ)</span>`;
+    } else {
+      aptsCell.textContent = row.aptsTotal;
+    }
     tr.insertCell(-1).textContent = row.rentTotal;
     tr.insertCell(-1).textContent = row.risersTotalAtFloor ? row.risersTotalAtFloor : '—';
   });
