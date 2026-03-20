@@ -2089,6 +2089,7 @@ export function renderFittingsBlock(totalApartments, ivptEnabled, zonesData, tot
     const maxFloor = Math.max(sec.floors || 0, ...aptsFloors);
 
     // Проходим по всем этажам корпуса (со 2-го, т.к. 1-й - аренда)
+    const hasPUI = !!sec.puiEnabled;
     for (let floor = 2; floor <= maxFloor; floor++) {
       const aptsOnFloor = sec.apts[floor] || 0;
       if (aptsOnFloor <= 0) continue;
@@ -2099,9 +2100,10 @@ export function renderFittingsBlock(totalApartments, ivptEnabled, zonesData, tot
 
       const risers = Math.max(1, +zone.risers || 1);
 
-      // Распределяем квартиры по стоякам (коллекторам)
-      const base = Math.floor(aptsOnFloor / risers);
-      const rem = aptsOnFloor % risers;
+      // Распределяем квартиры (+ПУИ) по стоякам (коллекторам)
+      const totalUnits = aptsOnFloor + (hasPUI ? 1 : 0);
+      const base = Math.floor(totalUnits / risers);
+      const rem = totalUnits % risers;
 
       for (let i = 0; i < risers; i++) {
         const outlets = i < rem ? base + 1 : base;
@@ -2135,20 +2137,30 @@ export function renderFittingsBlock(totalApartments, ivptEnabled, zonesData, tot
 
       const sortedOutlets = Array.from(sectionCollectors.keys()).sort((a, b) => a - b);
 
+      // Определяем, какой коллектор содержит выход ПУИ
+      // ПУИ добавляет +1 выход — он попадает в коллектор с наибольшим кол-вом выходов
+      const secHasPUI = !!(sections[si] && sections[si].puiEnabled);
+      const maxOutlets = sortedOutlets.length > 0 ? sortedOutlets[sortedOutlets.length - 1] : 0;
+
       let rowsHtml = '';
       sortedOutlets.forEach(outlets => {
         const count = sectionCollectors.get(outlets);
+        // Подписи выходов: "3 Кв + 1 ПУИ" для коллектора, получившего ПУИ
+        const isPuiCollector = secHasPUI && outlets === maxOutlets;
+        const outletDetail = isPuiCollector
+          ? ` <span style="color:#0d6efd;font-size:11px">(${outlets - 1} Кв + 1 ПУИ)</span>`
+          : '';
         // Коллекторы нужны для обеих систем В1 и Т3
         rowsHtml += `
           <tr>
             <td class="sys-cell sys-cell--V1">В1</td>
-            <td class="name-col">Коллектор на ${outlets} выход${getOutletsSuffix(outlets)}</td>
+            <td class="name-col">Коллектор на ${outlets} выход${getOutletsSuffix(outlets)}${outletDetail}</td>
             <td class="unit-col">шт</td>
             <td class="col-qty num-col">${count}</td>
           </tr>
           <tr>
             <td class="sys-cell sys-cell--T3">Т3</td>
-            <td class="name-col">Коллектор на ${outlets} выход${getOutletsSuffix(outlets)}</td>
+            <td class="name-col">Коллектор на ${outlets} выход${getOutletsSuffix(outlets)}${outletDetail}</td>
             <td class="unit-col">шт</td>
             <td class="col-qty num-col">${count}</td>
           </tr>
@@ -2183,20 +2195,26 @@ export function renderFittingsBlock(totalApartments, ivptEnabled, zonesData, tot
 
     // Сводка по зданию
     const sortedTotalOutlets = Array.from(collectorsTotalByOutlets.keys()).sort((a, b) => a - b);
+    const anyPUIEnabled = sections.some(s => s.puiEnabled);
+    const maxTotalOutlets = sortedTotalOutlets.length > 0 ? sortedTotalOutlets[sortedTotalOutlets.length - 1] : 0;
     let summaryRowsHtml = '';
     sortedTotalOutlets.forEach(outlets => {
       const count = collectorsTotalByOutlets.get(outlets);
+      const isPuiCollector = anyPUIEnabled && outlets === maxTotalOutlets;
+      const outletDetail = isPuiCollector
+        ? ` <span style="color:#0d6efd;font-size:11px">(${outlets - 1} Кв + 1 ПУИ)</span>`
+        : '';
       // Коллекторы нужны для обеих систем В1 и Т3
       summaryRowsHtml += `
         <tr>
           <td class="sys-cell sys-cell--V1">В1</td>
-          <td class="name-col">Коллектор на ${outlets} выход${getOutletsSuffix(outlets)}</td>
+          <td class="name-col">Коллектор на ${outlets} выход${getOutletsSuffix(outlets)}${outletDetail}</td>
           <td class="unit-col">шт</td>
           <td class="col-qty num-col">${count}</td>
         </tr>
         <tr>
           <td class="sys-cell sys-cell--T3">Т3</td>
-          <td class="name-col">Коллектор на ${outlets} выход${getOutletsSuffix(outlets)}</td>
+          <td class="name-col">Коллектор на ${outlets} выход${getOutletsSuffix(outlets)}${outletDetail}</td>
           <td class="unit-col">шт</td>
           <td class="col-qty num-col">${count}</td>
         </tr>
@@ -2593,10 +2611,12 @@ export function renderCollectorsSummary(zonesData) {
 
       // Сортируем по количеству выходов
       const sortedOutlets = Array.from(collectorsByOutlets.keys()).sort((a, b) => a - b);
+      const secPUI = !!(sections[si] && sections[si].puiEnabled);
+      const maxOutletsSec = sortedOutlets.length > 0 ? sortedOutlets[sortedOutlets.length - 1] : 0;
 
       html += `
         <details class="collector-details">
-          <summary><b>Корпус ${si + 1}</b> (итого: ${sectionTotal} шт)</summary>
+          <summary><b>Корпус ${si + 1}</b> (итого: ${sectionTotal} шт)${secPUI ? ' <span style="color:#0d6efd">+ПУИ</span>' : ''}</summary>
           <table class="pipeline-table">
             <thead>
               <tr>
@@ -2609,9 +2629,11 @@ export function renderCollectorsSummary(zonesData) {
 
       sortedOutlets.forEach(outlets => {
         const count = collectorsByOutlets.get(outlets);
+        const isPuiColl = secPUI && outlets === maxOutletsSec;
+        const puiNote = isPuiColl ? ` <span style="color:#0d6efd;font-size:11px">(${outlets - 1} Кв + 1 ПУИ)</span>` : '';
         html += `
               <tr>
-                <td>Коллектор на ${outlets} выход${getOutletsSuffixForSummary(outlets)}</td>
+                <td>Коллектор на ${outlets} выход${getOutletsSuffixForSummary(outlets)}${puiNote}</td>
                 <td>${count}</td>
               </tr>
         `;
@@ -3262,8 +3284,12 @@ export function renderSpecificationContent(zonesData, sections = []) {
   // =============================================
   const collectorsByOutlets = new Map(); // outlets -> count
 
+  let anySpecPUI = false;
   sections.forEach((sec, si) => {
     if (!sec.zones || sec.zones.length === 0) return;
+
+    const hasPUI = !!sec.puiEnabled;
+    if (hasPUI) anySpecPUI = true;
 
     const aptsFloors = Object.keys(sec.apts).map(k => parseInt(k, 10)).filter(k => k > 0 && sec.apts[k] > 0);
     const maxFloor = Math.max(sec.floors || 0, ...aptsFloors);
@@ -3276,8 +3302,9 @@ export function renderSpecificationContent(zonesData, sections = []) {
       if (!zone) continue;
 
       const risers = Math.max(1, +zone.risers || 1);
-      const base = Math.floor(aptsOnFloor / risers);
-      const rem = aptsOnFloor % risers;
+      const totalUnits = aptsOnFloor + (hasPUI ? 1 : 0);
+      const base = Math.floor(totalUnits / risers);
+      const rem = totalUnits % risers;
 
       for (let i = 0; i < risers; i++) {
         const outlets = i < rem ? base + 1 : base;
@@ -3322,11 +3349,14 @@ export function renderSpecificationContent(zonesData, sections = []) {
           <tbody>
     `;
 
+    const maxSpecOutlets = sortedCollectorOutlets.length > 0 ? sortedCollectorOutlets[sortedCollectorOutlets.length - 1] : 0;
     sortedCollectorOutlets.forEach(outlets => {
       const count = collectorsByOutlets.get(outlets);
+      const isPuiColl = anySpecPUI && outlets === maxSpecOutlets;
+      const puiNote = isPuiColl ? ` <span style="color:#0d6efd;font-size:11px">(${outlets - 1} Кв + 1 ПУИ)</span>` : '';
       html += `
             <tr>
-              <td>Коллектор на ${outlets} выход${getOutletsSuffix(outlets)}</td>
+              <td>Коллектор на ${outlets} выход${getOutletsSuffix(outlets)}${puiNote}</td>
               <td>${count}</td>
             </tr>
       `;

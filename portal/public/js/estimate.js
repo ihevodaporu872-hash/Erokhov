@@ -1388,9 +1388,10 @@ export function aggregateEstimateData({ zonesData, risersByDiameter, sections, h
 
         const risers = Math.max(1, +zone.risers || 1);
 
-        // Распределяем квартиры по стоякам (коллекторам)
-        const base = Math.floor(aptsOnFloor / risers);
-        const rem = aptsOnFloor % risers;
+        // Распределяем квартиры (+ПУИ) по стоякам (коллекторам)
+        const totalUnits = aptsOnFloor + (sec.puiEnabled ? 1 : 0);
+        const base = Math.floor(totalUnits / risers);
+        const rem = totalUnits % risers;
 
         for (let i = 0; i < risers; i++) {
           const outlets = i < rem ? base + 1 : base;
