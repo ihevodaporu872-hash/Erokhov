@@ -2444,6 +2444,10 @@
         }
 
         function handleAutoSave(state) {
+            console.log('[Portal AutoSave] Получено состояние:', state ? {
+                sections: state.sections ? state.sections.length + ' корпусов' : 'нет',
+                prices: state.estimatePrices ? Object.keys(state.estimatePrices).length + ' цен' : 'нет'
+            } : 'ПУСТО');
             const wsProjectId = getSystemProjectId('water-supply');
             if (!wsProjectId) return;
 
@@ -2926,13 +2930,24 @@
                 return;
             }
 
-            // Для water-supply берём данные из последнего auto-save
+            // Собираем данные для сохранения
             let projectData = {};
             if (systemType === 'water-supply') {
                 if (!lastAutoSaveState) {
-                    showCloudToast('Нет данных расчёта для сохранения', 'error');
+                    // Пробуем запросить свежие данные из iframe
+                    const iframe = document.getElementById('calcIframe');
+                    if (iframe && iframe.contentWindow) {
+                        iframe.contentWindow.postMessage({ type: 'request-state' }, '*');
+                        // Даём iframe 500мс на ответ
+                        await new Promise(r => setTimeout(r, 500));
+                    }
+                }
+                if (!lastAutoSaveState) {
+                    console.log('[SaveToCloud] lastAutoSaveState пуст — нет данных от iframe water-supply');
+                    showCloudToast('Нет данных расчёта для сохранения. Откройте вкладку водоснабжения и произведите расчёт.', 'error');
                     return;
                 }
+                console.log('[SaveToCloud] Данные для сохранения (water-supply):', Object.keys(lastAutoSaveState));
                 projectData = { calculations: { 'water-supply': lastAutoSaveState } };
             }
 

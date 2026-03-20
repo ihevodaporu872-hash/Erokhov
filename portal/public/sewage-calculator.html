@@ -4491,6 +4491,21 @@
     function saveCalculationToSupabase() {
         if (!portalProjectId) return;
         var payload = collectSewageState();
+
+        // Диагностика: проверяем полноту данных перед сохранением
+        var hasSettings = payload.buildingSettings && Object.keys(payload.buildingSettings).length > 0;
+        var hasPrices = payload.estimatePrices && Object.keys(payload.estimatePrices).length > 0;
+        console.log('[Sewage Save] Данные к сохранению:', {
+            settings: hasSettings ? Object.keys(payload.buildingSettings).length + ' корпусов' : 'ПУСТО',
+            prices: hasPrices ? Object.keys(payload.estimatePrices).length + ' цен' : 'нет цен',
+            scenario: payload.activeScenario || 'не задан',
+            equipment: payload.equipment_offers ? payload.equipment_offers.length + ' поз.' : 'нет'
+        });
+
+        if (!hasSettings && buildingStats && buildingStats.length) {
+            console.warn('[Sewage Save] Предупреждение: buildingSettings пуст при наличии buildingStats');
+        }
+
         fetch('/api/calculations/' + portalProjectId + '/sewage', {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },

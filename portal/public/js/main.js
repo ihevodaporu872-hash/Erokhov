@@ -133,6 +133,11 @@ function saveCurrentProject() {
   // Добавляем activeTabId в состояние проекта
   state.activeTabId = getActiveTabId();
 
+  const hasSections = state.sections && state.sections.length > 0;
+  if (!hasSections) {
+    console.warn('[SaveLocal] sections пуст — данные могут не сохраниться корректно');
+  }
+
   const project = findProjectById(projects, activeProjectId);
   if (project) {
     project.data = state;
@@ -278,6 +283,19 @@ function saveCalculationToSupabase() {
   const state = serializeCalculatorState();
   state.activeTabId = getActiveTabId();
 
+  // Диагностика: проверяем полноту данных перед сохранением
+  const hasSections = state.sections && state.sections.length > 0;
+  const hasPrices = state.estimatePrices && Object.keys(state.estimatePrices).length > 0;
+  console.log('[Water Save] Данные к сохранению:', {
+    sections: hasSections ? state.sections.length + ' корпусов' : 'ПУСТО',
+    prices: hasPrices ? Object.keys(state.estimatePrices).length + ' цен' : 'нет цен',
+    params: state.params ? 'OK' : 'ПУСТО'
+  });
+
+  if (!hasSections) {
+    console.warn('[Water Save] Предупреждение: sections пуст — сохранение данных без корпусов');
+  }
+
   fetch(`/api/calculations/${portalProjectId}/water-supply`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
@@ -385,6 +403,12 @@ function calculateWaterSupply() {
   // Отправляем финансовые итоги для аналитики портала
   if (window.parent !== window) {
     sendEstimateTotals();
+
+    // Синхронизируем lastAutoSaveState в портале для кнопки «Сохранить»
+    readParamsFromDOM();
+    const autoSaveState = serializeCalculatorState();
+    autoSaveState.activeTabId = getActiveTabId();
+    window.parent.postMessage({ type: 'auto-save', state: autoSaveState }, '*');
   }
 
   // Сохраняем расчёт в Supabase
@@ -2349,6 +2373,15 @@ window.addEventListener('message', (event) => {
       // Нет данных в сообщении — пробуем загрузить из Supabase
       loadCalculationFromSupabase();
     }
+  }
+
+  // Запрос актуального состояния от портала (для кнопки «Сохранить»)
+  if (event.data && event.data.type === 'request-state') {
+    readParamsFromDOM();
+    const state = serializeCalculatorState();
+    state.activeTabId = getActiveTabId();
+    console.log('[Water] Ответ на request-state:', Object.keys(state));
+    window.parent.postMessage({ type: 'auto-save', state: state }, '*');
   }
 
   // Синхронизация площади подземной части из паспорта проекта
