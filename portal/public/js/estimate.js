@@ -1695,7 +1695,11 @@ export function calculateBuildingSummary(estimateData, undergroundArea = 0) {
   Object.values(estimateData).forEach(sectionData => {
     ['cold', 'hot'].forEach(systemKey => {
       sectionData[systemKey].items.forEach(item => {
-        const key = `${item.type}-${item.name}`;
+        // Ключ включает sortKey, чтобы одноимённые позиции из разных групп
+        // (например «Кран шаровый Ду 15» из «Узла концевого» и из «Аренды»)
+        // оставались раздельными в сводке
+        const groupKey = item.sortKey || 'other';
+        const key = `${groupKey}|${item.type}|${item.name}`;
         const map = itemsMap[systemKey];
 
         if (map.has(key)) {
@@ -1711,7 +1715,8 @@ export function calculateBuildingSummary(estimateData, undergroundArea = 0) {
   if (undergroundArea > 0) {
     ['cold', 'hot'].forEach(systemKey => {
       UNDERGROUND_ITEMS[systemKey].forEach(item => {
-        const key = `${item.type}-${item.name}`;
+        const groupKey = item.sortKey || 'underground';
+        const key = `${groupKey}|${item.type}|${item.name}`;
         const map = itemsMap[systemKey];
 
         if (map.has(key)) {
