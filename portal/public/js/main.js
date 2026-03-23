@@ -321,6 +321,15 @@ function loadCalculationFromSupabase() {
       if (!saved.sections && !saved.params) return;
 
       loadCalculatorState(saved);
+
+      // Синхронизируем кол-во корпусов с buildingStats
+      if (buildingStats && Array.isArray(buildingStats) && buildingStats.length > 0) {
+        if (sections.length !== buildingStats.length) {
+          console.log(`[Water Supabase] Синхронизация корпусов: ${sections.length} → ${buildingStats.length}`);
+          ensureSectionsCount(buildingStats.length);
+        }
+      }
+
       syncAptsFromBuildingStats();
       applyStateToDOM();
 
@@ -2362,6 +2371,15 @@ window.addEventListener('message', (event) => {
     if (data && (data.sections || data.params)) {
       // Загружаем состояние из данных проекта
       loadCalculatorState(data);
+
+      // Принудительно синхронизируем кол-во корпусов с buildingStats
+      // (если сохранённый расчёт имел другое кол-во корпусов, чем текущий проект)
+      if (buildingStats && Array.isArray(buildingStats) && buildingStats.length > 0) {
+        if (sections.length !== buildingStats.length) {
+          console.log(`[load-project-data] Синхронизация корпусов: ${sections.length} → ${buildingStats.length}`);
+          ensureSectionsCount(buildingStats.length);
+        }
+      }
 
       // Синхронизируем квартиры из квартирографии проекта
       syncAptsFromBuildingStats();

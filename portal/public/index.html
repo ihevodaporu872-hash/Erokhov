@@ -2368,6 +2368,13 @@
                 // Всегда обновляем buildingHeight из building_stats (в т.ч. в сохранённых секциях)
                 if (data.sections && project && project.building_stats
                     && Array.isArray(project.building_stats)) {
+                    // Обрезаем sections до кол-ва корпусов проекта
+                    // (сохранённый расчёт мог быть от другого проекта с другим кол-вом корпусов)
+                    if (data.sections.length > project.building_stats.length) {
+                        console.log(`[sendProjectToIframe] Обрезка sections: ${data.sections.length} → ${project.building_stats.length}`);
+                        data.sections = data.sections.slice(0, project.building_stats.length);
+                        if (data.params) data.params.numSections = project.building_stats.length;
+                    }
                     data.sections.forEach((sec, idx) => {
                         const bs = project.building_stats[idx];
                         if (bs && bs.height) sec.buildingHeight = bs.height;
