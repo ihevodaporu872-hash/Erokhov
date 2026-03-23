@@ -3472,6 +3472,36 @@ export function renderSpecificationContent(zonesData, sections = []) {
     });
   }
 
+  // Добавляем позиции из «Узлы учёта МОП — ПУИ»
+  // Состав: Кран шаровый, Фильтр, Счетчик воды, Клапан обратный, Редуктор давления (×2 системы)
+  const puiWaterMeterItemsSpec = [
+    { name: 'Кран шаровый Ду 15', unit: 'шт' },
+    { name: 'Фильтр сетчатый косой Ду 15', unit: 'шт' },
+    { name: 'Счетчик воды Ду 15', unit: 'шт' },
+    { name: 'Клапан обратный Ду 15', unit: 'шт' },
+    { name: 'Редуктор давления Ду 15', unit: 'шт' },
+  ];
+
+  let totalPuiNodesSpec = 0;
+  if (sections && sections.length > 0) {
+    sections.forEach(sec => {
+      if (sec.puiEnabled) {
+        const typFloors = Object.keys(sec.apts || {}).filter(f => +f >= 2 && sec.apts[f] > 0).length;
+        totalPuiNodesSpec += typFloors;
+      }
+    });
+  }
+
+  if (totalPuiNodesSpec > 0) {
+    const puiQtyPerItem = totalPuiNodesSpec * 2; // × 2 для В1 и Т3
+    puiWaterMeterItemsSpec.forEach(item => {
+      shutoffValvesMap.set(item.name, {
+        unit: item.unit,
+        qty: (shutoffValvesMap.get(item.name)?.qty || 0) + puiQtyPerItem
+      });
+    });
+  }
+
   // Считаем общее количество
   let totalShutoffValves = 0;
   shutoffValvesMap.forEach(item => { totalShutoffValves += item.qty; });

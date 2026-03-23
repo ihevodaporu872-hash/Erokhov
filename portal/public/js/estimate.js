@@ -1071,6 +1071,67 @@ export function aggregateEstimateData({ zonesData, risersByDiameter, sections, h
     }
   });
 
+  // === 6.2. Узлы учёта МОП — ПУИ (помещение уборочного инвентаря) ===
+  // Состав: Кран шаровый Ду 15, Фильтр сетчатый косой Ду 15, Счетчик воды Ду 15,
+  //         Клапан обратный Ду 15, Редуктор давления Ду 15
+  const puiWaterMeterItems = [
+    { name: 'Кран шаровый Ду 15 (ПУИ)', unit: 'шт' },
+    { name: 'Фильтр сетчатый косой Ду 15 (ПУИ)', unit: 'шт' },
+    { name: 'Счетчик воды Ду 15 (ПУИ)', unit: 'шт' },
+    { name: 'Клапан обратный Ду 15 (ПУИ)', unit: 'шт' },
+    { name: 'Редуктор давления Ду 15 (ПУИ)', unit: 'шт' },
+  ];
+
+  sections.forEach((section, sectionIndex) => {
+    if (!section.puiEnabled) return;
+
+    // Количество типовых этажей с квартирами (≥2)
+    const puiFloors = Object.keys(section.apts || {}).filter(f => +f >= 2 && section.apts[f] > 0).length;
+    if (puiFloors <= 0) return;
+
+    // ХВС (cold) — работа + материалы
+    estimateData[sectionIndex].cold.items.push({
+      type: 'работа',
+      name: 'Монтаж узла учёта ПУИ',
+      unit: 'шт',
+      quantity: puiFloors,
+      sortKey: 'pui-water-meter',
+      sortOrder: 1,
+    });
+    let coldPuiOrder = 2;
+    puiWaterMeterItems.forEach(item => {
+      estimateData[sectionIndex].cold.items.push({
+        type: 'материал',
+        name: item.name,
+        unit: item.unit,
+        quantity: puiFloors,
+        sortKey: 'pui-water-meter',
+        sortOrder: coldPuiOrder++,
+      });
+    });
+
+    // ГВС (hot) — работа + материалы
+    estimateData[sectionIndex].hot.items.push({
+      type: 'работа',
+      name: 'Монтаж узла учёта ПУИ',
+      unit: 'шт',
+      quantity: puiFloors,
+      sortKey: 'pui-water-meter',
+      sortOrder: 1,
+    });
+    let hotPuiOrder = 2;
+    puiWaterMeterItems.forEach(item => {
+      estimateData[sectionIndex].hot.items.push({
+        type: 'материал',
+        name: item.name,
+        unit: item.unit,
+        quantity: puiFloors,
+        sortKey: 'pui-water-meter',
+        sortOrder: hotPuiOrder++,
+      });
+    });
+  });
+
   // === 7. Узлы концевые ===
   // Структура: 1 работа «Монтаж узла концевого» + 2 материала (воздухоотводчик + кран)
   if (zonesData && zonesData.length > 0) {
