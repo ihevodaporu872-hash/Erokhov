@@ -269,7 +269,6 @@ function extractDiameterFromSortKey(sortKey) {
  * 7. Монтаж коллектора (распределительной гребенки)
  * 8. Монтаж водомерного узла (Аренда)
  * 9. Установка устройств внутриквартирного пожаротушения
- * 10. Установка кранов шаровых Ду 15 (ИВПТ)
  * 11. Монтаж компенсатора сильфонного диаметром до 50мм
  * 12. Монтаж компенсатора сильфонного диаметром до 100мм
  * 13. Монтаж неподвижных опор
@@ -323,11 +322,7 @@ function getWorkOrderPriority(row) {
   if (name.startsWith('Установка устройств внутриквартирного пожаротушения')) {
     return 9;
   }
-  // 10. ИВПТ - краны
-  if (name.startsWith('Установка кранов шаровых') && name.includes('ИВПТ')) {
-    return 10;
-  }
-  // 11. Компенсатор до 50мм
+  // 10. Компенсатор до 50мм
   if (name.startsWith('Монтаж компенсатора сильфонного диаметром до 50')) {
     return 11;
   }
@@ -1241,20 +1236,12 @@ export function aggregateEstimateData({ zonesData, risersByDiameter, sections, h
         sortOrder: 2,
       });
       estimateData[sectionIndex].cold.items.push({
-        type: 'работа',
-        name: 'Установка кранов шаровых Ду 15 (ИВПТ)',
-        unit: 'шт',
-        quantity: apts,
-        sortKey: 'ivpt-valve',
-        sortOrder: 1,
-      });
-      estimateData[sectionIndex].cold.items.push({
         type: 'материал',
         name: 'Кран шаровой Ду 15 (ИВПТ)',
         unit: 'шт',
         quantity: apts,
-        sortKey: 'ivpt-valve',
-        sortOrder: 2,
+        sortKey: 'ivpt',
+        sortOrder: 3,
       });
     }
   });
