@@ -76,6 +76,7 @@ export function makeDefaultSection() {
     apts: {},
     ivptEnabled: false,
     puiEnabled: false,
+    techFloorEnabled: false,
     rent: { enabled: false, qty: 1 },
     commercialUnits: 1,
     kuuVariant: 'collector',
@@ -141,6 +142,10 @@ export function loadCalculatorState(data) {
       // Миграция: puiEnabled (ПУИ на этажах)
       if (sec.puiEnabled === undefined) {
         sec.puiEnabled = false;
+      }
+      // Миграция: techFloorEnabled (тех. этаж)
+      if (sec.techFloorEnabled === undefined) {
+        sec.techFloorEnabled = false;
       }
       // Миграция: commercialUnits из rent.qty
       if (sec.commercialUnits === undefined) {
@@ -224,6 +229,13 @@ export function toggleSectionIvpt(si) {
 export function toggleSectionPui(si) {
   if (!sections[si]) return;
   sections[si].puiEnabled = !sections[si].puiEnabled;
+  notifyStateChange();
+}
+
+// Переключение тех. этажа для корпуса
+export function toggleSectionTechFloor(si) {
+  if (!sections[si]) return;
+  sections[si].techFloorEnabled = !sections[si].techFloorEnabled;
   notifyStateChange();
 }
 

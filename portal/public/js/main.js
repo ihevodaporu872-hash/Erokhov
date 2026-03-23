@@ -28,6 +28,7 @@ import {
   setMopDiameter as stateSetMopDiameter,
   toggleSectionIvpt,
   toggleSectionPui,
+  toggleSectionTechFloor,
   estimatePrices,
   setEstimatePrices,
   buildingStats,
@@ -1121,6 +1122,11 @@ window.app = {
 
   togglePui(si) {
     toggleSectionPui(si);
+    recalcAll();
+  },
+
+  toggleTechFloor(si) {
+    toggleSectionTechFloor(si);
     recalcAll();
   },
 

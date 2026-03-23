@@ -459,6 +459,12 @@ export function renderSectionsBlocks() {
             <i class="bi bi-droplet"></i> ${sec.puiEnabled ? 'ПУИ включён' : 'Учесть ПУИ'}
           </button>
         </div>
+        <div>
+          <button class="uvp-toggle ${sec.techFloorEnabled ? 'active' : ''}"
+                  onclick="window.app.toggleTechFloor(${si})">
+            <i class="bi bi-layers"></i> ${sec.techFloorEnabled ? 'Тех. этаж вкл.' : 'Тех. этаж'}
+          </button>
+        </div>
       </div>
 
       <div class="kuu-cards-block">

@@ -390,6 +390,26 @@ export function computeZonesData(sections, h1, hn, ivptEnabled) {
         grandTotalRisersLen += mainRiserLen;
       }
     }
+
+    // === Тех. этаж: магистральный участок длиной L (МОП) для каждой зоны ===
+    // Добавляет горизонтальную разводку на тех. этаже по диаметрам зон (В1, Т3, Т4)
+    if (sec.techFloorEnabled) {
+      const mopL = sec.mop?.L || 30;
+      if (mopL > 0) {
+        sec.zones.forEach(z => {
+          const d = z.fixedD || {};
+          ['V1', 'T3', 'T4'].forEach(sys => {
+            const dia = +d[sys] || 0;
+            if (dia > 0) {
+              const key = `${si}:${sys}:${dia}`;
+              if (!byDiameter[key]) byDiameter[key] = { len: 0, count: 0 };
+              byDiameter[key].len += mopL;
+              grandTotalRisersLen += mopL;
+            }
+          });
+        });
+      }
+    }
   });
 
   return { zonesData, grandTotalRisersLen, byDiameter, byAlbum };
