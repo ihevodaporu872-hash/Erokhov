@@ -980,13 +980,17 @@ export function aggregateEstimateData({ zonesData, risersByDiameter, sections, h
   }
 
   // === 6. Счётчики воды ===
+  // Включает квартиры + аренду + ПУИ (по 1 счётчику на типовой этаж)
   sections.forEach((section, sectionIndex) => {
     let apts = 0;
     for (let fl = 2; fl <= section.floors; fl++) {
       apts += section.apts[fl] || 0;
     }
     const rent = section.rent?.enabled ? (section.commercialUnits || 0) : 0;
-    const totalUnits = apts + rent;
+    const puiMeters = section.puiEnabled
+      ? Object.keys(section.apts || {}).filter(f => +f >= 2 && section.apts[f] > 0).length
+      : 0;
+    const totalUnits = apts + rent + puiMeters;
 
     if (totalUnits > 0) {
       ['cold', 'hot'].forEach(estimateKey => {
@@ -1077,7 +1081,6 @@ export function aggregateEstimateData({ zonesData, risersByDiameter, sections, h
   const puiWaterMeterItems = [
     { name: 'Кран шаровый Ду 15 (ПУИ)', unit: 'шт' },
     { name: 'Фильтр сетчатый косой Ду 15 (ПУИ)', unit: 'шт' },
-    { name: 'Счетчик воды Ду 15 (ПУИ)', unit: 'шт' },
     { name: 'Клапан обратный Ду 15 (ПУИ)', unit: 'шт' },
     { name: 'Редуктор давления Ду 15 (ПУИ)', unit: 'шт' },
   ];
@@ -1092,7 +1095,7 @@ export function aggregateEstimateData({ zonesData, risersByDiameter, sections, h
     // ХВС (cold) — работа + материалы
     estimateData[sectionIndex].cold.items.push({
       type: 'работа',
-      name: 'Монтаж узла учёта ПУИ',
+      name: 'Монтаж водомерного узла (ПУИ)',
       unit: 'шт',
       quantity: puiFloors,
       sortKey: 'pui-water-meter',
@@ -1113,7 +1116,7 @@ export function aggregateEstimateData({ zonesData, risersByDiameter, sections, h
     // ГВС (hot) — работа + материалы
     estimateData[sectionIndex].hot.items.push({
       type: 'работа',
-      name: 'Монтаж узла учёта ПУИ',
+      name: 'Монтаж водомерного узла (ПУИ)',
       unit: 'шт',
       quantity: puiFloors,
       sortKey: 'pui-water-meter',
