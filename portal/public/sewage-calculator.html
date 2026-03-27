@@ -4005,25 +4005,30 @@
     function getEffectiveFacade(idx) {
         var s = getStormSettings(idx);
         var b = (buildingStats && buildingStats[idx]) ? buildingStats[idx] : null;
+        var bH = b ? (b.height || 0) : 0;
+        var nF = b && b.floors ? b.floors.length : 0;
+        var totalApts = b ? (b.totalApts || 0) : 0;
+        var avgFloorH = (nF > 0 && bH) ? Math.round(bH / nF * 10) / 10 : 0;
+
         if (s.autoApartmentCalc && b) {
-            var totalApts = b.totalApts || 0;
-            var nF = b.floors ? b.floors.length : 0;
-            var avgFloorH = (nF > 0 && b.height) ? Math.round(b.height / nF * 10) / 10 : 0;
+            var autoPipeLen = Math.round(avgFloorH * totalApts * 10) / 10;
             return {
-                risers: totalApts,             // стояков = квартир
-                balconies: totalApts,           // трапов = квартир
-                pipeLen: Math.round(avgFloorH * totalApts * 10) / 10, // ср.этаж × кв-р
+                risers: totalApts,
+                balconies: totalApts,
+                pipeLen: autoPipeLen,
                 avgFloorH: avgFloorH,
                 totalApts: totalApts,
                 auto: true
             };
         }
+        // Ручной режим: risers — это метраж трубы, balconies — кол-во трапов
+        var manualPipeLen = s.risers || 0;
         return {
-            risers: s.risers || 0,
+            risers: manualPipeLen,
             balconies: s.balconies || 0,
-            pipeLen: calcStormPipeLength(b || {}, idx),
-            avgFloorH: 0,
-            totalApts: b ? (b.totalApts || 0) : 0,
+            pipeLen: manualPipeLen,
+            avgFloorH: avgFloorH,
+            totalApts: totalApts,
             auto: false
         };
     }
@@ -4256,15 +4261,15 @@
             var isAuto = s.autoApartmentCalc;
             var effRisers = eff.risers;
             var effBalconies = eff.balconies;
-            var hasFacade = effRisers > 0 || effBalconies > 0;
-            var nSleeves = effRisers * nF;
+            var hasFacade = eff.pipeLen > 0 || effBalconies > 0;
+            var nSleeves = effBalconies * nF;
             var disabledAttr = isAuto ? ' readonly style="opacity:.6;pointer-events:none"' : '';
             var facadeWidget =
                 '<div class="card-widget' + (hasFacade ? ' expanded' : '') + '" data-idx="' + idx + '" data-widget="facade">' +
                 '<div class="card-widget-header storm-widget-toggle" data-idx="' + idx + '" data-widget="facade">' +
                 '<i class="bi bi-building-down card-widget-icon"></i>' +
                 '<span class="card-widget-title">Фасадные стояки (Балконы / Террасы)</span>' +
-                (hasFacade ? '<span class="card-widget-badge">' + effRisers + '\u00a0ст. · ' + facadeLen + '\u00a0м</span>' : '') +
+                (hasFacade ? '<span class="card-widget-badge">' + facadeLen + '\u00a0м · ' + effBalconies + '\u00a0трапов</span>' : '') +
                 '</div>' +
                 '<div class="card-widget-body">' +
 
@@ -4274,8 +4279,8 @@
                 '</label>' +
 
                 '<div class="bld-num-row" style="margin-bottom:10px">' +
-                '<label>Фасадные стояки DN50, шт:</label>' +
-                '<input type="number" min="0" value="' + effRisers + '" ' +
+                '<label>Фасадные стояки DN50, м.п.:</label>' +
+                '<input type="number" min="0" step="0.1" value="' + eff.pipeLen + '" ' +
                 'data-idx="' + idx + '" data-field="risers" class="storm-num bld-num"' + disabledAttr + '>' +
                 '</div>' +
 
@@ -4291,14 +4296,13 @@
                 (hasFacade && isAuto ? '<div class="card-widget-info">' +
                     '<i class="bi bi-calculator"></i>' +
                     'Авто-расчёт: средний этаж <strong>' + eff.avgFloorH + '\u00a0м</strong>' +
-                    ' на <strong>' + eff.totalApts + '</strong>\u00a0квартир' +
+                    ' \u00d7 <strong>' + eff.totalApts + '</strong>\u00a0квартир' +
                     ' = <strong>' + facadeLen + '\u00a0м</strong> трубы SML DN50' +
                     '</div>' : '') +
 
                 (hasFacade && !isAuto ? '<div class="card-widget-info">' +
                     '<i class="bi bi-rulers"></i>' +
-                    'Фасадная труба SML DN50: <strong>' + facadeLen + '\u00a0м</strong> ' +
-                    '(' + effRisers + '\u00a0ст.\u00a0×\u00a0' + bH + '\u00a0м)' +
+                    'Фасадная труба SML DN50: <strong>' + facadeLen + '\u00a0м</strong>' +
                     '</div>' : '') +
 
                 (nSleeves > 0 ? '<div class="card-widget-info" style="background:rgba(245,158,11,.08);color:#b45309">' +
@@ -4418,13 +4422,13 @@
             cb.addEventListener('change', function () {
                 var idx = parseInt(cb.dataset.idx, 10);
                 var s = getStormSettings(idx);
-                s.autoApartmentCalc = cb.checked;
-                // При переключении в ручной — копируем эффективные значения
-                if (!cb.checked) {
-                    var eff = getEffectiveFacade(idx);
-                    s.risers = eff.risers;
-                    s.balconies = eff.balconies;
+                // При переключении в ручной — копируем вычисленные значения как стартовые
+                if (cb.checked === false) {
+                    var eff = getEffectiveFacade(idx); // ещё в авто-режиме
+                    s.risers = eff.pipeLen;            // метраж трубы
+                    s.balconies = eff.balconies;       // кол-во трапов
                 }
+                s.autoApartmentCalc = cb.checked;
                 renderStormResults();
             });
         });
@@ -4435,7 +4439,8 @@
                 var idx = parseInt(inp.dataset.idx, 10);
                 var s = getStormSettings(idx);
                 if (s.autoApartmentCalc) return; // заблокировано
-                s[inp.dataset.field] = Math.max(0, parseInt(inp.value, 10) || 0);
+                var val = parseFloat(inp.value) || 0;
+                s[inp.dataset.field] = Math.max(0, Math.round(val * 10) / 10);
                 renderStormResults();
             });
         });
