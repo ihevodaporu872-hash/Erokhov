@@ -2729,6 +2729,10 @@
 
     // Генерация работы для позиции материала
     function workNameFor(materialName) {
+        // Греющий кабель — собственная расценка (НЕ трубопровод)
+        if (/Греющий кабель/i.test(materialName)) {
+            return 'Монтаж саморегулирующегося греющего кабеля';
+        }
         // Трубопроводы К1/К2 — специальные наименования работ
         var pipeMatch = materialName.match(/^(?:Трубопровод|Труба)\s+(ПП|ПП Бесшумный|НПВХ|SML)\s+DN\s*(\d+)/i);
         if (pipeMatch) {
@@ -2868,7 +2872,7 @@
         deduped.forEach(function (item) {
             if (item.type === 'работа') {
                 other.push(item);
-            } else if (/^(Трубопровод|Труба)\s/i.test(item.name)) {
+            } else if (/^(Трубопровод|Труба)\s/i.test(item.name) && !/Греющий кабель/i.test(item.name)) {
                 pipes.push(item);
             } else if (isFitting(item.name)) {
                 fittings.push(item);
