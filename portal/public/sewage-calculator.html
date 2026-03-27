@@ -2479,7 +2479,10 @@
         }
 
         var s = getStormSettings(idx);
-        var len = calcStormPipeLength(b, idx);
+        var eff = getEffectiveFacade(idx);
+        var len = eff.pipeLen;
+        var effRisers = eff.risers;
+        var effBalconies = eff.balconies;
 
         // Муфты Rapid DN50 для SML: ⌈len/3⌉
         if (len > 0)
@@ -2494,21 +2497,28 @@
                 Math.ceil(len / 1.5));
 
         // Трапы HL 90.2 — 1 шт на каждый балкон/террасу
-        if (s.balconies > 0)
+        if (effBalconies > 0) {
             addItem('storm_trap_hl902',
                 'Трап кровельный HL\u00a090.2 DN\u00a050 (балконы/террасы)', 'шт',
-                s.balconies,
+                effBalconies,
                 'Предусмотреть подключение к сети электрообогрева (раздел ЭО)');
-
-        // Аварийные гильзы — 1 шт на каждый балкон
-        if (s.balconies > 0)
-            addItem('storm_gilza',
-                'Гильза аварийная (стальная труба DN\u00a050–100, l\u00a0=\u00a00,3\u00a0м)', 'шт',
-                s.balconies);
+            addItem('storm_trap_tee_50',
+                'Тройник SML DN\u00a050 (подключение трапа К2)', 'шт',
+                effBalconies, '1 шт на трап');
+            addItem('storm_trap_elbow_50',
+                'Отвод 45° SML DN\u00a050 (подключение трапа К2)', 'шт',
+                effBalconies * 2, '2 шт на трап');
+            addItem('storm_trap_gilza',
+                'Противопожарная гильза DN\u00a050 (трап К2)', 'шт',
+                effBalconies, '1 шт на трап');
+            addItem('storm_trap_cable',
+                'Саморегулирующийся греющий кабель (обогрев трапов К2)', 'м.п.',
+                effBalconies * 2, '2 м на трап');
+        }
 
         // Аварийные гильзы выпуска с балкона — risers × floors
         var nFloors = b.floors ? b.floors.length : 0;
-        var nSleeves = (s.risers || 0) * nFloors;
+        var nSleeves = effRisers * nFloors;
         if (nSleeves > 0) {
             addItem('storm_sleeve',
                 'Аварийная гильза выпуска с балкона DN\u00a050 (L\u00a0=\u00a0500\u00a0мм)', 'шт',
@@ -2596,7 +2606,8 @@
 
         var ORDER = [
             'storm_rapid_50', 'storm_khomuty',
-            'storm_trap_hl902', 'storm_gilza',
+            'storm_trap_hl902', 'storm_trap_tee_50', 'storm_trap_elbow_50',
+            'storm_trap_gilza', 'storm_trap_cable',
             'storm_sleeve', 'storm_sleeve_sealant', 'storm_sleeve_cable',
             'storm_main_sml_100', 'storm_main_sml_150',
             'storm_main_tee_100', 'storm_main_tee_150',
@@ -3975,16 +3986,46 @@
 
     function getStormSettings(idx) {
         if (!stormSettings[idx]) {
-            // Предзаполнение: корпус 0 → 12 стояков, корпус 1 → 18 стояков
-            var defaultRisers = idx === 0 ? 12 : idx === 1 ? 18 : 0;
             stormSettings[idx] = {
-                risers:    defaultRisers,
-                balconies: 0,
-                mains:     [],
-                mainsNextId: 1
+                risers:            0,
+                balconies:         0,
+                autoApartmentCalc: true,  // расчёт по квартирографии
+                mains:             [],
+                mainsNextId:       1
             };
         }
+        // Миграция старых настроек без autoApartmentCalc
+        if (stormSettings[idx].autoApartmentCalc === undefined) {
+            stormSettings[idx].autoApartmentCalc = true;
+        }
         return stormSettings[idx];
+    }
+
+    // Эффективные значения фасадных стояков/трапов с учётом авто-режима
+    function getEffectiveFacade(idx) {
+        var s = getStormSettings(idx);
+        var b = (buildingStats && buildingStats[idx]) ? buildingStats[idx] : null;
+        if (s.autoApartmentCalc && b) {
+            var totalApts = b.totalApts || 0;
+            var nF = b.floors ? b.floors.length : 0;
+            var avgFloorH = (nF > 0 && b.height) ? Math.round(b.height / nF * 10) / 10 : 0;
+            return {
+                risers: totalApts,             // стояков = квартир
+                balconies: totalApts,           // трапов = квартир
+                pipeLen: Math.round(avgFloorH * totalApts * 10) / 10, // ср.этаж × кв-р
+                avgFloorH: avgFloorH,
+                totalApts: totalApts,
+                auto: true
+            };
+        }
+        return {
+            risers: s.risers || 0,
+            balconies: s.balconies || 0,
+            pipeLen: calcStormPipeLength(b || {}, idx),
+            avgFloorH: 0,
+            totalApts: b ? (b.totalApts || 0) : 0,
+            auto: false
+        };
     }
 
     // Авто-резерв: если высота > 75 м, установить reserve для существующих магистралей
@@ -4000,9 +4041,8 @@
     }
 
     function calcStormPipeLength(b, idx) {
-        var s = getStormSettings(idx);
-        if (!s.risers || !b.height) return 0;
-        return Math.round(s.risers * b.height * 10) / 10;
+        var eff = getEffectiveFacade(idx);
+        return eff.pipeLen;
     }
 
     function collectStormFittings() {
@@ -4017,7 +4057,10 @@
 
         buildingStats.forEach(function (b, idx) {
             var s   = getStormSettings(idx);
-            var len = calcStormPipeLength(b, idx);
+            var eff = getEffectiveFacade(idx);
+            var len = eff.pipeLen;
+            var effRisers = eff.risers;
+            var effBalconies = eff.balconies;
 
             // Муфты Rapid DN50 для SML: ⌈len/3⌉
             if (len > 0)
@@ -4032,21 +4075,29 @@
                     Math.ceil(len / 1.5));
 
             // Трапы HL 90.2 — 1 шт на каждый балкон/террасу
-            if (s.balconies > 0)
+            if (effBalconies > 0) {
                 addItem('storm_trap_hl902',
                     'Трап кровельный HL\u00a090.2 DN\u00a050 (балконы/террасы)', 'шт',
-                    s.balconies,
+                    effBalconies,
                     'Предусмотреть подключение к сети электрообогрева (раздел ЭО)');
-
-            // Аварийные гильзы — 1 шт на каждый балкон
-            if (s.balconies > 0)
-                addItem('storm_gilza',
-                    'Гильза аварийная (стальная труба DN\u00a050–100, l\u00a0=\u00a00,3\u00a0м)', 'шт',
-                    s.balconies);
+                // Комплектация на каждый трап: тройник + 2 отвода + гильза + 2м кабеля
+                addItem('storm_trap_tee_50',
+                    'Тройник SML DN\u00a050 (подключение трапа К2)', 'шт',
+                    effBalconies, '1 шт на трап');
+                addItem('storm_trap_elbow_50',
+                    'Отвод 45° SML DN\u00a050 (подключение трапа К2)', 'шт',
+                    effBalconies * 2, '2 шт на трап');
+                addItem('storm_trap_gilza',
+                    'Противопожарная гильза DN\u00a050 (трап К2)', 'шт',
+                    effBalconies, '1 шт на трап');
+                addItem('storm_trap_cable',
+                    'Саморегулирующийся греющий кабель (обогрев трапов К2)', 'м.п.',
+                    effBalconies * 2, '2 м на трап');
+            }
 
             // Аварийные гильзы выпуска с балкона — risers × floors
             var nFloors = b.floors ? b.floors.length : 0;
-            var nSleeves = (s.risers || 0) * nFloors;
+            var nSleeves = effRisers * nFloors;
             if (nSleeves > 0) {
                 addItem('storm_sleeve',
                     'Аварийная гильза выпуска с балкона DN\u00a050 (L\u00a0=\u00a0500\u00a0мм)', 'шт',
@@ -4144,7 +4195,8 @@
 
         var ORDER = [
             'storm_rapid_50', 'storm_khomuty',
-            'storm_trap_hl902', 'storm_gilza',
+            'storm_trap_hl902', 'storm_trap_tee_50', 'storm_trap_elbow_50',
+            'storm_trap_gilza', 'storm_trap_cable',
             'storm_sleeve', 'storm_sleeve_sealant', 'storm_sleeve_cable',
             'storm_main_sml_100', 'storm_main_sml_150',
             'storm_main_tee_100', 'storm_main_tee_150',
@@ -4200,36 +4252,53 @@
             var totalK2Len = Math.round((facadeLen + mainsTotalLen) * 10) / 10;
 
             // ══════ Виджет 1: Фасадные стояки ══════
-            var hasFacade = (s.risers || 0) > 0;
-            var nSleeves = (s.risers || 0) * nF;
+            var eff = getEffectiveFacade(idx);
+            var isAuto = s.autoApartmentCalc;
+            var effRisers = eff.risers;
+            var effBalconies = eff.balconies;
+            var hasFacade = effRisers > 0 || effBalconies > 0;
+            var nSleeves = effRisers * nF;
+            var disabledAttr = isAuto ? ' readonly style="opacity:.6;pointer-events:none"' : '';
             var facadeWidget =
                 '<div class="card-widget' + (hasFacade ? ' expanded' : '') + '" data-idx="' + idx + '" data-widget="facade">' +
                 '<div class="card-widget-header storm-widget-toggle" data-idx="' + idx + '" data-widget="facade">' +
                 '<i class="bi bi-building-down card-widget-icon"></i>' +
                 '<span class="card-widget-title">Фасадные стояки (Балконы / Террасы)</span>' +
-                (hasFacade ? '<span class="card-widget-badge">' + (s.risers || 0) + '\u00a0ст. · ' + facadeLen + '\u00a0м</span>' : '') +
+                (hasFacade ? '<span class="card-widget-badge">' + effRisers + '\u00a0ст. · ' + facadeLen + '\u00a0м</span>' : '') +
                 '</div>' +
                 '<div class="card-widget-body">' +
 
+                // Чекбокс авто-режима
+                '<label class="k1c-check" style="font-size:13px;display:flex;align-items:center;gap:6px;cursor:pointer;margin-bottom:12px;font-weight:600">' +
+                '<input type="checkbox"' + (isAuto ? ' checked' : '') + ' data-idx="' + idx + '" class="storm-auto-calc"> Расчёт по квартирографии' +
+                '</label>' +
+
                 '<div class="bld-num-row" style="margin-bottom:10px">' +
                 '<label>Фасадные стояки DN50, шт:</label>' +
-                '<input type="number" min="0" value="' + (s.risers || 0) + '" ' +
-                'data-idx="' + idx + '" data-field="risers" class="storm-num bld-num">' +
+                '<input type="number" min="0" value="' + effRisers + '" ' +
+                'data-idx="' + idx + '" data-field="risers" class="storm-num bld-num"' + disabledAttr + '>' +
                 '</div>' +
 
                 '<div class="bld-num-row" style="margin-bottom:10px">' +
                 '<label>Трапы балконов\u00a0/\u00a0террас (HL\u00a090.2), шт:</label>' +
-                '<input type="number" min="0" value="' + (s.balconies || 0) + '" ' +
-                'data-idx="' + idx + '" data-field="balconies" class="storm-num bld-num">' +
+                '<input type="number" min="0" value="' + effBalconies + '" ' +
+                'data-idx="' + idx + '" data-field="balconies" class="storm-num bld-num"' + disabledAttr + '>' +
                 '</div>' +
 
-                (s.balconies > 0 ? '<div class="k3-vent-info"><i class="bi bi-info-circle"></i> ' +
-                    'На каждый трап: 1\u00a0воронка HL\u00a090.2, 2\u00a0м кабеля, 1\u00a0тройник, 2\u00a0отвода</div>' : '') +
+                (effBalconies > 0 ? '<div class="k3-vent-info"><i class="bi bi-info-circle"></i> ' +
+                    'На каждый трап: 1\u00a0воронка HL\u00a090.2, 2\u00a0м кабеля, 1\u00a0тройник, 2\u00a0отвода, 1\u00a0п/п гильза</div>' : '') +
 
-                (hasFacade ? '<div class="card-widget-info">' +
+                (hasFacade && isAuto ? '<div class="card-widget-info">' +
+                    '<i class="bi bi-calculator"></i>' +
+                    'Авто-расчёт: средний этаж <strong>' + eff.avgFloorH + '\u00a0м</strong>' +
+                    ' на <strong>' + eff.totalApts + '</strong>\u00a0квартир' +
+                    ' = <strong>' + facadeLen + '\u00a0м</strong> трубы SML DN50' +
+                    '</div>' : '') +
+
+                (hasFacade && !isAuto ? '<div class="card-widget-info">' +
                     '<i class="bi bi-rulers"></i>' +
                     'Фасадная труба SML DN50: <strong>' + facadeLen + '\u00a0м</strong> ' +
-                    '(' + (s.risers || 0) + '\u00a0ст.\u00a0×\u00a0' + bH + '\u00a0м)' +
+                    '(' + effRisers + '\u00a0ст.\u00a0×\u00a0' + bH + '\u00a0м)' +
                     '</div>' : '') +
 
                 (nSleeves > 0 ? '<div class="card-widget-info" style="background:rgba(245,158,11,.08);color:#b45309">' +
@@ -4344,11 +4413,29 @@
             });
         });
 
-        // Числовые поля К2
+        // Чекбокс авто-расчёта по квартирографии
+        container.querySelectorAll('.storm-auto-calc').forEach(function (cb) {
+            cb.addEventListener('change', function () {
+                var idx = parseInt(cb.dataset.idx, 10);
+                var s = getStormSettings(idx);
+                s.autoApartmentCalc = cb.checked;
+                // При переключении в ручной — копируем эффективные значения
+                if (!cb.checked) {
+                    var eff = getEffectiveFacade(idx);
+                    s.risers = eff.risers;
+                    s.balconies = eff.balconies;
+                }
+                renderStormResults();
+            });
+        });
+
+        // Числовые поля К2 (работают только в ручном режиме)
         container.querySelectorAll('.storm-num').forEach(function (inp) {
             inp.addEventListener('input', function () {
-                getStormSettings(parseInt(inp.dataset.idx, 10))[inp.dataset.field] =
-                    Math.max(0, parseInt(inp.value, 10) || 0);
+                var idx = parseInt(inp.dataset.idx, 10);
+                var s = getStormSettings(idx);
+                if (s.autoApartmentCalc) return; // заблокировано
+                s[inp.dataset.field] = Math.max(0, parseInt(inp.value, 10) || 0);
                 renderStormResults();
             });
         });
