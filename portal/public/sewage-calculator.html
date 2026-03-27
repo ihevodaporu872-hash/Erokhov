@@ -3857,19 +3857,22 @@
             var mainInsLen = 0;
             (s.mains || []).forEach(function (m) {
                 var dn = m.diameter || 100;
-                var reserve = m.reserve ? 2 : 1;
-                var vertLen = bH * reserve;
-                var horizLen = 4;                     // горизонтальный лежак под кровлей
-                var pipeLen = vertLen + horizLen;
+                var vertH = Math.max(bH - 1, 0);     // вертикаль = высота здания − 1 м (отм. +0.000)
+                var horizLen = 16;                     // горизонтальный лежак
+                var vertLen = m.reserve ? vertH * 2 : vertH; // резерв дублирует только вертикаль
+                var pipeLen = Math.round((vertLen + horizLen) * 10) / 10;
                 if (pipeLen > 0) {
                     addItem('storm_main_sml_' + dn,
                         'Труба SML DN\u00a0' + dn + ' (магистральный водосток)', 'м.п.', pipeLen);
                     addItem('storm_main_rapid_' + dn,
                         'Муфта соединительная Rapid DN\u00a0' + dn + ' (SML)', 'шт',
                         Math.ceil(pipeLen / 3) + 3);  // +3 доп. муфты на узел сбора
+                    // Хомуты: горизонталь 0.75 м, вертикаль 1.5 м
+                    var clampHoriz = Math.ceil(horizLen / 0.75);
+                    var clampVert  = Math.ceil(vertLen / 1.5);
                     addItem('storm_main_khomuty',
                         'Хомут стальной (крепление магистралей К2)', 'шт',
-                        Math.ceil(pipeLen / 1.5) + 3); // +3 доп. хомуты на лежак
+                        clampHoriz + clampVert);
                     mainInsLen += pipeLen;
                 }
                 // Узел сбора: тройник + 2 отвода 45°
@@ -3877,12 +3880,12 @@
                     'Тройник SML DN\u00a0' + dn + ' (узел сбора)', 'шт', 1);
                 addItem('storm_main_elbow45_' + dn,
                     'Отвод 45° SML DN\u00a0' + dn + ' (узел сбора)', 'шт', 2);
-                // Воронки кровельные — 2 шт на магистраль
+                // Воронки кровельные — 6 шт на магистраль
                 addItem('storm_main_funnel',
-                    'Воронка кровельная HL62 с электроподогревом', 'шт', 2);
+                    'Воронка кровельная HL62 с электроподогревом', 'шт', 6);
                 addItem('storm_main_funnel_cable',
                     'Саморегулирующийся греющий кабель (обогрев воронок)', 'м.п.',
-                    4, '4 м на магистраль (2 воронки)');
+                    12, '2 м на воронку (6 воронок на магистраль)');
                 // Перемычки — только при резервном стояке
                 if (m.reserve && nFloors > 0) {
                     var nJumpers = Math.floor(nFloors / 5);
@@ -4033,14 +4036,15 @@
                     var nF = b.floors ? b.floors.length : 0;
                     var mainsCards = (s.mains || []).map(function (m, mi) {
                         var dn = m.diameter || 100;
-                        var reserve = m.reserve ? 2 : 1;
-                        var vertLen = Math.round(bH * reserve * 10) / 10;
-                        var totalLen = Math.round((vertLen + 4) * 10) / 10;
+                        var vertH = Math.max(bH - 1, 0);
+                        var vertLen = m.reserve ? vertH * 2 : vertH;
+                        var totalLen = Math.round((vertLen + 16) * 10) / 10;
                         var nJumpers = m.reserve ? Math.floor(nF / 5) : 0;
                         var infoLine = '<div class="k3-vent-info" style="margin-top:6px">' +
                             '<i class="bi bi-building-up"></i> Магистраль DN' + dn + ': <strong>' + totalLen + '\u00a0м</strong> SML' +
-                            (m.reserve ? ' (основной + резервный)' : ' (основной)') +
-                            ' · Узел сбора: 2\u00a0воронки + 4\u00a0м лежак' +
+                            ' (верт.\u00a0' + Math.round(vertLen * 10) / 10 + '\u00a0м + гор.\u00a016\u00a0м)' +
+                            (m.reserve ? ' · резерв' : '') +
+                            ' · 6\u00a0воронок HL62' +
                             (nJumpers > 0 ? ' · ' + nJumpers + '\u00a0перемычек' : '') +
                             '</div>';
                         return '<div class="k3-zone-card" style="margin-bottom:8px">' +
