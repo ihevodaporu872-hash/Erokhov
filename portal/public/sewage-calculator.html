@@ -373,6 +373,61 @@
         }
         .equip-card.active .equip-card-desc { color: var(--accent-blue); opacity: .8; }
 
+        /* ── К2: Виджеты-карточки ────────────────────────────────────────────── */
+        .card-widget {
+            border: 2px solid var(--gray-200);
+            border-radius: 12px;
+            padding: 18px 20px 14px;
+            margin-bottom: 14px;
+            background: var(--bg-card);
+            transition: border-color .15s, box-shadow .15s;
+        }
+        .card-widget.expanded {
+            border-color: var(--accent-blue);
+            box-shadow: 0 0 0 3px rgba(0,122,255,.10);
+        }
+        .card-widget-header {
+            display: flex; align-items: center; gap: 10px;
+            cursor: pointer; user-select: none; margin-bottom: 0;
+            transition: margin .15s;
+        }
+        .card-widget.expanded .card-widget-header { margin-bottom: 14px; }
+        .card-widget-icon {
+            font-size: 22px; color: var(--gray-400); transition: color .15s;
+        }
+        .card-widget.expanded .card-widget-icon { color: var(--accent-blue); }
+        .card-widget-title {
+            font-size: 14px; font-weight: 700; color: var(--gray-900); flex: 1;
+        }
+        .card-widget.expanded .card-widget-title { color: var(--accent-blue); }
+        .card-widget-badge {
+            font-size: 11px; font-weight: 600; color: var(--gray-500);
+            background: var(--gray-100, #f5f5f5); border-radius: 20px;
+            padding: 3px 10px; white-space: nowrap;
+        }
+        .card-widget.expanded .card-widget-badge {
+            color: var(--accent-blue); background: rgba(0,122,255,.1);
+        }
+        .card-widget-body { display: none; }
+        .card-widget.expanded .card-widget-body { display: block; }
+        .card-widget-info {
+            display: flex; align-items: center; gap: 6px;
+            margin-top: 10px; padding: 8px 12px;
+            background: rgba(0,122,255,.06); border-radius: 8px;
+            font-size: 12px; color: var(--accent-blue); font-weight: 500;
+        }
+        .card-widget-info i { font-size: 14px; }
+        .btn-outline-primary {
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 8px 16px;
+            border: 2px dashed var(--accent-blue); border-radius: 10px;
+            background: transparent; color: var(--accent-blue);
+            font-size: 13px; font-weight: 600; font-family: inherit; cursor: pointer;
+            transition: background .15s, transform .1s;
+        }
+        .btn-outline-primary:hover { background: var(--accent-blue-light); transform: translateY(-1px); }
+        .btn-outline-primary i { font-size: 15px; }
+
         /* ── К3: Зоны ────────────────────────────────────────────────────────── */
         .btn-add-zone {
             display: inline-flex; align-items: center; gap: 7px;
@@ -4110,7 +4165,7 @@
         return result;
     }
 
-    /* ─── Рендер аккордеонов К2 ──────────────────────────────────────────── */
+    /* ─── Рендер аккордеонов К2 (виджеты-карточки) ───────────────────────── */
     function renderStormAccordions() {
         var container = document.getElementById('stormBuildingAccordions');
         if (!container) return;
@@ -4129,100 +4184,148 @@
 
         var html = buildingStats.map(function (b, idx) {
             var s    = getStormSettings(idx);
-            var len  = calcStormPipeLength(b, idx);
+            var facadeLen = calcStormPipeLength(b, idx);
             var open = stormAccordionOpenState[idx] ? ' open' : '';
             var name = escHtml(b.name || ('Корпус ' + b.num));
+            var bH   = b.height || 0;
+            var nF   = b.floors ? b.floors.length : 0;
 
-            return '<details class="accordion" id="storm-accord-' + idx + '"' + open + '>' +
-                '<summary class="accordion-header">' +
-                '<span class="accordion-icon"></span>' +
-                name +
-                '<span class="accord-meta">— ' + s.risers + '\u00a0ст. · ' + len + '\u00a0м</span>' +
-                '</summary>' +
-                '<div class="accordion-content">' +
+            // Суммарная длина магистралей
+            var mainsTotalLen = 0;
+            (s.mains || []).forEach(function (m) {
+                var vertH = Math.max(bH - 1, 0);
+                var vertLen = m.reserve ? vertH * 2 : vertH;
+                mainsTotalLen += Math.round((vertLen + 16) * 10) / 10;
+            });
+            var totalK2Len = Math.round((facadeLen + mainsTotalLen) * 10) / 10;
 
-                '<div class="bld-stats-row">' +
-                '<span><i class="bi bi-layers"></i> Высота корпуса: <strong>' + (b.height || '—') + '\u00a0м</strong></span>' +
+            // ══════ Виджет 1: Фасадные стояки ══════
+            var hasFacade = (s.risers || 0) > 0;
+            var nSleeves = (s.risers || 0) * nF;
+            var facadeWidget =
+                '<div class="card-widget' + (hasFacade ? ' expanded' : '') + '" data-idx="' + idx + '" data-widget="facade">' +
+                '<div class="card-widget-header storm-widget-toggle" data-idx="' + idx + '" data-widget="facade">' +
+                '<i class="bi bi-building-down card-widget-icon"></i>' +
+                '<span class="card-widget-title">Фасадные стояки (Балконы / Террасы)</span>' +
+                (hasFacade ? '<span class="card-widget-badge">' + (s.risers || 0) + '\u00a0ст. · ' + facadeLen + '\u00a0м</span>' : '') +
                 '</div>' +
+                '<div class="card-widget-body">' +
 
-                '<div class="bld-num-row" style="margin-bottom:12px">' +
+                '<div class="bld-num-row" style="margin-bottom:10px">' +
                 '<label>Фасадные стояки DN50, шт:</label>' +
                 '<input type="number" min="0" value="' + (s.risers || 0) + '" ' +
                 'data-idx="' + idx + '" data-field="risers" class="storm-num bld-num">' +
                 '</div>' +
 
-                '<div class="bld-num-row" style="margin-bottom:12px">' +
+                '<div class="bld-num-row" style="margin-bottom:10px">' +
                 '<label>Трапы балконов\u00a0/\u00a0террас (HL\u00a090.2), шт:</label>' +
                 '<input type="number" min="0" value="' + (s.balconies || 0) + '" ' +
                 'data-idx="' + idx + '" data-field="balconies" class="storm-num bld-num">' +
                 '</div>' +
 
-                '<div class="pipe-length-display">' +
-                '<i class="bi bi-rulers"></i>' +
-                'Длина стояков К2 (стояков\u00a0×\u00a0высота корпуса):' +
-                '<strong>\u2009' + len + '\u00a0м</strong>' +
+                (s.balconies > 0 ? '<div class="k3-vent-info"><i class="bi bi-info-circle"></i> ' +
+                    'На каждый трап: 1\u00a0воронка HL\u00a090.2, 2\u00a0м кабеля, 1\u00a0тройник, 2\u00a0отвода</div>' : '') +
+
+                (hasFacade ? '<div class="card-widget-info">' +
+                    '<i class="bi bi-rulers"></i>' +
+                    'Фасадная труба SML DN50: <strong>' + facadeLen + '\u00a0м</strong> ' +
+                    '(' + (s.risers || 0) + '\u00a0ст.\u00a0×\u00a0' + bH + '\u00a0м)' +
+                    '</div>' : '') +
+
+                (nSleeves > 0 ? '<div class="card-widget-info" style="background:rgba(245,158,11,.08);color:#b45309">' +
+                    '<i class="bi bi-exclamation-triangle"></i> ' +
+                    'Аварийный сброс: <strong>' + nSleeves + '</strong>\u00a0гильз DN50 ' +
+                    '+ <strong>' + (Math.round(nSleeves * 0.5 * 10) / 10) + '\u00a0м</strong> греющего кабеля' +
+                    '</div>' : '') +
+
+                '</div>' + // /card-widget-body
+                '</div>';  // /card-widget
+
+            // ══════ Виджет 2: Магистральные стояки (Кровля) ══════
+            var hasMains = (s.mains || []).length > 0;
+            var mainsCards = (s.mains || []).map(function (m, mi) {
+                var dn = m.diameter || 100;
+                var vertH = Math.max(bH - 1, 0);
+                var vertLen = m.reserve ? vertH * 2 : vertH;
+                var totalLen = Math.round((vertLen + 16) * 10) / 10;
+                var nJumpers = m.reserve ? Math.floor(nF / 5) : 0;
+
+                return '<div class="k3-zone-card" style="margin-bottom:8px">' +
+                    '<div class="k3-zone-header">' +
+                    '<span><span class="k3-zone-name">Магистраль ' + (mi + 1) + '</span>' +
+                    '<span class="k3-zone-type-badge">' + totalLen + '\u00a0м SML</span></span>' +
+                    '<button class="k3-zone-remove storm-remove-main" data-idx="' + idx + '" data-main-id="' + m.id + '">&times;</button>' +
+                    '</div>' +
+                    '<div class="bld-num-row">' +
+                    '<label>Диаметр:</label>' +
+                    '<select class="storm-main-dn bld-select" data-idx="' + idx + '" data-main-id="' + m.id + '">' +
+                    '<option value="100"' + (dn === 100 ? ' selected' : '') + '>DN 100</option>' +
+                    '<option value="150"' + (dn === 150 ? ' selected' : '') + '>DN 150</option>' +
+                    '</select></div>' +
+                    '<div class="bld-num-row">' +
+                    '<label><input type="checkbox" class="storm-main-reserve" data-idx="' + idx + '" data-main-id="' + m.id + '"' +
+                    (m.reserve ? ' checked' : '') + '> Резервный стояк (1+1)</label>' +
+                    '</div>' +
+                    '<div class="k3-vent-info" style="margin-top:6px">' +
+                    '<i class="bi bi-building-up"></i> ' +
+                    'верт.\u00a0' + Math.round(vertLen * 10) / 10 + '\u00a0м + гор.\u00a016\u00a0м' +
+                    (m.reserve ? ' · резерв' : '') +
+                    ' · 6\u00a0воронок HL62' +
+                    (nJumpers > 0 ? ' · ' + nJumpers + '\u00a0перемычек' : '') +
+                    '</div>' +
+                    '</div>';
+            }).join('');
+
+            var mainsWidget =
+                '<div class="card-widget' + (hasMains ? ' expanded' : '') + '" data-idx="' + idx + '" data-widget="mains">' +
+                '<div class="card-widget-header storm-widget-toggle" data-idx="' + idx + '" data-widget="mains">' +
+                '<i class="bi bi-arrow-up-circle card-widget-icon"></i>' +
+                '<span class="card-widget-title">Магистральные стояки (Кровля)</span>' +
+                (hasMains ? '<span class="card-widget-badge">' + (s.mains || []).length + '\u00a0маг. · ' + mainsTotalLen + '\u00a0м</span>' : '') +
                 '</div>' +
+                '<div class="card-widget-body">' +
 
-                (function () {
-                    var nF = b.floors ? b.floors.length : 0;
-                    var nS = (s.risers || 0) * nF;
-                    if (nS > 0) {
-                        return '<div class="k3-vent-info" style="margin-top:8px">' +
-                            '<i class="bi bi-exclamation-triangle"></i> ' +
-                            'Аварийный сброс: автоматически рассчитано <strong>' + nS + '</strong>\u00a0гильз DN50 ' +
-                            '(' + (s.risers || 0) + '\u00a0ст.\u00a0×\u00a0' + nF + '\u00a0эт.) ' +
-                            '+ <strong>' + (Math.round(nS * 0.5 * 10) / 10) + '\u00a0м</strong> греющего кабеля' +
-                            '</div>';
-                    }
-                    return '';
-                })() +
-
-                // ── Магистральные стояки (Кровля) ──
-                '<div class="bld-equipment-section" style="margin-top:16px">' +
-                '<p class="bld-equipment-title">Магистральные стояки (Кровля)</p>' +
-                '<div style="margin-bottom:8px">' +
-                '<button class="btn-add-zone storm-add-main" data-idx="' + idx + '">' +
+                '<div style="margin-bottom:10px">' +
+                '<button class="btn-outline-primary storm-add-main" data-idx="' + idx + '">' +
                 '<i class="bi bi-plus-circle"></i> Добавить магистраль' +
                 '</button></div>' +
 
-                (function () {
-                    var bH = b.height || 0;
-                    var nF = b.floors ? b.floors.length : 0;
-                    var mainsCards = (s.mains || []).map(function (m, mi) {
-                        var dn = m.diameter || 100;
-                        var vertH = Math.max(bH - 1, 0);
-                        var vertLen = m.reserve ? vertH * 2 : vertH;
-                        var totalLen = Math.round((vertLen + 16) * 10) / 10;
-                        var nJumpers = m.reserve ? Math.floor(nF / 5) : 0;
-                        var infoLine = '<div class="k3-vent-info" style="margin-top:6px">' +
-                            '<i class="bi bi-building-up"></i> Магистраль DN' + dn + ': <strong>' + totalLen + '\u00a0м</strong> SML' +
-                            ' (верт.\u00a0' + Math.round(vertLen * 10) / 10 + '\u00a0м + гор.\u00a016\u00a0м)' +
-                            (m.reserve ? ' · резерв' : '') +
-                            ' · 6\u00a0воронок HL62' +
-                            (nJumpers > 0 ? ' · ' + nJumpers + '\u00a0перемычек' : '') +
-                            '</div>';
-                        return '<div class="k3-zone-card" style="margin-bottom:8px">' +
-                            '<div class="k3-zone-header">' +
-                            '<span><span class="k3-zone-name">Магистраль ' + (mi + 1) + '</span></span>' +
-                            '<button class="k3-zone-remove storm-remove-main" data-idx="' + idx + '" data-main-id="' + m.id + '">&times;</button>' +
-                            '</div>' +
-                            '<div class="bld-num-row">' +
-                            '<label>Диаметр:</label>' +
-                            '<select class="storm-main-dn bld-select" data-idx="' + idx + '" data-main-id="' + m.id + '">' +
-                            '<option value="100"' + (dn === 100 ? ' selected' : '') + '>DN 100</option>' +
-                            '<option value="150"' + (dn === 150 ? ' selected' : '') + '>DN 150</option>' +
-                            '</select></div>' +
-                            '<div class="bld-num-row">' +
-                            '<label><input type="checkbox" class="storm-main-reserve" data-idx="' + idx + '" data-main-id="' + m.id + '"' +
-                            (m.reserve ? ' checked' : '') + '> Резервный стояк (1+1)</label>' +
-                            '</div>' +
-                            infoLine +
-                            '</div>';
-                    });
-                    return mainsCards.join('');
-                })() +
+                mainsCards +
 
-                '</div>' + // /bld-equipment-section
+                (hasMains ? '<div class="card-widget-info">' +
+                    '<i class="bi bi-rulers"></i>' +
+                    'Магистральные трубы: <strong>' + mainsTotalLen + '\u00a0м</strong>' +
+                    '</div>' : '') +
+
+                '</div>' + // /card-widget-body
+                '</div>';  // /card-widget
+
+            // Общая сводка
+            var summaryInfo = totalK2Len > 0
+                ? '<div class="card-widget-info" style="margin-top:4px;margin-bottom:4px">' +
+                  '<i class="bi bi-clipboard-data"></i> Итого труб К2 по корпусу: ' +
+                  '<strong>' + totalK2Len + '\u00a0м</strong> ' +
+                  '(фасад\u00a0' + facadeLen + ' + магистр.\u00a0' + mainsTotalLen + ')' +
+                  '</div>'
+                : '';
+
+            return '<details class="accordion" id="storm-accord-' + idx + '"' + open + '>' +
+                '<summary class="accordion-header">' +
+                '<span class="accordion-icon"></span>' +
+                name +
+                '<span class="accord-meta">— ' + totalK2Len + '\u00a0м</span>' +
+                '</summary>' +
+                '<div class="accordion-content">' +
+
+                '<div class="bld-stats-row">' +
+                '<span><i class="bi bi-layers"></i> Высота: <strong>' + (bH || '—') + '\u00a0м</strong></span>' +
+                '<span><i class="bi bi-building"></i> Этажей: <strong>' + nF + '</strong></span>' +
+                (bH > 75 ? '<span style="color:#b45309"><i class="bi bi-shield-check"></i> Авто-резерв (>75\u00a0м)</span>' : '') +
+                '</div>' +
+
+                facadeWidget +
+                mainsWidget +
+                summaryInfo +
 
                 '</div>' + // /accordion-content
                 '</details>';
@@ -4230,7 +4333,18 @@
 
         container.innerHTML = html;
 
-        // Обработчики числовых полей К2
+        // ── Обработчики ──
+
+        // Раскрытие/сворачивание виджетов
+        container.querySelectorAll('.storm-widget-toggle').forEach(function (hdr) {
+            hdr.addEventListener('click', function (e) {
+                if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+                var widget = hdr.closest('.card-widget');
+                if (widget) widget.classList.toggle('expanded');
+            });
+        });
+
+        // Числовые поля К2
         container.querySelectorAll('.storm-num').forEach(function (inp) {
             inp.addEventListener('input', function () {
                 getStormSettings(parseInt(inp.dataset.idx, 10))[inp.dataset.field] =
