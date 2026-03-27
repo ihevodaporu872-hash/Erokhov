@@ -2412,7 +2412,7 @@
         return Object.keys(acc).map(function (k) { return acc[k]; });
     }
 
-    // Собирает К2-фитинги для одного корпуса
+    // Собирает К2-фитинги для одного корпуса (полная версия, синхронизирована с collectStormFittings)
     function collectStormFittingsForBuilding(idx) {
         if (!buildingStats || !buildingStats[idx]) return [];
         var b = buildingStats[idx];
@@ -2423,24 +2423,143 @@
             else { acc[key] = { name: name, unit: unit, qty: qty, note: note || '', group: group || '' }; }
         }
 
-        var ss = getStormSettings(idx);
-        var pipeLen = calcStormPipeLength(b, idx);
-        if (!pipeLen) return [];
+        var s = getStormSettings(idx);
+        var len = calcStormPipeLength(b, idx);
 
-        var risers = ss.funnelCount || 1;
-        // Муфты Rapid DN50
-        addItem('storm_rapid', 'Муфта Rapid DN50 (К2)', 'шт', Math.ceil(pipeLen / 3), '', '');
-        // Воронки
-        addItem('storm_funnel', 'Водоприёмная воронка DN50', 'шт', risers, '', '');
-        // Ревизии
-        addItem('storm_revision', 'Ревизия DN50 (К2)', 'шт', risers, '', 'service');
+        // Муфты Rapid DN50 для SML: ⌈len/3⌉
+        if (len > 0)
+            addItem('storm_rapid_50',
+                'Муфта соединительная Rapid DN\u00a050 (SML, К2)', 'шт',
+                Math.ceil(len / 3));
 
-        if (stormInsulation) {
-            addItem('storm_insul', 'Теплоизоляция 9 мм (К2)', 'м', Math.round(pipeLen * 10) / 10, '', '');
-            addItem('storm_heating', 'Греющий кабель (К2)', 'м', Math.round(pipeLen * 10) / 10, '', '');
+        // Хомуты стальные: ⌈len/1.5⌉
+        if (len > 0)
+            addItem('storm_khomuty',
+                'Хомут стальной (крепление стояков К2)', 'шт',
+                Math.ceil(len / 1.5));
+
+        // Трапы HL 90.2 — 1 шт на каждый балкон/террасу
+        if (s.balconies > 0)
+            addItem('storm_trap_hl902',
+                'Трап кровельный HL\u00a090.2 DN\u00a050 (балконы/террасы)', 'шт',
+                s.balconies,
+                'Предусмотреть подключение к сети электрообогрева (раздел ЭО)');
+
+        // Аварийные гильзы — 1 шт на каждый балкон
+        if (s.balconies > 0)
+            addItem('storm_gilza',
+                'Гильза аварийная (стальная труба DN\u00a050–100, l\u00a0=\u00a00,3\u00a0м)', 'шт',
+                s.balconies);
+
+        // Аварийные гильзы выпуска с балкона — risers × floors
+        var nFloors = b.floors ? b.floors.length : 0;
+        var nSleeves = (s.risers || 0) * nFloors;
+        if (nSleeves > 0) {
+            addItem('storm_sleeve',
+                'Аварийная гильза выпуска с балкона DN\u00a050 (L\u00a0=\u00a0500\u00a0мм)', 'шт',
+                nSleeves, 'Стальная оцинкованная труба DN50, l=0.5 м');
+            addItem('storm_sleeve_sealant',
+                'Герметик для гильз (огнестойкий)', 'шт', nSleeves);
+            addItem('storm_sleeve_cable',
+                'Саморегулирующийся греющий кабель (обогрев гильз)', 'м.п.',
+                Math.round(nSleeves * 0.5 * 10) / 10, '0,5 м на каждую гильзу');
         }
 
-        return Object.keys(acc).map(function (k) { return acc[k]; });
+        // ── Магистральные стояки (Кровля) ──
+        var bH = b.height || 0;
+        var mainInsLen = 0;
+        (s.mains || []).forEach(function (m) {
+            var dn = m.diameter || 100;
+            var vertH = Math.max(bH - 1, 0);
+            var horizLen = 16;
+            var vertLen = m.reserve ? vertH * 2 : vertH;
+            var pipeLen = Math.round((vertLen + horizLen) * 10) / 10;
+            if (pipeLen > 0) {
+                addItem('storm_main_sml_' + dn,
+                    'Труба SML DN\u00a0' + dn + ' (магистральный водосток)', 'м.п.', pipeLen);
+                addItem('storm_main_rapid_' + dn,
+                    'Муфта соединительная Rapid DN\u00a0' + dn + ' (SML)', 'шт',
+                    Math.ceil(pipeLen / 3) + 3);
+                var clampHoriz = Math.ceil(horizLen / 0.75);
+                var clampVert  = Math.ceil(vertLen / 1.5);
+                addItem('storm_main_khomuty',
+                    'Хомут стальной (крепление магистралей К2)', 'шт',
+                    clampHoriz + clampVert);
+                mainInsLen += pipeLen;
+            }
+            addItem('storm_main_tee_' + dn,
+                'Тройник SML DN\u00a0' + dn + ' (узел сбора)', 'шт', 1);
+            addItem('storm_main_elbow45_' + dn,
+                'Отвод 45° SML DN\u00a0' + dn + ' (узел сбора)', 'шт', 2);
+            addItem('storm_main_funnel',
+                'Воронка кровельная HL62 с электроподогревом', 'шт', 6);
+            addItem('storm_main_funnel_cable',
+                'Саморегулирующийся греющий кабель (обогрев воронок)', 'м.п.',
+                12, '2 м на воронку (6 воронок на магистраль)');
+            if (m.reserve && nFloors > 0) {
+                var nJumpers = Math.floor(nFloors / 5);
+                if (nJumpers > 0) {
+                    addItem('storm_main_jumper_elbow_' + dn,
+                        'Отвод 90° SML DN\u00a0' + dn + ' (перемычки)', 'шт', nJumpers * 2);
+                    addItem('storm_main_jumper_pipe_' + dn,
+                        'Труба SML DN\u00a0' + dn + ' (перемычки, 1\u00a0м)', 'м.п.', nJumpers);
+                }
+            }
+        });
+
+        // ── Ревизии стояков К2 (каждый 3-й этаж) ───────────────────
+        var k2RevPer = nFloors > 0 ? Math.floor(nFloors / 3) : 0;
+        if (k2RevPer > 0) {
+            if ((s.risers || 0) > 0) {
+                var k2FacadeRevs = s.risers * k2RevPer;
+                addItem('storm_rev_50',
+                    'Ревизия SML DN\u00a050 (стояки К2)', 'шт', k2FacadeRevs,
+                    'Каждый 3-й этаж', 'service');
+                addItem('storm_rapid_rev_50',
+                    'Муфта Rapid DN\u00a050 (ревизии К2)', 'шт', k2FacadeRevs * 2,
+                    '+2 муфты на SML-ревизию', 'service');
+            }
+            (s.mains || []).forEach(function (m) {
+                var dn = m.diameter || 100;
+                var mainRev = (m.reserve ? 2 : 1) * k2RevPer;
+                addItem('storm_rev_' + dn,
+                    'Ревизия SML DN\u00a0' + dn + ' (магистр. К2)', 'шт', mainRev,
+                    'Каждый 3-й этаж', 'service');
+                addItem('storm_rapid_rev_' + dn,
+                    'Муфта Rapid DN\u00a0' + dn + ' (ревизии К2)', 'шт', mainRev * 2,
+                    '+2 муфты на SML-ревизию', 'service');
+            });
+        }
+
+        // Изоляция вспененный каучук
+        var totalInsLen = len + mainInsLen;
+        if (stormInsulation && totalInsLen > 0)
+            addItem('storm_insulation',
+                'Изоляция из вспененного каучука (стояки К2)', 'м.п.',
+                totalInsLen,
+                'Трубопроводы изолировать вспененным каучуком. Предусмотреть электрообогрев стояков и трапов');
+
+        var ORDER = [
+            'storm_rapid_50', 'storm_khomuty',
+            'storm_trap_hl902', 'storm_gilza',
+            'storm_sleeve', 'storm_sleeve_sealant', 'storm_sleeve_cable',
+            'storm_main_sml_100', 'storm_main_sml_150',
+            'storm_main_tee_100', 'storm_main_tee_150',
+            'storm_main_elbow45_100', 'storm_main_elbow45_150',
+            'storm_main_rapid_100', 'storm_main_rapid_150',
+            'storm_main_khomuty',
+            'storm_main_funnel', 'storm_main_funnel_cable',
+            'storm_main_jumper_elbow_100', 'storm_main_jumper_elbow_150',
+            'storm_main_jumper_pipe_100', 'storm_main_jumper_pipe_150',
+            'storm_rev_50', 'storm_rapid_rev_50',
+            'storm_rev_100', 'storm_rev_150',
+            'storm_rapid_rev_100', 'storm_rapid_rev_150',
+            'storm_insulation'
+        ];
+        var result = [];
+        ORDER.forEach(function (k) { if (acc[k]) result.push(acc[k]); });
+        Object.keys(acc).forEach(function (k) { if (ORDER.indexOf(k) === -1) result.push(acc[k]); });
+        return result;
     }
 
     // Собирает К3-фитинги для одного корпуса
@@ -3010,9 +3129,11 @@
                 });
             }
 
-            html += '<details class="estimate-details">' +
-                '<summary class="estimate-details-header"><span class="estimate-system-icon icon-k2"></span>К2 — Дождевая канализация</summary>' +
-                '<div class="estimate-details-content">' + renderEstimateTable(k2Items, idx + ':k2') + '</div></details>';
+            if (k2Items.length > 0) {
+                html += '<details class="estimate-details">' +
+                    '<summary class="estimate-details-header"><span class="estimate-system-icon icon-k2"></span>К2 — Дождевая канализация</summary>' +
+                    '<div class="estimate-details-content">' + renderEstimateTable(k2Items, idx + ':k2') + '</div></details>';
+            }
 
             // ═══ Уровень 2: К3 ═══
             var k3Items = collectK3FittingsForBuilding(idx);
@@ -3790,6 +3911,18 @@
         return stormSettings[idx];
     }
 
+    // Авто-резерв: если высота > 75 м, установить reserve для существующих магистралей
+    function applyAutoReserve(idx) {
+        if (!buildingStats || !buildingStats[idx]) return;
+        var bHeight = buildingStats[idx].height || 0;
+        if (bHeight > 75) {
+            var s = getStormSettings(idx);
+            (s.mains || []).forEach(function (m) {
+                m.reserve = true;
+            });
+        }
+    }
+
     function calcStormPipeLength(b, idx) {
         var s = getStormSettings(idx);
         if (!s.risers || !b.height) return 0;
@@ -4085,11 +4218,14 @@
             });
         });
 
-        // Добавить магистраль
+        // Добавить магистраль (авто-резерв при высоте > 75 м)
         container.querySelectorAll('.storm-add-main').forEach(function (btn) {
             btn.addEventListener('click', function () {
-                var s = getStormSettings(parseInt(btn.dataset.idx, 10));
-                s.mains.push({ id: s.mainsNextId++, diameter: 100, reserve: false });
+                var bIdx = parseInt(btn.dataset.idx, 10);
+                var s = getStormSettings(bIdx);
+                var bHeight = (buildingStats && buildingStats[bIdx]) ? (buildingStats[bIdx].height || 0) : 0;
+                var autoReserve = bHeight > 75;
+                s.mains.push({ id: s.mainsNextId++, diameter: 100, reserve: autoReserve });
                 renderStormResults();
             });
         });
@@ -4698,6 +4834,8 @@
                     Object.keys(saved.stormSettings).forEach(function (k) {
                         stormSettings[k] = saved.stormSettings[k];
                     });
+                    // Авто-резерв при высоте > 75 м (не перезаписывает ручной сброс пользователем,
+                    // т.к. saved.stormSettings уже содержит пользовательские значения reserve)
                 }
                 if (saved.stormInsulation !== undefined) {
                     stormInsulation = saved.stormInsulation;
@@ -5654,6 +5792,10 @@
             // Восстанавливаем сохранённые цены из сообщения
             if (msg.data && msg.data.estimatePrices) {
                 estimatePrices = msg.data.estimatePrices;
+            }
+            // Авто-резерв при высоте > 75 м
+            if (buildingStats) {
+                buildingStats.forEach(function (b, idx) { applyAutoReserve(idx); });
             }
             renderResultsTable();
             renderStormResults();
