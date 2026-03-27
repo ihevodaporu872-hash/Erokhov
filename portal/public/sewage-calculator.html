@@ -1140,15 +1140,18 @@
                 pipeType:        'pp',
                 riserDiameter:   110,
                 kitchenDiameter: 50,
+                h1:              0,       // высота 1-го этажа (0 = авто)
                 // Дополнительное оборудование
                 condensate:  false,   // воронки отвода конденсата
                 pui:         false,   // трапы ПУИ
                 trashRoom:   false,   // трап мусорокамеры
                 balconies:   0,       // трапы балконов DN110
+                drainage:    false,   // Дренаж (К13.1)
                 // К1С — коммерческая канализация
                 k1cCount:    0,       // количество помещений (точек)
                 k1cCatering: false,   // общепит (переход в К3)
                 k1cValves:   false,   // воздушные клапаны DN110
+                k1cVentType: 'riser', // riser | valve (HL900N)
                 // Отделка квартир
                 finishing:   false,   // включить расчёт отделки
                 finishGrade: 'standard', // standard | luxury
@@ -1166,21 +1169,27 @@
     }
 
     /* ─── Длина труб (транзитный расчёт) ─────────────────────────────────── */
-    function calcRiserLengthM(building, scenario) {
+    function calcRiserLengthM(building, scenario, idx) {
         if (!building.floors || !building.floors.length || !building.height) return 0;
         var sorted = building.floors.slice().sort(function (a, b) { return b.floor - a.floor; });
-        var floorH = building.height / building.floors.length;
+        var nFloors = building.floors.length;
+        // Высота 1-го этажа: из настроек или усреднённая
+        var s = (idx !== undefined) ? getSettings(idx) : null;
+        var h1 = (s && s.h1 > 0) ? s.h1 : (building.height / nFloors);
+        var hn = nFloors > 1 ? (building.height - h1) / (nFloors - 1) : h1;
+        var minFloor = sorted[sorted.length - 1].floor;
         var runMax = 0, total = 0;
         sorted.forEach(function (f) {
             var cnt = getFloorCount(f, scenario);
             if (cnt > runMax) runMax = cnt;
-            total += runMax * floorH;
+            var fH = (f.floor === minFloor) ? h1 : hn;
+            total += runMax * fH;
         });
         return Math.round(total * 10) / 10;
     }
 
     function calcTotalLengthM(b, scenario, idx) {
-        var riserLen = calcRiserLengthM(b, scenario);
+        var riserLen = calcRiserLengthM(b, scenario, idx);
         var puiLen   = (idx !== undefined && getSettings(idx).pui) ? (b.height || 0) : 0;
         return Math.round((riserLen + puiLen) * 10) / 10;
     }
@@ -1204,7 +1213,7 @@
             var floorsN  = b.floors ? b.floors.length : 0;
             var bathR    = calcBathRisers(b);
             var kitR     = calcKitchenRisers(b);
-            var len      = calcRiserLengthM(b, activeScenario);
+            var len      = calcRiserLengthM(b, activeScenario, idx);
             var isPlastic = (s.pipeType === 'pp' || s.pipeType === 'pp_silent' || s.pipeType === 'pvc');
             var isSML    = (s.pipeType === 'sml');
             var revPer   = floorsN > 0 ? Math.floor(floorsN / 3) : 0;
@@ -1270,6 +1279,12 @@
                 addItem('rapid_' + s.riserDiameter,
                     'Муфта соединительная Rapid DN\u00a0' + s.riserDiameter + ' (SML)', 'шт',
                     Math.ceil(len / 3));
+
+            // ── Опорная труба SML (1 шт на 15 м стояка) ─────────────────
+            if (isSML && len > 0)
+                addItem('sml_support_' + s.riserDiameter,
+                    'Опорная труба SML DN\u00a0' + s.riserDiameter + ' с опорным кольцом и консолью', 'шт',
+                    Math.ceil(len / 15), '1 шт на 15 м стояка');
 
             // ── Дополнительное общедомовое оборудование ──────────────────
 
@@ -1461,6 +1476,11 @@
                     addItem('k1c_air_valve',
                         'Воздушный клапан DN\u00a0110 (К1С)', 'шт', n1c,
                         'Канализационный воздушный клапан', K1C);
+                // Вентиляция К1С: клапан HL900N или вытяжной стояк
+                if (s.k1cVentType === 'valve')
+                    addItem('k1c_air_valve_hl900n',
+                        'Воздушный клапан HL900N DN\u00a0110 (К1С)', 'шт', n1c,
+                        'Вместо вытяжного стояка на кровлю', K1C);
                 // Прочистка К1С — 1 шт на каждый стояк (перед выпуском)
                 addItem('k1c_cleanout',
                     'Прочистка SML DN\u00a0110 (К1С)', 'шт', n1c,
@@ -1468,6 +1488,24 @@
                 addItem('rapid_cleanout_k1c',
                     'Муфта Rapid DN\u00a0110 (прочистки К1С)', 'шт', n1c * 2,
                     '+2 муфты на SML-прочистку', SG);
+            }
+
+            // ── Дренаж К13.1 ────────────────────────────────────────────
+            if (s.drainage && floorsN > 0) {
+                var K131 = 'k131';
+                var sections131 = bathR || 1;
+                var aptsTotal131 = b.totalApts || 0;
+                addItem('k131_trap',
+                    'Трап HL310NPr-3000 DN\u00a050/75 (К13.1)', 'шт',
+                    sections131 * floorsN, '1 на секцию на этаж', K131);
+                addItem('k131_funnel',
+                    'Воронка HL21 DN\u00a032 (К13.1)', 'шт',
+                    aptsTotal131, '1 на квартиру', K131);
+                var drainLen131 = (b.height || 0) * sections131;
+                if (drainLen131 > 0)
+                    addItem('k131_pipe',
+                        'Труба НПВХ DN\u00a050 (дренаж К13.1)', 'м.п.',
+                        Math.round(drainLen131 * 10) / 10, '', K131);
             }
 
             // ── Дюбель-гвозди для крепления противопожарных муфт ────────
@@ -1498,6 +1536,7 @@
             'dubel_fire',
             'khomuty',
             'rapid_50','rapid_110','rapid_160',
+            'sml_support_110','sml_support_160',
             'krest_110_110_50','krest_110_50_50',
             'krest_sml_110_110_50','krest_sml_110_50_50',
             'tee_110_110','tee_110_50','tee_50_50',
@@ -1506,9 +1545,11 @@
             'otvod_sml_110_45','otvod_sml_50_45',
             'rapid_fit_110','rapid_fit_50',
             'k1c_sml_pipe','k1c_tee_110','k1c_plug_110','k1c_rapid_110','k1c_air_valve',
+            'k1c_air_valve_hl900n',
             'k1c_cleanout','rapid_cleanout_k1c',
             'voronka_condensate',
-            'trap_dn50_pui','trap_dn50_trash'
+            'trap_dn50_pui','trap_dn50_trash',
+            'k131_trap','k131_funnel','k131_pipe'
         ];
         var result = [];
         ORDER.forEach(function (k) { if (acc[k]) result.push(acc[k]); });
@@ -1617,6 +1658,12 @@
                 '<div class="equip-card-desc">' + (b.totalApts || 0) + '\u00a0кв. · ' + (s.finishGrade === 'luxury' ? 'Люкс' : 'Стандарт') + '</div>' +
                 '</div>' +
 
+                '<div class="equip-card' + (s.drainage ? ' active' : '') + '" data-idx="' + idx + '" data-field="drainage">' +
+                '<i class="bi bi-droplet-half equip-icon"></i>' +
+                '<div class="equip-card-title">Дренаж (К13.1)</div>' +
+                '<div class="equip-card-desc">Трапы HL310NPr · Воронки HL21 · НПВХ</div>' +
+                '</div>' +
+
                 '</div>' +  // /equip-grid
 
                 // К1С — Встроенные помещения
@@ -1633,11 +1680,18 @@
                 '<label class="k1c-check" style="font-size:12px;display:flex;align-items:center;gap:4px;cursor:pointer">' +
                 '<input type="checkbox"' + (s.k1cValves ? ' checked' : '') + ' data-idx="' + idx + '" data-field="k1cValves" class="k1c-checkbox"> Воздушные клапаны DN110' +
                 '</label>' +
+                '<div class="input-group" style="margin:0;flex:0 0 auto">' +
+                '<label style="font-size:12px">Вентиляция:</label>' +
+                '<select data-idx="' + idx + '" data-field="k1cVentType" class="k1c-vent-select" style="font-size:12px;padding:3px 6px">' +
+                '<option value="riser"' + (s.k1cVentType === 'riser' ? ' selected' : '') + '>Вытяжной стояк на кровлю</option>' +
+                '<option value="valve"' + (s.k1cVentType === 'valve' ? ' selected' : '') + '>Воздушный клапан HL900N</option>' +
+                '</select></div>' +
                 '</div>' +
                 (s.k1cCount > 0 ? '<div class="k3-vent-info" style="margin-top:6px"><i class="bi bi-info-circle"></i> ' +
                     s.k1cCount + '\u00a0точ. \u00d7 SML DN110: ' +
                     'тройник + заглушка + 2\u00a0Rapid' +
                     (s.k1cValves ? ' + клапан DN110' : '') +
+                    (s.k1cVentType === 'valve' ? ' + HL900N' : '') +
                     (s.k1cCatering ? ' · <strong>К3:</strong> жироулов. + 2\u00a0сифона/помещ.' : '') +
                     '</div>' : '') +
                 '</div>' +
@@ -1697,12 +1751,20 @@
                 '</select></div>' +
                 '</div>' +
 
+                '<div class="row-2">' +
+                '<div class="input-group"><label>Высота 1-го этажа, м:</label>' +
+                '<input type="number" min="0" step="0.1" value="' + (s.h1 || '') + '" placeholder="авто" ' +
+                'data-idx="' + idx + '" data-field="h1" class="bld-h1" style="width:80px">' +
+                '</div>' +
+                '</div>' +
+
                 kitRow +
 
                 '<div class="pipe-length-display">' +
                 '<i class="bi bi-rulers"></i>' +
                 'Расчётная длина стояков К1 (с учётом транзита):' +
                 '<strong>\u2009' + len + '\u00a0м</strong>' +
+                (s.h1 > 0 ? '<span style="font-size:11px;color:var(--gray-500);margin-left:8px">(h₁=' + s.h1 + '\u00a0м)</span>' : '') +
                 '</div>' +
 
                 (function () {
@@ -1776,6 +1838,23 @@
             inp.addEventListener('input', function () {
                 getSettings(parseInt(inp.dataset.idx, 10)).finishReserve =
                     Math.max(0, Math.min(30, parseInt(inp.value, 10) || 0));
+                renderResultsTable();
+            });
+        });
+
+        // Обработчики: высота 1-го этажа
+        container.querySelectorAll('.bld-h1').forEach(function (inp) {
+            inp.addEventListener('input', function () {
+                var val = parseFloat(inp.value) || 0;
+                getSettings(parseInt(inp.dataset.idx, 10)).h1 = Math.max(0, val);
+                renderResultsTable();
+            });
+        });
+
+        // Обработчики: вентиляция К1С
+        container.querySelectorAll('.k1c-vent-select').forEach(function (sel) {
+            sel.addEventListener('change', function () {
+                getSettings(parseInt(sel.dataset.idx, 10)).k1cVentType = sel.value;
                 renderResultsTable();
             });
         });
@@ -2036,6 +2115,15 @@
                 rows += itemRow(item.name, item.unit, item.qty, '', item.qty, item.note);
             });
         }
+        var k131 = k1Fittings.filter(function (i) { return i.group === 'k131'; });
+        if (k131.length) {
+            rows += '<tr class="spec-group-row"><td colspan="7">К13.1 — Дренаж</td></tr>';
+            k131.forEach(function (item) {
+                if (item.unit === 'шт') k1EqCount += item.qty;
+                else k1PipeM += item.qty;
+                rows += itemRow(item.name, item.unit, item.qty, '', item.qty, item.note);
+            });
+        }
         var k1Service = k1Fittings.filter(function (i) { return i.group === 'service'; });
         if (k1Service.length) {
             rows += '<tr class="spec-group-row"><td colspan="7">Элементы обслуживания и прочистки</td></tr>';
@@ -2217,19 +2305,26 @@
         var floorsN = b.floors ? b.floors.length : 0;
         var bathR = calcBathRisers(b);
         var kitR = calcKitchenRisers(b);
-        var len = calcRiserLengthM(b, activeScenario);
+        var len = calcRiserLengthM(b, activeScenario, idx);
         var isPlastic = (s.pipeType === 'pp' || s.pipeType === 'pp_silent' || s.pipeType === 'pvc');
         var isSML = (s.pipeType === 'sml');
         var totalRisers = calcRisers(b, idx);
+        var revPer = floorsN > 0 ? Math.floor(floorsN / 3) : 0;
 
         // Муфты Rapid (SML)
         if (isSML) {
             var rapidCount = Math.ceil(len / 3);
             addItem('rapid_' + s.riserDiameter, 'Муфта Rapid DN' + s.riserDiameter, 'шт', rapidCount, '', '');
             if (showKitchen && s.kitchenDiameter !== s.riserDiameter) {
-                var kitLen = calcRiserLengthM(b, activeScenario) * (kitR / Math.max(totalRisers, 1));
+                var kitLen = calcRiserLengthM(b, activeScenario, idx) * (kitR / Math.max(totalRisers, 1));
                 var rapidKit = Math.ceil(kitLen / 3);
                 addItem('rapid_' + s.kitchenDiameter, 'Муфта Rapid DN' + s.kitchenDiameter, 'шт', rapidKit, '', '');
+            }
+            // Опорная труба SML с опорным кольцом и консолью (1 шт на 15 м стояка)
+            if (len > 0) {
+                addItem('sml_support_' + s.riserDiameter,
+                    'Опорная труба SML DN\u00a0' + s.riserDiameter + ' с опорным кольцом и консолью', 'шт',
+                    Math.ceil(len / 15), '1 шт на 15 м стояка', '');
             }
         }
 
@@ -2239,11 +2334,13 @@
             addItem('clamp_' + s.riserDiameter, 'Хомут ' + s.riserDiameter + ' мм', 'шт', clampCount, '', '');
         }
 
-        // Противопожарные муфты
-        var fireSleeveCount = totalRisers * Math.max(floorsN - 1, 0);
-        addItem('firesleeve_' + s.riserDiameter, 'Муфта противопожарная DN' + s.riserDiameter, 'шт', fireSleeveCount, '', '');
-        // Дюбели для муфт (4 шт на муфту)
-        addItem('dowel_fire', 'Дюбель для муфты', 'шт', fireSleeveCount * 4, '', '');
+        // Противопожарные муфты (только пластик)
+        if (isPlastic) {
+            var fireSleeveCount = totalRisers * floorsN;
+            addItem('firesleeve_' + s.riserDiameter, 'Муфта противопожарная DN' + s.riserDiameter, 'шт', fireSleeveCount, '', '');
+            // Дюбели для муфт (3 шт на муфту — синхронизация с collectFittings)
+            addItem('dowel_fire', 'Дюбель-гвоздь металлический (крепление муфт)', 'шт', fireSleeveCount * 3, '3 шт на каждую противопожарную муфту', '');
+        }
 
         // Крестовины (по этажам)
         if (floorsN > 0) {
@@ -2255,15 +2352,54 @@
             }
         }
 
-        // Ревизии
-        var revCount = totalRisers;
-        addItem('revision_110', 'Ревизия DN' + s.riserDiameter, 'шт', revCount, 'На первом этаже каждого стояка', 'service');
+        // Ревизии (каждый 3-й этаж — синхронизация с collectFittings)
+        if (revPer > 0) {
+            addItem('revision_110', 'Ревизия DN' + s.riserDiameter, 'шт', totalRisers * revPer, 'Каждый 3-й этаж', 'service');
+            if (isSML) {
+                addItem('rapid_rev_' + s.riserDiameter,
+                    'Муфта Rapid DN\u00a0' + s.riserDiameter + ' (ревизии)', 'шт',
+                    totalRisers * revPer * 2, '+2 муфты на SML-ревизию', 'service');
+            }
+        }
+
+        // Компенсационные патрубки (только пластик)
+        if (isPlastic && revPer > 0) {
+            addItem('kompens_' + s.riserDiameter,
+                'Компенсационный патрубок DN\u00a0' + s.riserDiameter, 'шт',
+                totalRisers * revPer, 'Каждый 3-й этаж', '');
+        }
 
         // К1С (встроенные помещения)
         if (s.k1cCount > 0) {
             addItem('k1c_trap', 'Трап DN50 (К1С)', 'шт', s.k1cCount, '', 'k1c');
             if (s.k1cCatering) {
                 addItem('k1c_grease', 'Жироуловитель (К1С)', 'шт', s.k1cCount, '', 'k1c');
+            }
+            // Вентиляция К1С: клапан HL900N или вытяжной стояк
+            if (s.k1cVentType === 'valve') {
+                addItem('k1c_air_valve_hl900n',
+                    'Воздушный клапан HL900N DN\u00a0110 (К1С)', 'шт', s.k1cCount,
+                    'Вместо вытяжного стояка на кровлю', 'k1c');
+            }
+        }
+
+        // Дренаж К13.1
+        if (s.drainage) {
+            // Секции = кол-во уникальных лестничных клеток = можно приблизить как bathR
+            var sections = bathR || 1;
+            var aptsTotal = b.totalApts || 0;
+            addItem('k131_trap',
+                'Трап HL310NPr-3000 DN\u00a050/75 (К13.1)', 'шт',
+                sections * floorsN, '1 на секцию на этаж', 'k131');
+            addItem('k131_funnel',
+                'Воронка HL21 DN\u00a032 (К13.1)', 'шт',
+                aptsTotal, '1 на квартиру', 'k131');
+            // Труба НПВХ для дренажных стояков
+            var drainLen = (b.height || 0) * sections;
+            if (drainLen > 0) {
+                addItem('k131_pipe',
+                    'Труба НПВХ DN\u00a050 (дренаж К13.1)', 'м.п.',
+                    Math.round(drainLen * 10) / 10, '', 'k131');
             }
         }
 
@@ -2510,6 +2646,18 @@
         if (/Воронка конденсатная|Воронка капельная/i.test(materialName)) {
             return 'Монтаж воронки капельной';
         }
+        // Опорная труба SML
+        if (/Опорная труба SML/i.test(materialName)) {
+            return 'Монтаж опорной трубы SML с опорным кольцом и консолью';
+        }
+        // Воронки HL21 (К13.1)
+        if (/Воронка HL21/i.test(materialName)) {
+            return 'Установка воронки водосточной (полимерной)';
+        }
+        // Клапан HL900N (К1С)
+        if (/HL900N/i.test(materialName)) {
+            return 'Монтаж воздушного клапана канализационного';
+        }
         // Трапы
         if (/Трап/i.test(materialName)) {
             return 'Установка трапов (полимерных)';
@@ -2536,9 +2684,12 @@
     function needsWorkRow(name) {
         // Комплектующие без своей работы — входят в работу по родительской позиции
         if (/Дюбель|Гибкая подводка|Сифон/i.test(name)) return false;
+        // HL900N — генерирует отдельную работу
+        if (/HL900N/i.test(name)) return true;
         // Фасонные части — монтаж включён в расценку трубы
         if (/Тройник|Отвод|Крестовина|Хомут|Ревизия|Патрубок компенсац|Муфта соединительная|Муфта Rapid|Прочистка|Клапан/i.test(name)) return false;
         // Трубы, изоляция, противопожарные муфты, оборудование, санфаянс — да
+        if (/Опорная труба SML/i.test(name)) return true;
         if (/Трубопровод|Труба/i.test(name)) return true;
         if (/Изоляция|Теплоизоляция/i.test(name)) return true;
         if (/Муфта противопожарная/i.test(name)) return true;
