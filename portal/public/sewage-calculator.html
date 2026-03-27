@@ -2863,16 +2863,19 @@
         var deduped = deduplicateItems(items);
 
         // Классификация
-        var pipes = [];       // Трубопроводы/трубы
+        var pipes = [];       // Трубопроводы/трубы (НЕ кабель)
+        var cables = [];      // Греющий кабель — отдельная категория
         var fittings = [];    // Фасонина (привязана к трубе по DN)
         var devices = [];     // Приборы/оборудование (генерируют работу)
         var accessories = []; // Комплектующие (сифоны, подводки — привязаны к прибору)
-        var other = [];       // Прочее (изоляция, муфты п/п, кабель и т.д.)
+        var other = [];       // Прочее (изоляция, муфты п/п и т.д.)
 
         deduped.forEach(function (item) {
             if (item.type === 'работа') {
                 other.push(item);
-            } else if (/^(Трубопровод|Труба)\s/i.test(item.name) && !/Греющий кабель/i.test(item.name)) {
+            } else if (/Греющий кабель/i.test(item.name)) {
+                cables.push(item);  // КАТЕГОРИЧЕСКИ отделяем от pipes
+            } else if (/^(Трубопровод|Труба)\s/i.test(item.name)) {
                 pipes.push(item);
             } else if (isFitting(item.name)) {
                 fittings.push(item);
@@ -2977,7 +2980,21 @@
             });
         });
 
-        // ── 3. Прочее (изоляция, муфты п/п, кабель, явные работы) ──
+        // ── 3. Греющий кабель — строго отдельная работа, НЕ суммируется с трубами ──
+        cables.forEach(function (cable) {
+            result.push({
+                name: 'Монтаж саморегулирующегося греющего кабеля', unit: cable.unit, qty: cable.qty,
+                note: cable.note, group: cable.group, type: 'работа',
+                defaultPrice: cable.defaultWorkPrice || null
+            });
+            result.push({
+                name: cable.name, unit: cable.unit, qty: cable.qty,
+                note: cable.note, group: cable.group, type: 'материал',
+                defaultPrice: cable.defaultPrice || null
+            });
+        });
+
+        // ── 4. Прочее (изоляция, муфты п/п, явные работы) ──
         other.forEach(function (item) {
             if (item.type === 'работа') {
                 result.push(item);
