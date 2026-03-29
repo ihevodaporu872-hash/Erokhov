@@ -2596,6 +2596,31 @@
             });
         }
 
+        // ── Парапетный сброс ──
+        var pN = (s.parapet && s.parapetCount > 0) ? s.parapetCount : 0;
+        if (pN > 0) {
+            addItem('parapet_sml_125',
+                'Труба SML DN\u00a0125 (парапетный сброс)', 'м.п.', 8 * pN);
+            addItem('parapet_rev_125',
+                'Ревизия SML DN\u00a0125 (парапет)', 'шт', pN);
+            addItem('parapet_elbow_125',
+                'Отвод 45° SML DN\u00a0125 (парапет)', 'шт', 4 * pN);
+            addItem('parapet_rapid_125',
+                'Хомут соединительный Rapid DN\u00a0125 (парапет)', 'шт', 6 * pN);
+            addItem('parapet_hl068',
+                'Воронка парапетная HL068.5E с электроподогревом', 'шт', Math.ceil(pN * 1.5));
+            addItem('parapet_body_110',
+                'Корпус кровельной воронки DN110 с подогревом и битумным полотном', 'шт', pN);
+            addItem('parapet_hl65h', 'Надставной элемент HL65H', 'шт', pN);
+            addItem('parapet_hl350', 'Насадная деталь HL350', 'шт', pN);
+            addItem('parapet_hl160', 'Дренажное кольцо HL160', 'шт', pN);
+            addItem('parapet_insul_125',
+                'Трубки теплоизоляционные 13\u00a0мм (для DN125, парапет)', 'м.п.', 8 * pN);
+            addItem('parapet_fastener',
+                'Крепёжный комплект (хомут + шпилька, парапет)', 'шт', 4 * pN);
+            mainInsLen += 8 * pN;
+        }
+
         // Изоляция вспененный каучук
         var totalInsLen = len + mainInsLen;
         if (stormInsulation && totalInsLen > 0)
@@ -2617,6 +2642,9 @@
             'storm_main_funnel', 'storm_main_funnel_cable',
             'storm_main_jumper_elbow_100', 'storm_main_jumper_elbow_150',
             'storm_main_jumper_pipe_100', 'storm_main_jumper_pipe_150',
+            'parapet_sml_125', 'parapet_rev_125', 'parapet_elbow_125', 'parapet_rapid_125',
+            'parapet_hl068', 'parapet_body_110', 'parapet_hl65h', 'parapet_hl350', 'parapet_hl160',
+            'parapet_insul_125', 'parapet_fastener',
             'storm_rev_50', 'storm_rapid_rev_50',
             'storm_rev_100', 'storm_rev_150',
             'storm_rapid_rev_100', 'storm_rapid_rev_150',
@@ -3990,6 +4018,8 @@
                 risers:            0,
                 balconies:         0,
                 autoApartmentCalc: true,  // расчёт по квартирографии
+                parapet:           false, // парапетный сброс
+                parapetCount:      0,     // кол-во воронок DN110
                 mains:             [],
                 mainsNextId:       1
             };
@@ -4189,7 +4219,42 @@
                 });
             }
 
-            // Изоляция вспененный каучук — метраж = длине фасадных труб + магистралей
+            // ── Парапетный сброс ──
+            var pN = (s.parapet && s.parapetCount > 0) ? s.parapetCount : 0;
+            if (pN > 0) {
+                addItem('parapet_sml_125',
+                    'Труба SML DN\u00a0125 (парапетный сброс)', 'м.п.', 8 * pN,
+                    '8 м на воронку');
+                addItem('parapet_rev_125',
+                    'Ревизия SML DN\u00a0125 (парапет)', 'шт', pN);
+                addItem('parapet_elbow_125',
+                    'Отвод 45° SML DN\u00a0125 (парапет)', 'шт', 4 * pN,
+                    '4 шт на воронку');
+                addItem('parapet_rapid_125',
+                    'Хомут соединительный Rapid DN\u00a0125 (парапет)', 'шт', 6 * pN,
+                    '6 шт на воронку');
+                addItem('parapet_hl068',
+                    'Воронка парапетная HL068.5E с электроподогревом', 'шт',
+                    Math.ceil(pN * 1.5),
+                    '1.5 шт на точку (с запасом)');
+                addItem('parapet_body_110',
+                    'Корпус кровельной воронки DN110 с подогревом и битумным полотном', 'шт', pN);
+                addItem('parapet_hl65h',
+                    'Надставной элемент HL65H', 'шт', pN);
+                addItem('parapet_hl350',
+                    'Насадная деталь HL350', 'шт', pN);
+                addItem('parapet_hl160',
+                    'Дренажное кольцо HL160', 'шт', pN);
+                addItem('parapet_insul_125',
+                    'Трубки теплоизоляционные 13\u00a0мм (для DN125, парапет)', 'м.п.', 8 * pN,
+                    '8 м на воронку');
+                addItem('parapet_fastener',
+                    'Крепёжный комплект (хомут + шпилька, парапет)', 'шт', 4 * pN,
+                    '4 шт на воронку');
+                mainInsLen += 8 * pN; // для общей изоляции
+            }
+
+            // Изоляция вспененный каучук — метраж = длине фасадных труб + магистралей + парапет
             var totalInsLen = len + mainInsLen;
             if (stormInsulation && totalInsLen > 0)
                 addItem('storm_insulation',
@@ -4211,6 +4276,9 @@
             'storm_main_funnel', 'storm_main_funnel_cable',
             'storm_main_jumper_elbow_100', 'storm_main_jumper_elbow_150',
             'storm_main_jumper_pipe_100', 'storm_main_jumper_pipe_150',
+            'parapet_sml_125', 'parapet_rev_125', 'parapet_elbow_125', 'parapet_rapid_125',
+            'parapet_hl068', 'parapet_body_110', 'parapet_hl65h', 'parapet_hl350', 'parapet_hl160',
+            'parapet_insul_125', 'parapet_fastener',
             'storm_rev_50', 'storm_rapid_rev_50',
             'storm_rev_100', 'storm_rev_150',
             'storm_rapid_rev_100', 'storm_rapid_rev_150',
@@ -4373,12 +4441,49 @@
                 '</div>' + // /card-widget-body
                 '</div>';  // /card-widget
 
-            // Общая сводка
-            var summaryInfo = totalK2Len > 0
+            // ══════ Виджет 3: Парапетный сброс ══════
+            var hasParapet = s.parapet && s.parapetCount > 0;
+            var parapetPipeLen = hasParapet ? 8 * s.parapetCount : 0;
+            var parapetWidget =
+                '<div class="card-widget' + (s.parapet ? ' expanded' : '') + '" data-idx="' + idx + '" data-widget="parapet">' +
+                '<div class="card-widget-header storm-widget-toggle" data-idx="' + idx + '" data-widget="parapet">' +
+                '<i class="bi bi-box-arrow-in-down card-widget-icon"></i>' +
+                '<span class="card-widget-title">Парапетный сброс</span>' +
+                (hasParapet ? '<span class="card-widget-badge">' + s.parapetCount + '\u00a0воронок · ' + parapetPipeLen + '\u00a0м DN125</span>' : '') +
+                '</div>' +
+                '<div class="card-widget-body">' +
+
+                '<label class="k1c-check" style="font-size:13px;display:flex;align-items:center;gap:6px;cursor:pointer;margin-bottom:12px;font-weight:600">' +
+                '<input type="checkbox"' + (s.parapet ? ' checked' : '') + ' data-idx="' + idx + '" class="storm-parapet-toggle"> Парапетный сброс' +
+                '</label>' +
+
+                (s.parapet ? '<div class="bld-num-row" style="margin-bottom:10px">' +
+                    '<label>Количество воронок DN110, шт:</label>' +
+                    '<input type="number" min="0" value="' + (s.parapetCount || 0) + '" ' +
+                    'data-idx="' + idx + '" class="storm-parapet-count bld-num">' +
+                    '</div>' : '') +
+
+                (hasParapet ? '<div class="card-widget-info">' +
+                    '<i class="bi bi-info-circle"></i> ' +
+                    'На каждую воронку: 8\u00a0м SML DN125, 1\u00a0ревизия, 4\u00a0отвода 45°, 6\u00a0Rapid DN125, ' +
+                    'HL068.5E, корпус DN110, HL65H, HL350, HL160, 8\u00a0м изоляции, 4\u00a0крепежа' +
+                    '</div>' : '') +
+
+                '</div>' + // /card-widget-body
+                '</div>';  // /card-widget
+
+            // Общая сводка (включая парапет)
+            var grandK2Len = Math.round((totalK2Len + parapetPipeLen) * 10) / 10;
+            var summaryParts = [];
+            if (facadeLen > 0) summaryParts.push('фасад\u00a0' + facadeLen);
+            if (mainsTotalLen > 0) summaryParts.push('магистр.\u00a0' + mainsTotalLen);
+            if (parapetPipeLen > 0) summaryParts.push('парапет\u00a0' + parapetPipeLen);
+
+            var summaryInfo = grandK2Len > 0
                 ? '<div class="card-widget-info" style="margin-top:4px;margin-bottom:4px">' +
                   '<i class="bi bi-clipboard-data"></i> Итого труб К2 по корпусу: ' +
-                  '<strong>' + totalK2Len + '\u00a0м</strong> ' +
-                  '(фасад\u00a0' + facadeLen + ' + магистр.\u00a0' + mainsTotalLen + ')' +
+                  '<strong>' + grandK2Len + '\u00a0м</strong> ' +
+                  (summaryParts.length > 0 ? '(' + summaryParts.join(' + ') + ')' : '') +
                   '</div>'
                 : '';
 
@@ -4386,7 +4491,7 @@
                 '<summary class="accordion-header">' +
                 '<span class="accordion-icon"></span>' +
                 name +
-                '<span class="accord-meta">— ' + totalK2Len + '\u00a0м</span>' +
+                '<span class="accord-meta">— ' + grandK2Len + '\u00a0м</span>' +
                 '</summary>' +
                 '<div class="accordion-content">' +
 
@@ -4398,6 +4503,7 @@
 
                 facadeWidget +
                 mainsWidget +
+                parapetWidget +
                 summaryInfo +
 
                 '</div>' + // /accordion-content
@@ -4487,6 +4593,25 @@
                 for (var i = 0; i < s.mains.length; i++) {
                     if (s.mains[i].id === mid) { s.mains[i].reserve = cb.checked; break; }
                 }
+                renderStormResults();
+            });
+        });
+
+        // Парапетный сброс — чекбокс
+        container.querySelectorAll('.storm-parapet-toggle').forEach(function (cb) {
+            cb.addEventListener('change', function () {
+                var s = getStormSettings(parseInt(cb.dataset.idx, 10));
+                s.parapet = cb.checked;
+                if (!s.parapetCount) s.parapetCount = 0;
+                renderStormResults();
+            });
+        });
+
+        // Парапетный сброс — количество воронок
+        container.querySelectorAll('.storm-parapet-count').forEach(function (inp) {
+            inp.addEventListener('input', function () {
+                var s = getStormSettings(parseInt(inp.dataset.idx, 10));
+                s.parapetCount = Math.max(0, parseInt(inp.value, 10) || 0);
                 renderStormResults();
             });
         });
