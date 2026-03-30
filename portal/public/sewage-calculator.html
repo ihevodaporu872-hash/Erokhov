@@ -3007,9 +3007,22 @@
     }
 
     // Извлечение DN из названия для привязки фасонины к трубе
+    // Поддерживает: "DN 110", "DN110", "110×50", "110/45°", "ПП 110×110×50"
     function extractDN(name) {
-        var m = name.match(/DN\s*(\d+)/i);
-        return m ? parseInt(m[1], 10) : 0;
+        var norm = name.replace(/\u00a0/g, ' ');
+        // Приоритет 1: явный "DN 110" или "DN110"
+        var m1 = norm.match(/DN\s*(\d+)/i);
+        if (m1) return parseInt(m1[1], 10);
+        // Приоритет 2: "ПП 110" или "SML 110" (материал + первое число)
+        var m2 = norm.match(/(?:ПП|SML|НПВХ|ПП Бесшумный)\s+(\d+)/i);
+        if (m2) return parseInt(m2[1], 10);
+        // Приоритет 3: первое число ≥ 25 (не путать с углами 45/90)
+        var m3 = norm.match(/(\d+)/);
+        if (m3) {
+            var v = parseInt(m3[1], 10);
+            if (v >= 25 && v !== 45 && v !== 90) return v;
+        }
+        return 0;
     }
 
     // Дедупликация: суммирует qty для совпадающих name+unit
@@ -3112,28 +3125,62 @@
         var result = [];
 
         // ── 1. Трубы: работа → труба → фасонина того же DN ──
-        // Работа = полная длина (монтаж по осям), Материал = длина − габариты фитингов
+        // Работа = полная длина (монтаж по осям)
+        // Материал = (длина − Σ габаритов фитингов этого DN) × 1.02
+        //
+        // Стратегия: сначала привязываем каждый фитинг к трубе по DN,
+        // затем считаем суммарный вычет для каждой трубы.
+
+        // Шаг 1: Привязка фитингов к трубам по DN
+        var fittingsByDN = {};  // { dn: [fitting, ...] }
+        var orphanFittings = [];
+        fittings.forEach(function (f) {
+            var fDN = extractDN(f.name);
+            if (fDN > 0) {
+                if (!fittingsByDN[fDN]) fittingsByDN[fDN] = [];
+                fittingsByDN[fDN].push(f);
+            } else {
+                orphanFittings.push(f);
+            }
+        });
+
+        // Шаг 2: Обработка каждой трубы
+        var usedDNs = {};
         pipes.forEach(function (pipe) {
             var pipeDN = extractDN(pipe.name);
             var fullQty = pipe.qty;
 
-            // Собираем фасонину этого DN и считаем суммарную длину фитингов
-            var attachedFittings = [];
-            var remaining = [];
+            // Собираем фитинги этого DN + сироты (DN=0) для первой трубы
+            var attachedFittings = (fittingsByDN[pipeDN] || []).slice();
+            if (!usedDNs['orphan']) {
+                attachedFittings = attachedFittings.concat(orphanFittings);
+                usedDNs['orphan'] = true;
+            }
+            usedDNs[pipeDN] = true;
+
+            // Считаем суммарную длину фитингов для вычета
             var totalFittingLen = 0;
-            fittings.forEach(function (f) {
-                var fDN = extractDN(f.name);
-                if (fDN === pipeDN || (pipeDN > 0 && fDN === 0)) {
-                    attachedFittings.push(f);
-                    totalFittingLen += getFittingLength(f.name) * (f.qty || 0);
-                } else {
-                    remaining.push(f);
+            var fittingDetails = [];
+            attachedFittings.forEach(function (f) {
+                var fLen = getFittingLength(f.name);
+                var deduction = fLen * (f.qty || 0);
+                totalFittingLen += deduction;
+                if (fLen > 0) {
+                    fittingDetails.push(f.name.replace(/\u00a0/g, ' ').substring(0, 40) +
+                        ': ' + (f.qty || 0) + ' × ' + fLen + 'м = ' + Math.round(deduction * 10) / 10 + 'м');
                 }
             });
-            fittings = remaining;
+            totalFittingLen = Math.round(totalFittingLen * 10) / 10;
 
-            // Материал трубы = (полная длина − длина фитингов) × коэф. запаса 1.02
+            // Материал трубы = (полная длина − длина фитингов) × 1.02
             var materialQty = Math.round(Math.max(0, fullQty - totalFittingLen) * 1.02 * 10) / 10;
+
+            // Отладка
+            console.log('[Вычет фитингов] ' + pipe.name.replace(/\u00a0/g, ' ') +
+                ': Работа=' + fullQty + 'м, Вычтено=' + totalFittingLen +
+                'м, Материал=' + materialQty + 'м');
+            if (fittingDetails.length > 0)
+                console.log('  Детали: ' + fittingDetails.join('; '));
 
             // Работа — полный метраж (монтаж по осям)
             result.push({
@@ -3157,13 +3204,17 @@
             });
         });
 
-        // Оставшаяся фасонина без трубы
-        fittings.forEach(function (f) {
-            result.push({
-                name: f.name, unit: f.unit, qty: f.qty,
-                note: f.note, group: f.group, type: 'материал',
-                defaultPrice: f.defaultPrice || null
-            });
+        // Оставшаяся фасонина без трубы (DN не совпал ни с одной трубой)
+        Object.keys(fittingsByDN).forEach(function (dn) {
+            if (!usedDNs[dn]) {
+                fittingsByDN[dn].forEach(function (f) {
+                    result.push({
+                        name: f.name, unit: f.unit, qty: f.qty,
+                        note: f.note, group: f.group, type: 'материал',
+                        defaultPrice: f.defaultPrice || null
+                    });
+                });
+            }
         });
 
         // ── 2. Приборы: работа → прибор → комплектующие ──
