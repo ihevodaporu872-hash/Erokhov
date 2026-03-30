@@ -674,6 +674,24 @@
                                                 <div class="scenario-card-formula">Стояков К1 = С/У + ⌈Кухни / 2⌉</div>
                                             </div>
 
+                                            <div class="scenario-card" data-scenario="4">
+                                                <div class="scenario-card-badge">Ручной ввод</div>
+                                                <div class="scenario-card-title"><i class="bi bi-pencil-square"></i>С/У + дополнительные стояки</div>
+                                                <div class="scenario-card-desc">Базовое количество = С/У, дополнительные стояки задаются вручную для сложных планировок.</div>
+                                                <div class="scenario-card-formula">Стояков К1 = С/У + ручной ввод</div>
+                                            </div>
+
+                                        </div>
+
+                                        <div id="manualRiserBlock" style="display:none;margin-top:12px">
+                                            <div class="bld-num-row" style="max-width:360px">
+                                                <label style="font-weight:600">Доп. стояки (кухни/прочее):</label>
+                                                <input type="number" id="manualRiserAdd" min="0" value="0" class="bld-num"
+                                                       style="width:80px">
+                                            </div>
+                                            <div class="k3-vent-info" style="margin-top:6px">
+                                                <i class="bi bi-info-circle"></i> Итого = С/У (авто из квартирографии) + введённое значение. Применяется ко всем корпусам.
+                                            </div>
                                         </div>
 
                                         <h4 class="subsection-title">Параметры труб по корпусам</h4>
@@ -1050,6 +1068,7 @@
     /* ─── Состояние ──────────────────────────────────────────────────────── */
     var buildingStats  = null;
     var activeScenario = 1;
+    var manualRiserAdd = 0; // доп. стояки для сценария 4 (ручной)
     var activeSystem   = 'K1';
     var portalProjectId = null;   // ID проекта из портала (для Supabase)
 
@@ -1119,9 +1138,21 @@
             document.querySelectorAll('.scenario-card').forEach(function (c) { c.classList.remove('active'); });
             card.classList.add('active');
             activeScenario = parseInt(card.dataset.scenario, 10);
+            // Показ/скрытие блока ручного ввода
+            var manualBlock = document.getElementById('manualRiserBlock');
+            if (manualBlock) manualBlock.style.display = (activeScenario === 4) ? '' : 'none';
             renderResultsTable();
         });
     });
+
+    // Обработчик ввода доп. стояков (сценарий 4)
+    var manualInput = document.getElementById('manualRiserAdd');
+    if (manualInput) {
+        manualInput.addEventListener('input', function () {
+            manualRiserAdd = Math.max(0, parseInt(this.value, 10) || 0);
+            if (activeScenario === 4) renderResultsTable();
+        });
+    }
 
     /* ─── Кнопка экспорта ────────────────────────────────────────────────── */
     document.getElementById('btnExportExcel').addEventListener('click', exportToExcel);
@@ -1172,6 +1203,7 @@
         var mk = maxFloorValue(building, 'kitchens');
         if (activeScenario === 2) return mk;
         if (activeScenario === 3) return Math.ceil(mk / 2);
+        if (activeScenario === 4) return manualRiserAdd;
         return 0;
     }
 
@@ -1220,6 +1252,7 @@
         if (scenario === 1) return f.bath || 0;
         if (scenario === 2) return (f.bath || 0) + (f.kitchens || 0);
         if (scenario === 3) return (f.bath || 0) + Math.ceil((f.kitchens || 0) / 2);
+        if (scenario === 4) return (f.bath || 0) + manualRiserAdd;
         return f.bath || 0;
     }
 
@@ -1254,7 +1287,7 @@
     function collectFittings() {
         if (!buildingStats || !buildingStats.length) return [];
 
-        var showKitchen = (activeScenario === 2 || activeScenario === 3);
+        var showKitchen = (activeScenario === 2 || activeScenario === 3 || activeScenario === 4);
         var acc = {};
 
         function addItem(key, name, unit, qty, note, group) {
@@ -1481,7 +1514,6 @@
                     }
                 } else if (activeScenario === 3) {
                     // Сценарий 3: Оптимизированный (С/У + ceil(кухни/2))
-                    // Каждый основной стояк: крестовина 110×50×50 + стандартный набор С/У
                     if (bathR > 0) {
                         var bPts = bathR * floorsN;
                         if (isPlastic) {
@@ -1502,6 +1534,53 @@
                                 'Муфта соединительная Rapid DN\u00a0110 (фасонные)', 'шт',
                                 bPts * 3,
                                 '3 муфты на узел (крестовина + отвод)', FG);
+                        }
+                    }
+                } else if (activeScenario === 4) {
+                    // Сценарий 4: Ручной — С/У по сценарию 1 + доп. стояки как кухонные
+                    if (bathR > 0) {
+                        var bPts = bathR * floorsN;
+                        if (isPlastic) {
+                            addItem('krest_110_110_50',
+                                'Крестовина двухплоскостная ПП 110×110×50', 'шт', bPts,
+                                'Подключение С/У (сценарий 4)', FG);
+                            addItem('otvod_110_45',
+                                'Отвод ПП 110/45°', 'шт', bPts,
+                                'Подключение С/У (сценарий 4)', FG);
+                        } else {
+                            addItem('krest_sml_110_110_50',
+                                'Крестовина SML 110×110×50', 'шт', bPts,
+                                'Подключение С/У (сценарий 4)', FG);
+                            addItem('otvod_sml_110_45',
+                                'Отвод SML 110/45°', 'шт', bPts,
+                                'Подключение С/У (сценарий 4)', FG);
+                            addItem('rapid_fit_110',
+                                'Муфта соединительная Rapid DN\u00a0110 (фасонные)', 'шт',
+                                bPts * 3,
+                                '3 муфты на узел (крестовина + отвод)', FG);
+                        }
+                    }
+                    // Доп. стояки (ручной ввод) — фасонина как кухонные стояки
+                    if (manualRiserAdd > 0) {
+                        var mPts = manualRiserAdd * floorsN;
+                        if (isPlastic) {
+                            addItem('tee_50_50',
+                                'Тройник ПП 50×50', 'шт', mPts,
+                                'Подключение доп. стояков (сценарий 4)', FG);
+                            addItem('otvod_50_45',
+                                'Отвод ПП 50/45°', 'шт', mPts * 2,
+                                'Подключение доп. стояков (сценарий 4)', FG);
+                        } else {
+                            addItem('tee_sml_50_50',
+                                'Тройник SML 50×50', 'шт', mPts,
+                                'Подключение доп. стояков (сценарий 4)', FG);
+                            addItem('otvod_sml_50_45',
+                                'Отвод SML 50/45°', 'шт', mPts * 2,
+                                'Подключение доп. стояков (сценарий 4)', FG);
+                            addItem('rapid_fit_50',
+                                'Муфта соединительная Rapid DN\u00a050 (фасонные)', 'шт',
+                                mPts * 3,
+                                '3 муфты на узел (тройник + 2 отвода)', FG);
                         }
                     }
                 }
@@ -1662,7 +1741,7 @@
             accordionOpenState[parseInt(det.id.replace('sewage-accord-', ''), 10)] = det.open;
         });
 
-        var showKitchen = (activeScenario === 2 || activeScenario === 3);
+        var showKitchen = (activeScenario === 2 || activeScenario === 3 || activeScenario === 4);
 
         var html = buildingStats.map(function (b, idx) {
             var s      = getSettings(idx);
@@ -1930,7 +2009,7 @@
         }
 
         var matLabels   = { pp: 'ПП', pp_silent: 'ПП Бесшумный', pvc: 'НПВХ', sml: 'SML' };
-        var showKitchen = (activeScenario === 2 || activeScenario === 3);
+        var showKitchen = (activeScenario === 2 || activeScenario === 3 || activeScenario === 4);
         var totalRisers = 0, totalLength = 0;
 
         var rows = buildingStats.map(function (b, idx) {
@@ -1983,7 +2062,7 @@
             else          { acc[key] = { name: name, unit: unit, qty: qty, note: note || '', group: group || '' }; }
         }
 
-        var showKitchen = (activeScenario === 2 || activeScenario === 3);
+        var showKitchen = (activeScenario === 2 || activeScenario === 3 || activeScenario === 4);
         var totalApts = 0;
 
         buildingStats.forEach(function (b, idx) {
@@ -2098,7 +2177,7 @@
         }
 
         var matLabels   = { pp: 'ПП', pp_silent: 'ПП Бесшумный', pvc: 'НПВХ', sml: 'SML' };
-        var showKitchen = (activeScenario === 2 || activeScenario === 3);
+        var showKitchen = (activeScenario === 2 || activeScenario === 3 || activeScenario === 4);
         var rowNum = 1, rows = '';
 
         // Хелпер: строка материала
@@ -2348,7 +2427,7 @@
     function collectFittingsForBuilding(idx) {
         if (!buildingStats || !buildingStats[idx]) return [];
         var b = buildingStats[idx];
-        var showKitchen = (activeScenario === 2 || activeScenario === 3);
+        var showKitchen = (activeScenario === 2 || activeScenario === 3 || activeScenario === 4);
         var acc = {};
         function addItem(key, name, unit, qty, note, group) {
             if (!qty || qty <= 0) return;
@@ -3859,7 +3938,7 @@
             return;
         }
         var matLabels   = { pp: 'ПП', pp_silent: 'ПП Бесшумный', pvc: 'НПВХ', sml: 'SML' };
-        var showKitchen = (activeScenario === 2 || activeScenario === 3);
+        var showKitchen = (activeScenario === 2 || activeScenario === 3 || activeScenario === 4);
         var sep = ';', lines = [], rowNum = 1;
 
         lines.push(['№','Наименование','Ед.','Кол-во','Запас','С учётом запаса','Примечание'].join(sep));
@@ -5122,6 +5201,7 @@
             : undefined;
         return {
             activeScenario: activeScenario,
+            manualRiserAdd: manualRiserAdd,
             buildingSettings: settings,
             k3Settings: k3,
             stormSettings: storm,
@@ -5194,6 +5274,17 @@
                 }
                 if (saved.activeScenario) {
                     activeScenario = saved.activeScenario;
+                    // Восстанавливаем активную карточку сценария
+                    document.querySelectorAll('.scenario-card').forEach(function (c) {
+                        c.classList.toggle('active', parseInt(c.dataset.scenario, 10) === activeScenario);
+                    });
+                    var manualBlock = document.getElementById('manualRiserBlock');
+                    if (manualBlock) manualBlock.style.display = (activeScenario === 4) ? '' : 'none';
+                }
+                if (saved.manualRiserAdd !== undefined) {
+                    manualRiserAdd = saved.manualRiserAdd;
+                    var mInp = document.getElementById('manualRiserAdd');
+                    if (mInp) mInp.value = manualRiserAdd;
                 }
                 if (saved.estimatePrices) {
                     estimatePrices = saved.estimatePrices;
