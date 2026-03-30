@@ -3029,6 +3029,33 @@
         return order.map(function (k) { return map[k]; });
     }
 
+    // ── Габаритные длины фитингов (м) для вычитания из метража трубы ──
+    var FITTING_LENGTHS = {
+        // ПП
+        'Крестовина двухплоскостная ПП 110':  0.30,
+        'Тройник ПП 110':                     0.25,
+        'Ревизия ПП 110':                     0.30,
+        'Компенсационный патрубок DN 110':     0.15,
+        'Тройник ПП 50':                      0.15,
+        'Ревизия ПП 50':                      0.20,
+        // SML (все DN)
+        'Муфта соединительная Rapid':          0.05,
+        'Муфта Rapid':                         0.05,
+        'Тройник SML':                         0.25,
+        'Крестовина SML':                      0.25,
+        'Ревизия SML':                         0.30,
+        'Отвод SML':                           0.15,
+        'Отвод ПП':                            0.12
+    };
+
+    function getFittingLength(fittingName) {
+        var keys = Object.keys(FITTING_LENGTHS);
+        for (var i = 0; i < keys.length; i++) {
+            if (fittingName.indexOf(keys[i]) !== -1) return FITTING_LENGTHS[keys[i]];
+        }
+        return 0;
+    }
+
     // Развёртка items с группировкой:
     // Трубы: Работа трубы → Труба → Фасонина (того же DN)
     // Приборы: Работа прибора → Прибор → Комплектующие (сифон, подводки)
@@ -3066,35 +3093,49 @@
         var result = [];
 
         // ── 1. Трубы: работа → труба → фасонина того же DN ──
+        // Работа = полная длина (монтаж по осям), Материал = длина − габариты фитингов
         pipes.forEach(function (pipe) {
             var pipeDN = extractDN(pipe.name);
-            // Работа
-            result.push({
-                name: workNameFor(pipe.name), unit: pipe.unit, qty: pipe.qty,
-                note: pipe.note, group: pipe.group, type: 'работа',
-                defaultPrice: pipe.defaultWorkPrice || null
-            });
-            // Материал
-            result.push({
-                name: pipe.name, unit: pipe.unit, qty: pipe.qty,
-                note: pipe.note, group: pipe.group, type: 'материал',
-                defaultPrice: pipe.defaultPrice || null
-            });
-            // Привязанная фасонина
+            var fullQty = pipe.qty;
+
+            // Собираем фасонину этого DN и считаем суммарную длину фитингов
+            var attachedFittings = [];
             var remaining = [];
+            var totalFittingLen = 0;
             fittings.forEach(function (f) {
                 var fDN = extractDN(f.name);
                 if (fDN === pipeDN || (pipeDN > 0 && fDN === 0)) {
-                    result.push({
-                        name: f.name, unit: f.unit, qty: f.qty,
-                        note: f.note, group: f.group, type: 'материал',
-                        defaultPrice: f.defaultPrice || null
-                    });
+                    attachedFittings.push(f);
+                    totalFittingLen += getFittingLength(f.name) * (f.qty || 0);
                 } else {
                     remaining.push(f);
                 }
             });
             fittings = remaining;
+
+            // Материал трубы = (полная длина − длина фитингов) × коэф. запаса 1.02
+            var materialQty = Math.round(Math.max(0, fullQty - totalFittingLen) * 1.02 * 10) / 10;
+
+            // Работа — полный метраж (монтаж по осям)
+            result.push({
+                name: workNameFor(pipe.name), unit: pipe.unit, qty: fullQty,
+                note: pipe.note, group: pipe.group, type: 'работа',
+                defaultPrice: pipe.defaultWorkPrice || null
+            });
+            // Материал — за вычетом фитингов
+            result.push({
+                name: pipe.name, unit: pipe.unit, qty: materialQty,
+                note: pipe.note, group: pipe.group, type: 'материал',
+                defaultPrice: pipe.defaultPrice || null
+            });
+            // Привязанная фасонина
+            attachedFittings.forEach(function (f) {
+                result.push({
+                    name: f.name, unit: f.unit, qty: f.qty,
+                    note: f.note, group: f.group, type: 'материал',
+                    defaultPrice: f.defaultPrice || null
+                });
+            });
         });
 
         // Оставшаяся фасонина без трубы
