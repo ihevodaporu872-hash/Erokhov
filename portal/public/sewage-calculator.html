@@ -3086,10 +3086,15 @@
             var key = item.name + '|' + (item.unit || '');
             if (map[key]) {
                 map[key].qty = (map[key].qty || 0) + (item.qty || 0);
+                // Суммируем materialQty если есть у обоих
+                if (item.materialQty !== undefined) {
+                    map[key].materialQty = (map[key].materialQty || 0) + item.materialQty;
+                }
             } else {
                 map[key] = { name: item.name, unit: item.unit, qty: item.qty || 0,
                     note: item.note, group: item.group, type: item.type,
                     defaultPrice: item.defaultPrice, defaultWorkPrice: item.defaultWorkPrice };
+                if (item.materialQty !== undefined) map[key].materialQty = item.materialQty;
                 order.push(key);
             }
         });
@@ -3185,6 +3190,10 @@
             var workQty = pipe.qty;
             // materialQty рассчитан в collectFittingsForBuilding (прямой вычет)
             var matQty = (pipe.materialQty !== undefined) ? pipe.materialQty : workQty;
+
+            console.log('[Смета] ' + pipe.name.replace(/\u00a0/g, ' ') +
+                ': Работа=' + workQty + 'м, Материал=' + matQty + 'м' +
+                (pipe.materialQty !== undefined ? ' (вычет фитингов)' : ' (без вычета)'));
 
             // Работа — полный метраж (монтаж по осям)
             result.push({
