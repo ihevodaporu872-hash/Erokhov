@@ -2544,7 +2544,60 @@
         if (s.trashRoom) addItem('trash_trap', 'Трап DN110', 'шт', 1, 'Мусорокамера', '');
         if (s.balconies > 0) addItem('balcony_trap', 'Трап DN110', 'шт', s.balconies, 'Балконы', '');
 
-        return Object.keys(acc).map(function (k) { return acc[k]; });
+        // ── Прямой расчёт вычета фитингов для К1 (жёсткие константы) ──
+        // Константы длин фитингов (м)
+        var FL = {
+            cross110: 0.30, tee110: 0.25, rev110: 0.30, kompens110: 0.15,
+            cross50: 0.15, tee50: 0.15, rev50: 0.20,
+            cross160: 0.40, tee160: 0.35, rev160: 0.40,
+            rapid110: 0.05, rapid50: 0.05, rapid125: 0.07, rapid160: 0.07,
+            otvod110: 0.12, otvod50: 0.10
+        };
+
+        // Подсчёт фитингов DN основного стояка (110 или 160)
+        var rDN = s.riserDiameter;
+        var crossQty = (acc['cross_110'] ? acc['cross_110'].qty : 0);
+        var revRiser = totalRisers * revPer;
+        var kompRiser = isPlastic ? totalRisers * revPer : 0;
+        var rapidRiser = isSML ? Math.ceil(len / 3) : 0;
+        var rapidRevRiser = isSML ? revRiser * 2 : 0;
+
+        var deductRiser = 0;
+        if (rDN <= 110) {
+            deductRiser = crossQty * FL.cross110 + revRiser * FL.rev110 + kompRiser * FL.kompens110
+                + rapidRiser * FL.rapid110 + rapidRevRiser * FL.rapid110;
+        } else {
+            deductRiser = crossQty * FL.cross160 + revRiser * FL.rev160 + kompRiser * FL.kompens110
+                + rapidRiser * FL.rapid160 + rapidRevRiser * FL.rapid160;
+        }
+
+        // Подсчёт фитингов DN кухонного стояка (50 или 110)
+        var kDN = s.kitchenDiameter;
+        var teeKitQty = (acc['tee_110_50'] ? acc['tee_110_50'].qty : 0);
+        var revKit = (showKitchen && kitR > 0) ? kitR * revPer : 0;
+        var kompKit = isPlastic ? revKit : 0;
+
+        var deductKitchen = 0;
+        if (kDN <= 50) {
+            deductKitchen = teeKitQty * FL.tee50 + revKit * FL.rev50 + kompKit * FL.cross50;
+        } else {
+            deductKitchen = teeKitQty * FL.tee110 + revKit * FL.rev110 + kompKit * FL.kompens110;
+        }
+
+        deductRiser = Math.round(deductRiser * 10) / 10;
+        deductKitchen = Math.round(deductKitchen * 10) / 10;
+
+        console.log('[К1 вычет] Корпус ' + idx + ': DN' + rDN + ' вычет=' + deductRiser +
+            'м (кресты=' + crossQty + ', рев=' + revRiser + ', комп=' + kompRiser +
+            ', rapid=' + rapidRiser + '+' + rapidRevRiser + ')');
+        if (deductKitchen > 0)
+            console.log('[К1 вычет] Корпус ' + idx + ': DN' + kDN + ' (кухня) вычет=' + deductKitchen +
+                'м (тройн=' + teeKitQty + ', рев=' + revKit + ')');
+
+        var items = Object.keys(acc).map(function (k) { return acc[k]; });
+        // Прикрепляем метаданные вычета — используются при добавлении трубы
+        items._k1Deduction = { riser: deductRiser, kitchen: deductKitchen };
+        return items;
     }
 
     // Собирает К2-фитинги для одного корпуса (полная версия, синхронизирована с collectStormFittings)
@@ -3125,96 +3178,50 @@
         var result = [];
 
         // ── 1. Трубы: работа → труба → фасонина того же DN ──
-        // Работа = полная длина (монтаж по осям)
-        // Материал = (длина − Σ габаритов фитингов этого DN) × 1.02
-        //
-        // Стратегия: сначала привязываем каждый фитинг к трубе по DN,
-        // затем считаем суммарный вычет для каждой трубы.
-
-        // Шаг 1: Привязка фитингов к трубам по DN
-        var fittingsByDN = {};  // { dn: [fitting, ...] }
-        var orphanFittings = [];
-        fittings.forEach(function (f) {
-            var fDN = extractDN(f.name);
-            if (fDN > 0) {
-                if (!fittingsByDN[fDN]) fittingsByDN[fDN] = [];
-                fittingsByDN[fDN].push(f);
-            } else {
-                orphanFittings.push(f);
-            }
-        });
-
-        // Шаг 2: Обработка каждой трубы
-        var usedDNs = {};
+        // Работа = qty (полная длина по осям)
+        // Материал = materialQty (если задан — прямой вычет из К1), иначе qty
         pipes.forEach(function (pipe) {
             var pipeDN = extractDN(pipe.name);
-            var fullQty = pipe.qty;
-
-            // Собираем фитинги этого DN + сироты (DN=0) для первой трубы
-            var attachedFittings = (fittingsByDN[pipeDN] || []).slice();
-            if (!usedDNs['orphan']) {
-                attachedFittings = attachedFittings.concat(orphanFittings);
-                usedDNs['orphan'] = true;
-            }
-            usedDNs[pipeDN] = true;
-
-            // Считаем суммарную длину фитингов для вычета
-            var totalFittingLen = 0;
-            var fittingDetails = [];
-            attachedFittings.forEach(function (f) {
-                var fLen = getFittingLength(f.name);
-                var deduction = fLen * (f.qty || 0);
-                totalFittingLen += deduction;
-                if (fLen > 0) {
-                    fittingDetails.push(f.name.replace(/\u00a0/g, ' ').substring(0, 40) +
-                        ': ' + (f.qty || 0) + ' × ' + fLen + 'м = ' + Math.round(deduction * 10) / 10 + 'м');
-                }
-            });
-            totalFittingLen = Math.round(totalFittingLen * 10) / 10;
-
-            // Материал трубы = (полная длина − длина фитингов) × 1.02
-            var materialQty = Math.round(Math.max(0, fullQty - totalFittingLen) * 1.02 * 10) / 10;
-
-            // Отладка
-            console.log('[Вычет фитингов] ' + pipe.name.replace(/\u00a0/g, ' ') +
-                ': Работа=' + fullQty + 'м, Вычтено=' + totalFittingLen +
-                'м, Материал=' + materialQty + 'м');
-            if (fittingDetails.length > 0)
-                console.log('  Детали: ' + fittingDetails.join('; '));
+            var workQty = pipe.qty;
+            // materialQty рассчитан в collectFittingsForBuilding (прямой вычет)
+            var matQty = (pipe.materialQty !== undefined) ? pipe.materialQty : workQty;
 
             // Работа — полный метраж (монтаж по осям)
             result.push({
-                name: workNameFor(pipe.name), unit: pipe.unit, qty: fullQty,
+                name: workNameFor(pipe.name), unit: pipe.unit, qty: workQty,
                 note: pipe.note, group: pipe.group, type: 'работа',
                 defaultPrice: pipe.defaultWorkPrice || null
             });
-            // Материал — за вычетом фитингов
+            // Материал — за вычетом фитингов (если materialQty задан)
             result.push({
-                name: pipe.name, unit: pipe.unit, qty: materialQty,
+                name: pipe.name, unit: pipe.unit, qty: matQty,
                 note: pipe.note, group: pipe.group, type: 'материал',
                 defaultPrice: pipe.defaultPrice || null
             });
-            // Привязанная фасонина
-            attachedFittings.forEach(function (f) {
-                result.push({
-                    name: f.name, unit: f.unit, qty: f.qty,
-                    note: f.note, group: f.group, type: 'материал',
-                    defaultPrice: f.defaultPrice || null
-                });
-            });
-        });
-
-        // Оставшаяся фасонина без трубы (DN не совпал ни с одной трубой)
-        Object.keys(fittingsByDN).forEach(function (dn) {
-            if (!usedDNs[dn]) {
-                fittingsByDN[dn].forEach(function (f) {
+            // Привязанная фасонина (по DN)
+            var remaining = [];
+            fittings.forEach(function (f) {
+                var fDN = extractDN(f.name);
+                if (fDN === pipeDN || (pipeDN > 0 && fDN === 0)) {
                     result.push({
                         name: f.name, unit: f.unit, qty: f.qty,
                         note: f.note, group: f.group, type: 'материал',
                         defaultPrice: f.defaultPrice || null
                     });
-                });
-            }
+                } else {
+                    remaining.push(f);
+                }
+            });
+            fittings = remaining;
+        });
+
+        // Оставшаяся фасонина без трубы
+        fittings.forEach(function (f) {
+            result.push({
+                name: f.name, unit: f.unit, qty: f.qty,
+                note: f.note, group: f.group, type: 'материал',
+                defaultPrice: f.defaultPrice || null
+            });
         });
 
         // ── 2. Приборы: работа → прибор → комплектующие ──
@@ -3410,13 +3417,16 @@
 
             // ═══ Уровень 2: К1 ═══
             var k1Items = collectFittingsForBuilding(idx);
-            // Добавляем трубы стояков как первый элемент
+            var k1Deduction = k1Items._k1Deduction || { riser: 0, kitchen: 0 };
+            // Добавляем трубы стояков как первый элемент (с вычетом фитингов)
             var totalLen = calcTotalLengthM(b, activeScenario, idx);
             if (totalLen > 0) {
                 var mat = matLabels[s.pipeType] || s.pipeType;
+                var workLen = Math.round(totalLen * 10) / 10;
+                var matLen = Math.round(Math.max(0, totalLen - k1Deduction.riser) * 1.02 * 10) / 10;
                 k1Items.unshift({
                     name: 'Трубопровод ' + mat + ' DN' + s.riserDiameter + ' мм (стояки)',
-                    unit: 'м.п.', qty: Math.round(totalLen * 10) / 10, note: '', group: '', type: 'материал'
+                    unit: 'м.п.', qty: workLen, materialQty: matLen, note: '', group: '', type: 'материал'
                 });
             }
 
@@ -3583,12 +3593,15 @@
 
                 // К1
                 var k1Items = collectFittingsForBuilding(idx);
+                var k1Ded = k1Items._k1Deduction || { riser: 0, kitchen: 0 };
                 var totalLen = calcTotalLengthM(b, activeScenario, idx);
                 if (totalLen > 0) {
                     var mat = matLabels[s.pipeType] || s.pipeType;
+                    var wLen = Math.round(totalLen * 10) / 10;
+                    var mLen = Math.round(Math.max(0, totalLen - k1Ded.riser) * 1.02 * 10) / 10;
                     k1Items.unshift({
                         name: 'Трубопровод ' + mat + ' DN' + s.riserDiameter + ' мм (стояки)',
-                        unit: 'м.п.', qty: Math.round(totalLen * 10) / 10, type: 'материал'
+                        unit: 'м.п.', qty: wLen, materialQty: mLen, type: 'материал'
                     });
                 }
                 sumItems(k1Items, idx + ':k1');
@@ -3673,10 +3686,16 @@
 
             // К1
             var k1Items = collectFittingsForBuilding(idx);
+            var k1D = k1Items._k1Deduction || { riser: 0, kitchen: 0 };
             var totalLen = calcTotalLengthM(b, activeScenario, idx);
             if (totalLen > 0) {
                 var mat = matLabels[s.pipeType] || s.pipeType;
-                k1Items.unshift({ name: 'Трубопровод ' + mat + ' DN' + s.riserDiameter + ' мм (стояки)', unit: 'м.п.', qty: Math.round(totalLen * 10) / 10, type: 'материал' });
+                k1Items.unshift({
+                    name: 'Трубопровод ' + mat + ' DN' + s.riserDiameter + ' мм (стояки)',
+                    unit: 'м.п.', qty: Math.round(totalLen * 10) / 10,
+                    materialQty: Math.round(Math.max(0, totalLen - k1D.riser) * 1.02 * 10) / 10,
+                    type: 'материал'
+                });
             }
             collectFromExpanded(expandItemsWithWork(k1Items), itemType, uniqueMap);
 
@@ -3901,12 +3920,15 @@
 
             // К1 — Бытовая канализация
             var k1Items = collectFittingsForBuilding(idx);
+            var k1Ded2 = k1Items._k1Deduction || { riser: 0, kitchen: 0 };
             var totalLen = calcTotalLengthM(b, activeScenario, idx);
             if (totalLen > 0) {
                 var mat = matLabels[s.pipeType] || s.pipeType;
                 k1Items.unshift({
                     name: 'Трубопровод ' + mat + ' DN' + s.riserDiameter + ' мм (стояки)',
-                    unit: 'м.п.', qty: Math.round(totalLen * 10) / 10, type: 'материал'
+                    unit: 'м.п.', qty: Math.round(totalLen * 10) / 10,
+                    materialQty: Math.round(Math.max(0, totalLen - k1Ded2.riser) * 1.02 * 10) / 10,
+                    type: 'материал'
                 });
             }
             var k1Totals = addSectionToRows(rows, 'К1 — Бытовая канализация', k1Items, idx + ':k1');
