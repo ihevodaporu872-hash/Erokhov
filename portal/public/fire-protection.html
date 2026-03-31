@@ -709,8 +709,13 @@
                 var dryBDN  = s.dryBranchDN || 65;
                 var dryLmain = Math.max(bH - 1, 0); // высота − 1 м (отм. +0.000)
                 var dryMainTotal = Math.round(dryLmain * dryN * 10) / 10;
-                var dryBranchTotal = Math.round((nF - 1) * dryBpf * dryN * 0.35 * 10) / 10;
-                var dryBranchCount = (nF - 1) * dryBpf * dryN; // кол-во ответвлений
+                // Этажи со 2-го: определяем общее число этажей здания
+                var maxFloorNum = 0;
+                if (b.floors) b.floors.forEach(function (f) { if (f.floor > maxFloorNum) maxFloorNum = f.floor; });
+                if (maxFloorNum === 0) maxFloorNum = nF; // fallback
+                var dryFloorsFrom2 = Math.max(maxFloorNum - 1, 0); // этажи 2..maxFloor
+                var dryBranchCount = dryFloorsFrom2 * dryBpf * dryN; // кол-во ответвлений
+                var dryBranchTotal = Math.round(dryBranchCount * 0.35 * 10) / 10;
 
                 // Стояки
                 addItem('vpv_dry_main', 'Труба стальная э/с ГОСТ\u00a010704-91 DN\u00a0' + dryMDN + ' (сухотруб стояк)', 'м.п.',
@@ -1104,7 +1109,10 @@
                         '<div class="fire-info" style="margin-top:8px">' +
                         '<i class="bi bi-rulers"></i> Стояк: ' + Math.max(bH - 1, 0) + ' м \u00d7 ' + (s.dryPipeCount || 2) +
                         ' = <strong>' + Math.round(Math.max(bH - 1, 0) * (s.dryPipeCount || 2) * 10) / 10 + ' м</strong> DN' + (s.dryMainDN || 80) +
-                        ' · Ответвления: ' + ((nF - 1) * (s.dryBranchPerFloor || 2) * (s.dryPipeCount || 2)) + ' шт' +
+                        ' · Ответвления: ' + ((function () {
+                            var mfl = 0; if (b.floors) b.floors.forEach(function (f) { if (f.floor > mfl) mfl = f.floor; });
+                            return Math.max((mfl || nF) - 1, 0) * (s.dryBranchPerFloor || 2) * (s.dryPipeCount || 2);
+                        })()) + ' шт' +
                         '</div></div>'
                     : '')
                 : '') +
