@@ -384,8 +384,14 @@
                 dryBranchPerFloor: 2,  // ответвлений на стояк на этаж
                 dryMainDN:      80,    // диаметр стояка сухотруба
                 dryBranchDN:    65,    // диаметр ответвления
-                vpvDN:          65,    // диаметр основного стояка ВПВ (50/65/80)
+                vpvDN:          65,    // диаметр основного стояка ВПВ — DEPRECATED, теперь per-zone
                 zoneBoundary:   17,    // граница зон (этаж)
+                // В2.2 (Зона 1)
+                z1DN:           65,    // диаметр стояка Зоны 1
+                z1Risers:       2,     // кол-во стояков Зоны 1
+                // В2.3 (Зона 2)
+                z2DN:           65,    // диаметр стояка Зоны 2
+                z2Risers:       2,     // кол-во стояков Зоны 2
                 // Гидравлика РД
                 flowRate:       11.6,  // расход, л/с
                 pressure:       0.13,  // напор, МПа
@@ -403,6 +409,10 @@
         if (fireSettings[idx].dryBranchDN === undefined) fireSettings[idx].dryBranchDN = 65;
         if (fireSettings[idx].vpvDN === undefined) fireSettings[idx].vpvDN = 65;
         if (fireSettings[idx].zoneBoundary === undefined) fireSettings[idx].zoneBoundary = 17;
+        if (fireSettings[idx].z1DN === undefined) fireSettings[idx].z1DN = fireSettings[idx].vpvDN || 65;
+        if (fireSettings[idx].z1Risers === undefined) fireSettings[idx].z1Risers = 2;
+        if (fireSettings[idx].z2DN === undefined) fireSettings[idx].z2DN = fireSettings[idx].vpvDN || 65;
+        if (fireSettings[idx].z2Risers === undefined) fireSettings[idx].z2Risers = 2;
         if (fireSettings[idx].flowRate === undefined) fireSettings[idx].flowRate = 11.6;
         if (fireSettings[idx].pressure === undefined) fireSettings[idx].pressure = 0.13;
         return fireSettings[idx];
@@ -493,15 +503,22 @@
             var sec     = s.sections || 1;
             var bH      = b.height || 0;
             var floorH  = nF > 0 ? bH / nF : 3;
-            var dn      = s.vpvDN || 65;
-            var dnLabel = 'DN\u00a0' + dn;
-            var pipeGost = dn >= 50 ? 'э/с ГОСТ\u00a010704-91' : 'ВГП ГОСТ\u00a03262-75';
+            // Per-zone DN и стояки
+            var z1DN     = s.z1DN || 65;
+            var z2DN     = s.z2DN || 65;
+            var z1R      = s.z1Risers || 2;
+            var z2R      = s.z2Risers || 2;
+            var z1Label  = 'DN\u00a0' + z1DN;
+            var z2Label  = 'DN\u00a0' + z2DN;
+            var z1Gost   = z1DN >= 50 ? 'э/с ГОСТ\u00a010704-91' : 'ВГП ГОСТ\u00a03262-75';
+            var z2Gost   = z2DN >= 50 ? 'э/с ГОСТ\u00a010704-91' : 'ВГП ГОСТ\u00a03262-75';
             var z2      = hasZone2(b, idx);
             var z1F     = zone1Floors(b, idx);
             var z2F     = zone2Floors(b, idx);
+            var zb      = getZoneBoundary(idx);
 
             // Считаем общее кол-во стояков (для затворов обслуживания)
-            totalRisers += sec * (z2 ? 2 : 1);
+            totalRisers += z1R + (z2 ? z2R : 0);
 
             // ШПК: 2 шт на секцию на этаж
             // 1-й этаж: ШПК-320-12 (+2 ОП-5), остальные: ШПК-320-21
@@ -553,79 +570,67 @@
                 addItem('vpv_hose_z2', 'Рукав пожарный DN\u00a065, 20 м', 'шт', shpkZ2,
                     'По 1 на каждый ШПК (Зона II)', 'zone2');
 
-            // Стояки (диаметр из настроек корпуса)
-            var riserLenZ1 = Math.round(floorH * z1F * sec * 10) / 10;
-            var riserLenZ2 = z2 ? Math.round(floorH * z2F * sec * 10) / 10 : 0;
-            var zb = getZoneBoundary(idx);
+            // ── В2.2 Стояки (Зона 1) ──
+            var riserLenZ1 = Math.round(floorH * z1F * z1R * 10) / 10;
+            addItem('vpv_pipe_z1', 'Труба стальная ' + z1Gost + ' ' + z1Label + ' (стояки В2.2)', 'м.п.',
+                riserLenZ1, z1R + ' ст. × ' + z1F + ' эт. × ' + floorH.toFixed(1) + ' м', 'zone1');
 
-            addItem('vpv_pipe_z1', 'Труба стальная ' + pipeGost + ' ' + dnLabel + ' (стояки ВПВ)', 'м.п.',
-                riserLenZ1, 'Зона I: 1 стояк на секцию', 'zone1');
-            if (riserLenZ2 > 0)
-                addItem('vpv_pipe_z2', 'Труба стальная ' + pipeGost + ' ' + dnLabel + ' (стояки ВПВ)', 'м.п.',
-                    riserLenZ2, 'Зона II: 1 стояк на секцию', 'zone2');
+            // Этажные ветки DN25 Зоны 1
+            var branchZ1 = Math.round(3 * z1F * z1R * 10) / 10;
+            addItem('vpv_branch_z1', 'Труба стальная ВГП ГОСТ\u00a03262-75 DN\u00a025 (этажные ветки В2.2)', 'м.п.',
+                branchZ1, '~3 м на этаж на стояк (Зона I)', 'zone1');
 
-            // Этажные ветки DN25 (ГОСТ 3262-75 — ВГП, Ду < 50)
-            var branchZ1 = Math.round(3 * z1F * sec * 10) / 10;
-            var branchZ2 = z2 ? Math.round(3 * z2F * sec * 10) / 10 : 0;
+            // Грувлоки Зоны 1
+            var gruvZ1 = z1F * z1R * 2;
+            addItem('vpv_gruvlok_z1', 'Муфта грувлок ' + z1Label, 'шт', gruvZ1,
+                '2 шт на стык, ' + z1R + ' стояков', 'zone1');
 
-            addItem('vpv_branch_z1', 'Труба стальная ВГП ГОСТ\u00a03262-75 DN\u00a025 (этажные ветки ВПВ)', 'м.п.',
-                branchZ1, '~3 м на этаж на секцию (Зона I)', 'zone1');
-            if (branchZ2 > 0)
-                addItem('vpv_branch_z2', 'Труба стальная ВГП ГОСТ\u00a03262-75 DN\u00a025 (этажные ветки ВПВ)', 'м.п.',
-                    branchZ2, '~3 м на этаж на секцию (Зона II)', 'zone2');
+            // Хомуты Зоны 1
+            addItem('vpv_clamp_z1', 'Хомут стальной (крепление труб В2.2)', 'шт',
+                Math.ceil((riserLenZ1 + branchZ1) / 1.5), 'Через 1,5 м (Зона I)', 'zone1');
 
-            // Транзит Зоны II через эт. 1-11 (только труба)
+            // Арматура Зоны 1
+            addItem('vpv_valve_z1', 'Кран шаровой ' + z1Label + ' (стояки В2.2)', 'шт',
+                z1R * 2, '2 шт на стояк (верх/низ)', 'zone1');
+            addItem('vpv_check_z1', 'Клапан обратный ' + z1Label + ' (В2.2)', 'шт',
+                z1R, '1 шт на стояк', 'zone1');
+            addItem('vpv_manometer_z1', 'Манометр с трёхходовым краном (В2.2)', 'шт',
+                shpkZ1, '1 шт на каждый ШПК', 'zone1');
+            addItem('vpv_flush_z1', 'Кран промывочный DN\u00a050 (В2.2)', 'шт',
+                z1R, '1 шт на стояк', 'zone1');
+
+            // ── В2.3 Стояки (Зона 2) — из подвала через всё здание ──
+            var riserLenZ2 = 0, branchZ2 = 0;
             if (z2) {
-                var transitLen = Math.round(floorH * getZoneBoundary(idx) * sec * 10) / 10;
-                addItem('vpv_transit_z2', 'Труба стальная ' + pipeGost + ' ' + dnLabel + ' (транзит Зона II, эт. 1-' + zb + ')', 'м.п.',
-                    transitLen, 'Транзитный стояк через Зону I (эт. 1-' + zb + ')', 'zone2');
+                // Стояки Зоны 2 идут из подвала через всю высоту → floorH × nF × z2R
+                riserLenZ2 = Math.round(floorH * nF * z2R * 10) / 10;
+                addItem('vpv_pipe_z2', 'Труба стальная ' + z2Gost + ' ' + z2Label + ' (стояки В2.3, транзит через зону 1)', 'м.п.',
+                    riserLenZ2, z2R + ' ст. × ' + nF + ' эт. × ' + floorH.toFixed(1) + ' м (полная высота)', 'zone2');
+
+                // Этажные ветки Зоны 2 — только свои этажи
+                branchZ2 = Math.round(3 * z2F * z2R * 10) / 10;
+                addItem('vpv_branch_z2', 'Труба стальная ВГП ГОСТ\u00a03262-75 DN\u00a025 (этажные ветки В2.3)', 'м.п.',
+                    branchZ2, '~3 м на этаж на стояк (Зона II)', 'zone2');
+
+                // Грувлоки Зоны 2 — по всей высоте
+                var gruvZ2 = nF * z2R * 2;
+                addItem('vpv_gruvlok_z2', 'Муфта грувлок ' + z2Label, 'шт', gruvZ2,
+                    '2 шт на стык, ' + z2R + ' стояков × ' + nF + ' эт.', 'zone2');
+
+                // Хомуты Зоны 2
+                addItem('vpv_clamp_z2', 'Хомут стальной (крепление труб В2.3)', 'шт',
+                    Math.ceil((riserLenZ2 + branchZ2) / 1.5), 'Через 1,5 м (Зона II)', 'zone2');
+
+                // Арматура Зоны 2
+                addItem('vpv_valve_z2', 'Кран шаровой ' + z2Label + ' (стояки В2.3)', 'шт',
+                    z2R * 2, '2 шт на стояк (верх/низ)', 'zone2');
+                addItem('vpv_check_z2', 'Клапан обратный ' + z2Label + ' (В2.3)', 'шт',
+                    z2R, '1 шт на стояк', 'zone2');
+                addItem('vpv_manometer_z2', 'Манометр с трёхходовым краном (В2.3)', 'шт',
+                    shpkZ2, '1 шт на каждый ШПК', 'zone2');
+                addItem('vpv_flush_z2', 'Кран промывочный DN\u00a050 (В2.3)', 'шт',
+                    z2R, '1 шт на стояк', 'zone2');
             }
-
-            // Муфты грувлок DN65: 2 на стык (1 стык на этаж на стояк)
-            var gruvZ1 = z1F * sec * 2;
-            var gruvZ2 = z2 ? (z2F + getZoneBoundary(idx)) * sec * 2 : 0;
-            addItem('vpv_gruvlok_z1', 'Муфта грувлок ' + dnLabel, 'шт', gruvZ1,
-                '2 шт на стык, 1 стык/этаж/стояк (Зона I)', 'zone1');
-            if (gruvZ2 > 0)
-                addItem('vpv_gruvlok_z2', 'Муфта грувлок ' + dnLabel, 'шт', gruvZ2,
-                    '2 шт на стык, 1 стык/этаж/стояк (Зона II)', 'zone2');
-
-            // Хомуты: через 1,5 м по всем трубам
-            var totalPipeZ1 = riserLenZ1 + branchZ1;
-            var totalPipeZ2 = riserLenZ2 + branchZ2 + (z2 ? Math.round(floorH * getZoneBoundary(idx) * sec * 10) / 10 : 0);
-            addItem('vpv_clamp_z1', 'Хомут стальной (крепление труб ВПВ)', 'шт',
-                Math.ceil(totalPipeZ1 / 1.5), 'Через 1,5 м (Зона I)', 'zone1');
-            if (totalPipeZ2 > 0)
-                addItem('vpv_clamp_z2', 'Хомут стальной (крепление труб ВПВ)', 'шт',
-                    Math.ceil(totalPipeZ2 / 1.5), 'Через 1,5 м (Зона II)', 'zone2');
-
-            // Кран шаровой DN65: верх/низ стояка
-            addItem('vpv_valve_z1', 'Кран шаровой ' + dnLabel + ' (стояки ВПВ)', 'шт',
-                sec * 2, '2 шт на стояк (верх/низ, Зона I)', 'zone1');
-            if (z2)
-                addItem('vpv_valve_z2', 'Кран шаровой ' + dnLabel + ' (стояки ВПВ)', 'шт',
-                    sec * 2, '2 шт на стояк (верх/низ, Зона II)', 'zone2');
-
-            // Клапан обратный DN65: 1 на стояк
-            addItem('vpv_check_z1', 'Клапан обратный ' + dnLabel, 'шт',
-                sec, '1 шт на стояк (Зона I)', 'zone1');
-            if (z2)
-                addItem('vpv_check_z2', 'Клапан обратный ' + dnLabel, 'шт',
-                    sec, '1 шт на стояк (Зона II)', 'zone2');
-
-            // Манометр с трёхходовым краном: 1 на этажное ответвление (на каждый ШПК)
-            addItem('vpv_manometer_z1', 'Манометр с трёхходовым краном (этажные ответвления ВПВ)', 'шт',
-                shpkZ1, '1 шт на каждый ШПК (Зона I)', 'zone1');
-            if (shpkZ2 > 0)
-                addItem('vpv_manometer_z2', 'Манометр с трёхходовым краном (этажные ответвления ВПВ)', 'шт',
-                    shpkZ2, '1 шт на каждый ШПК (Зона II)', 'zone2');
-
-            // Кран промывочный DN50: 1 на магистраль (= 1 на стояк)
-            addItem('vpv_flush_z1', 'Кран промывочный DN\u00a050 (магистраль ВПВ)', 'шт',
-                sec, '1 шт на стояк (Зона I)', 'zone1');
-            if (z2)
-                addItem('vpv_flush_z2', 'Кран промывочный DN\u00a050 (магистраль ВПВ)', 'шт',
-                    sec, '1 шт на стояк (Зона II)', 'zone2');
 
             // Фасадные патрубки DN80: 2 шт на зону (подключение ПА)
             addItem('vpv_facade_z1', 'Патрубок фасадный DN\u00a080 (подключение ПА)', 'шт',
@@ -690,15 +695,14 @@
                 '2 на стояк (' + riserCount + ' ст.) + 1 на магистраль (' + sec + ' секц.)', 'zone1');
 
             // ── Отводы 90° (× 1.1 коэффициент на огибание балок и венткоробов) ──
-            var elbowsBase = z1F * sec * 2; // 2 отвода на этаж на секцию (типовой)
-            var elbowsZ2base = z2 ? z2F * sec * 2 : 0;
-            var elbowsZ1 = Math.ceil(elbowsBase * 1.1);
-            var elbowsZ2 = Math.ceil(elbowsZ2base * 1.1);
-            addItem('vpv_elbow_z1', 'Отвод 90\u00b0 ' + dnLabel + ' (с учётом коэф. 1.1)', 'шт', elbowsZ1,
-                'Зона I: 2/эт./секц. \u00d7 1.1 (огибание балок и венткоробов)', 'zone1');
-            if (elbowsZ2 > 0)
-                addItem('vpv_elbow_z2', 'Отвод 90\u00b0 ' + dnLabel + ' (с учётом коэф. 1.1)', 'шт', elbowsZ2,
-                    'Зона II: 2/эт./секц. \u00d7 1.1', 'zone2');
+            var elbowsZ1 = Math.ceil(z1F * z1R * 2 * 1.1);
+            addItem('vpv_elbow_z1', 'Отвод 90\u00b0 ' + z1Label + ' (В2.2, коэф. 1.1)', 'шт', elbowsZ1,
+                'Зона I: 2/эт./стояк \u00d7 1.1', 'zone1');
+            if (z2) {
+                var elbowsZ2 = Math.ceil(z2F * z2R * 2 * 1.1);
+                addItem('vpv_elbow_z2', 'Отвод 90\u00b0 ' + z2Label + ' (В2.3, коэф. 1.1)', 'шт', elbowsZ2,
+                    'Зона II: 2/эт./стояк \u00d7 1.1', 'zone2');
+            }
 
             // ── Сухотруб (В2.4) — расчёт по квартирографии ──
             var dryTotalPipeLen = 0;
@@ -747,7 +751,6 @@
 
             // ── Комплект маркировки (наклейки, стрелки направления) ──
             var allPipeLenForMarking = riserLenZ1 + riserLenZ2 + branchZ1 + branchZ2
-                + (z2 ? Math.round(floorH * zb * sec * 10) / 10 : 0)
                 + dryTotalPipeLen;
             if (allPipeLenForMarking > 0) {
                 addItem('vpv_marking', 'Комплект маркировки (наклейки, стрелки направления потока)', 'компл.',
@@ -760,9 +763,7 @@
             var paintSurfMap = { 25: 0.106, 50: 0.189, 65: 0.239, 80: 0.279, 100: 0.359 };
             function paintPerM(d) { return paintSurfMap[d] || 0.239; }
 
-            var paintPerVpv = dn <= 50 ? paintPerM(50) : dn <= 65 ? paintPerM(65) : paintPerM(80);
-            var vpvPipeLen = riserLenZ1 + riserLenZ2 + (z2 ? Math.round(floorH * zb * sec * 10) / 10 : 0);
-            var paintAreaVpv = vpvPipeLen * paintPerVpv;
+            var paintAreaVpv = riserLenZ1 * paintPerM(z1DN) + riserLenZ2 * paintPerM(z2DN);
             var paintAreaBranch = (branchZ1 + branchZ2) * paintPerM(25);
             // Сухотруб
             var paintAreaDry = 0;
@@ -801,7 +802,7 @@
             'vpv_marking', 'vpv_paint', 'vpv_service_damper',
             'vpv_shpk_z2', 'vpv_dppk_z2', 'vpv_diaphragm_z2', 'vpv_hose_z2',
             'vpv_manometer_z2',
-            'vpv_pipe_z2', 'vpv_branch_z2', 'vpv_transit_z2', 'vpv_gruvlok_z2', 'vpv_clamp_z2',
+            'vpv_pipe_z2', 'vpv_branch_z2', 'vpv_gruvlok_z2', 'vpv_clamp_z2',
             'vpv_valve_z2', 'vpv_check_z2', 'vpv_flush_z2', 'vpv_elbow_z2',
             'vpv_facade_z2', 'vpv_gm80_z2', 'vpv_check80_z2'
         ];
@@ -1045,27 +1046,78 @@
                 'class="fire-sections bld-num" data-idx="' + idx + '" style="width:64px">' +
                 '</div>' +
 
-                (systemPrefix === 'vpv' ?
-                    '<div class="bld-num-row" style="margin-top:8px">' +
-                    '<label><i class="bi bi-circle"></i> Диаметр основного стояка ВПВ:</label>' +
-                    '<select class="fire-vpv-dn bld-select" data-idx="' + idx + '" style="width:120px">' +
-                    '<option value="50"' + (s.vpvDN === 50 ? ' selected' : '') + '>DN 50</option>' +
-                    '<option value="65"' + (s.vpvDN === 65 ? ' selected' : '') + '>DN 65 (стандарт)</option>' +
-                    '<option value="80"' + (s.vpvDN === 80 ? ' selected' : '') + '>DN 80</option>' +
-                    '</select></div>' +
-
+                (systemPrefix === 'vpv' ? (function () {
+                    var avgFH = nF > 0 ? Math.round(bH / nF * 10) / 10 : 3;
+                    var z1End = Math.min(s.zoneBoundary || 17, nF);
+                    var z2Start = z1End + 1;
+                    var z1PipeLen = Math.round(avgFH * z1End * (s.z1Risers || 2) * 10) / 10;
+                    var z2PipeLen = nF > z1End ? Math.round(avgFH * nF * (s.z2Risers || 2) * 10) / 10 : 0;
+                    return '' +
                     '<div class="bld-num-row" style="margin-top:8px">' +
                     '<label><i class="bi bi-layers"></i> Граница зон (этаж):</label>' +
                     '<input type="number" min="5" max="50" step="1" value="' + (s.zoneBoundary || 17) + '" ' +
                     'class="fire-zone-boundary bld-num" data-idx="' + idx + '" style="width:64px">' +
                     '</div>' +
 
+                    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px">' +
+
+                    // ── В2.2 (Зона 1) ──
+                    '<div style="padding:10px;border:2px solid #2563eb;border-radius:10px;background:rgba(37,99,235,.04)">' +
+                    '<div style="font-weight:700;font-size:12px;color:#2563eb;margin-bottom:8px">' +
+                    '<i class="bi bi-shield-check"></i> В2.2 — Зона 1 (эт. 1\u2013' + z1End + ')' +
+                    '</div>' +
+                    '<div class="bld-num-row" style="margin-bottom:6px">' +
+                    '<label>DN стояка:</label>' +
+                    '<select class="fire-z1-dn bld-select" data-idx="' + idx + '" style="width:90px">' +
+                    '<option value="50"' + ((s.z1DN || 65) === 50 ? ' selected' : '') + '>DN 50</option>' +
+                    '<option value="65"' + ((s.z1DN || 65) === 65 ? ' selected' : '') + '>DN 65</option>' +
+                    '<option value="80"' + ((s.z1DN || 65) === 80 ? ' selected' : '') + '>DN 80</option>' +
+                    '</select></div>' +
+                    '<div class="bld-num-row">' +
+                    '<label>Стояков:</label>' +
+                    '<input type="number" min="1" max="20" value="' + (s.z1Risers || 2) + '" ' +
+                    'class="fire-z1-risers bld-num" data-idx="' + idx + '" style="width:56px">' +
+                    '</div>' +
+                    '<div style="font-size:11px;color:#2563eb;margin-top:6px">' +
+                    '<i class="bi bi-rulers"></i> Труба: <strong>' + z1PipeLen + '</strong> м (' +
+                    (s.z1Risers || 2) + ' ст. \u00d7 ' + z1End + ' эт. \u00d7 ' + avgFH + ' м)' +
+                    '</div></div>' +
+
+                    // ── В2.3 (Зона 2) ──
+                    (nF > z1End ?
+                        '<div style="padding:10px;border:2px solid #dc2626;border-radius:10px;background:rgba(220,38,38,.04)">' +
+                        '<div style="font-weight:700;font-size:12px;color:#dc2626;margin-bottom:8px">' +
+                        '<i class="bi bi-shield-exclamation"></i> В2.3 — Зона 2 (эт. ' + z2Start + '\u2013' + nF + ')' +
+                        '</div>' +
+                        '<div class="bld-num-row" style="margin-bottom:6px">' +
+                        '<label>DN стояка:</label>' +
+                        '<select class="fire-z2-dn bld-select" data-idx="' + idx + '" style="width:90px">' +
+                        '<option value="50"' + ((s.z2DN || 65) === 50 ? ' selected' : '') + '>DN 50</option>' +
+                        '<option value="65"' + ((s.z2DN || 65) === 65 ? ' selected' : '') + '>DN 65</option>' +
+                        '<option value="80"' + ((s.z2DN || 65) === 80 ? ' selected' : '') + '>DN 80</option>' +
+                        '</select></div>' +
+                        '<div class="bld-num-row">' +
+                        '<label>Стояков:</label>' +
+                        '<input type="number" min="1" max="20" value="' + (s.z2Risers || 2) + '" ' +
+                        'class="fire-z2-risers bld-num" data-idx="' + idx + '" style="width:56px">' +
+                        '</div>' +
+                        '<div style="font-size:11px;color:#dc2626;margin-top:6px">' +
+                        '<i class="bi bi-rulers"></i> Труба: <strong>' + z2PipeLen + '</strong> м (' +
+                        (s.z2Risers || 2) + ' ст. \u00d7 ' + nF + ' эт. \u00d7 ' + avgFH + ' м, полная высота)' +
+                        '</div></div>'
+                    : '<div style="padding:10px;border:2px dashed var(--gray-300);border-radius:10px;opacity:.5;text-align:center">' +
+                      '<i class="bi bi-dash-circle"></i> Зона 2 не требуется (' + nF + ' эт. \u2264 ' + z1End + ')' +
+                      '</div>') +
+
+                    '</div>' + // /grid
+
                     '<div class="fire-info" style="margin-top:8px;background:rgba(239,68,68,.06);color:#dc2626">' +
                     '<i class="bi bi-speedometer2"></i> ' +
                     '<strong>Гидравлика РД:</strong> ' +
                     'Расход <strong>' + (s.flowRate || 11.6) + '</strong> л/с · ' +
                     'Напор <strong>' + (s.pressure || 0.13) + '</strong> МПа' +
-                    '</div>'
+                    '</div>';
+                })()
                 : '') +
 
                 (systemPrefix === 'aupt' ?
@@ -1188,6 +1240,32 @@
             el.addEventListener('change', function () {
                 var idx = parseInt(el.dataset.idx, 10);
                 getSettings(idx).vpvDN = parseInt(el.value, 10) || 65;
+                renderResults();
+            });
+        });
+        container.querySelectorAll('.fire-z1-dn').forEach(function (el) {
+            el.addEventListener('change', function () {
+                getSettings(parseInt(el.dataset.idx, 10)).z1DN = parseInt(el.value, 10) || 65;
+                renderResults();
+            });
+        });
+        container.querySelectorAll('.fire-z1-risers').forEach(function (el) {
+            el.addEventListener('change', function () {
+                getSettings(parseInt(el.dataset.idx, 10)).z1Risers = Math.max(1, parseInt(el.value, 10) || 2);
+                renderAllAccordions();
+                renderResults();
+            });
+        });
+        container.querySelectorAll('.fire-z2-dn').forEach(function (el) {
+            el.addEventListener('change', function () {
+                getSettings(parseInt(el.dataset.idx, 10)).z2DN = parseInt(el.value, 10) || 65;
+                renderResults();
+            });
+        });
+        container.querySelectorAll('.fire-z2-risers').forEach(function (el) {
+            el.addEventListener('change', function () {
+                getSettings(parseInt(el.dataset.idx, 10)).z2Risers = Math.max(1, parseInt(el.value, 10) || 2);
+                renderAllAccordions();
                 renderResults();
             });
         });
@@ -1595,8 +1673,9 @@
         if (item._key && item._key.indexOf('aupt') === 0) sys = 'aupt';
         else if (item._key && item._key.indexOf('vpv_dry') === 0) sys = 'dry';
 
+        var zone = item.group || ''; // zone1 / zone2
         function push(type, name, unit, qty) {
-            out.push({ type: type, name: name, unit: unit, qty: Math.round(qty * 10) / 10, sys: sys });
+            out.push({ type: type, name: name, unit: unit, qty: Math.round(qty * 10) / 10, sys: sys, _zone: zone });
         }
 
         var isPipe = item.unit === 'м.п.' && /Труба стальная/i.test(item.name);
@@ -1721,8 +1800,13 @@
                 '</div>';
         }
 
+        // Разделяем ВПВ на Зону 1 (В2.2) и Зону 2 (В2.3) по группе
+        var vpvZ1 = data.vpv.filter(function (it) { return !it._zone || it._zone === 'zone1'; });
+        var vpvZ2 = data.vpv.filter(function (it) { return it._zone === 'zone2'; });
+
         el.innerHTML =
-            renderSection(data.vpv, 'Система ВПВ (Внутренний противопожарный водопровод)', 'bi-shield-check', '#2563eb') +
+            renderSection(vpvZ1, 'В2.2 — ВПВ Зона 1', 'bi-shield-check', '#2563eb') +
+            (vpvZ2.length ? renderSection(vpvZ2, 'В2.3 — ВПВ Зона 2', 'bi-shield-exclamation', '#7c3aed') : '') +
             renderSection(data.dry, 'Система Сухотруба (В2.4)', 'bi-building-up', '#059669') +
             renderSection(data.aupt, 'Система АПТ (Спринклерная)', 'bi-droplet-half', '#dc2626');
     }
