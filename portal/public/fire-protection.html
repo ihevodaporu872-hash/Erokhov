@@ -522,17 +522,20 @@
                 addItem('vpv_dppk_z2', 'Датчик ДППК (датчик положения пожарного крана)', 'шт', shpkZ2,
                     '1 шт на каждый ШПК (Зона II)', 'zone2');
 
-            // Диафрагмы Ду50: Зона I эт. 1-5, Зона II — первые 4 этажа зоны
-            var diagZ1floors = Math.min(z1F, 5); // этажи 1-5
+            // Диафрагмы (нерж. сталь) для гашения напора на ПК
+            // Зона I: этажи ≤ 13 — по 1 на каждый ШПК
+            var diagZ1floors = Math.min(z1F, 13);
             var diagZ1 = 2 * sec * diagZ1floors;
-            addItem('vpv_diaphragm_z1', 'Диафрагма Ду50 для снижения давления', 'шт', diagZ1,
-                'Зона I: эт. 1\u2013' + Math.min(z1F, 5) + ', в каждый ШПК', 'zone1');
+            addItem('vpv_diaphragm_z1', 'Диафрагма Ду50 (нерж. сталь) для снижения давления', 'шт', diagZ1,
+                'Зона I: эт. 1\u2013' + Math.min(z1F, 13) + ', в каждый ШПК', 'zone1');
             if (z2) {
-                var diagZ2floors = Math.min(z2F, 4);
+                // Зона II: этажи 18–31 (первые 13 этажей зоны II)
+                var diagZ2floors = Math.min(z2F, 13);
                 var diagZ2 = 2 * sec * diagZ2floors;
+                var zbVal = getZoneBoundary(idx);
                 if (diagZ2 > 0)
-                    addItem('vpv_diaphragm_z2', 'Диафрагма Ду50 для снижения давления', 'шт', diagZ2,
-                        'Зона II: эт. ' + (getZoneBoundary(idx) + 1) + '\u2013' + Math.min(getZoneBoundary(idx) + z2F, getZoneBoundary(idx) + 4) + ', в каждый ШПК', 'zone2');
+                    addItem('vpv_diaphragm_z2', 'Диафрагма Ду50 (нерж. сталь) для снижения давления', 'шт', diagZ2,
+                        'Зона II: эт. ' + (zbVal + 1) + '\u2013' + Math.min(zbVal + z2F, zbVal + 13) + ', в каждый ШПК', 'zone2');
             }
 
             // Рукав DN65 — по 1 на каждый ШПК
@@ -669,18 +672,50 @@
                     commPipe, '~5 м на помещение аренды', 'zone1');
             }
 
-            // ── Сухотруб DN65 на фасаде ──
+            // ── Заглушки эллиптические ГОСТ 17379 ──
+            // 2 шт на каждый стояк (верх/низ) + 1 на тупиковую магистраль
+            var riserCount = sec * (z2 ? 2 : 1);
+            var capsOnRisers = riserCount * 2;
+            var capsOnMains = sec; // 1 тупиковая магистраль на секцию
+            addItem('vpv_caps', 'Заглушка эллиптическая ГОСТ\u00a017379 ' + dnLabel, 'шт',
+                capsOnRisers + capsOnMains,
+                '2 на стояк (' + riserCount + ' ст.) + 1 на магистраль (' + sec + ' секц.)', 'zone1');
+
+            // ── Отводы 90° (× 1.1 коэффициент на огибание балок и венткоробов) ──
+            var elbowsBase = z1F * sec * 2; // 2 отвода на этаж на секцию (типовой)
+            var elbowsZ2base = z2 ? z2F * sec * 2 : 0;
+            var elbowsZ1 = Math.ceil(elbowsBase * 1.1);
+            var elbowsZ2 = Math.ceil(elbowsZ2base * 1.1);
+            addItem('vpv_elbow_z1', 'Отвод 90\u00b0 ' + dnLabel + ' (с учётом коэф. 1.1)', 'шт', elbowsZ1,
+                'Зона I: 2/эт./секц. \u00d7 1.1 (огибание балок и венткоробов)', 'zone1');
+            if (elbowsZ2 > 0)
+                addItem('vpv_elbow_z2', 'Отвод 90\u00b0 ' + dnLabel + ' (с учётом коэф. 1.1)', 'шт', elbowsZ2,
+                    'Зона II: 2/эт./секц. \u00d7 1.1', 'zone2');
+
+            // ── Сухотруб DN65 на фасаде (В2.4) ──
             if (s.dryRiser && bH > 0) {
                 var dryLen = Math.round(bH * 10) / 10;
-                var dryHeads = Math.max(1, Math.ceil(bH / 20)); // ГМ-65 через каждые 20 м
+                var dryHeads = Math.max(1, Math.ceil(bH / 20));
                 addItem('vpv_dry_pipe', 'Труба стальная э/с ГОСТ\u00a010704-91 DN\u00a065 (сухотруб фасадный)', 'м.п.',
                     dryLen, 'Высота корпуса ' + bH + ' м', 'zone1');
-                addItem('vpv_dry_head', 'Головка ГМ-65 (сухотруб)', 'шт', dryHeads,
-                    'Через каждые 20 м по высоте', 'zone1');
-                addItem('vpv_dry_valve', 'Кран шаровой DN\u00a065 (сухотруб)', 'шт', 2,
-                    'Верх/низ сухотруба', 'zone1');
-                addItem('vpv_dry_check', 'Клапан обратный DN\u00a065 (сухотруб)', 'шт', 1,
-                    'Внизу сухотруба', 'zone1');
+                addItem('vpv_dry_head', 'Головка ГМ-65 (сухотруб, фасад)', 'шт', 2,
+                    '2 шт на фасад (верх/низ)', 'zone1');
+                addItem('vpv_dry_valve', 'Задвижка DN\u00a065 (узел ввода сухотруба)', 'шт', 1,
+                    'Узел ввода сухотруба', 'zone1');
+                addItem('vpv_dry_check', 'Клапан обратный DN\u00a065 (узел ввода сухотруба)', 'шт', 1,
+                    'Узел ввода сухотруба', 'zone1');
+                addItem('vpv_dry_clamp', 'Хомут стальной (крепление сухотруба)', 'шт',
+                    Math.ceil(dryLen / 1.5), 'Через 1,5 м', 'zone1');
+            }
+
+            // ── Комплект маркировки (наклейки, стрелки направления) ──
+            var allPipeLenForMarking = riserLenZ1 + riserLenZ2 + branchZ1 + branchZ2
+                + (z2 ? Math.round(floorH * zb * sec * 10) / 10 : 0)
+                + (s.dryRiser && bH > 0 ? bH : 0);
+            if (allPipeLenForMarking > 0) {
+                addItem('vpv_marking', 'Комплект маркировки (наклейки, стрелки направления потока)', 'компл.',
+                    Math.ceil(allPipeLenForMarking / 20),
+                    '1 компл. на каждые 20 м трубы', 'zone1');
             }
 
             // ── Окраска труб ВПВ (зелёный цвет, 2 слоя) ──
@@ -711,15 +746,16 @@
             'vpv_manometer_z1',
             'vpv_pipe_z1', 'vpv_branch_z1', 'vpv_gruvlok_z1', 'vpv_clamp_z1',
             'vpv_valve_z1', 'vpv_check_z1', 'vpv_flush_z1',
+            'vpv_caps', 'vpv_elbow_z1',
             'vpv_facade_z1', 'vpv_gm80_z1', 'vpv_check80_z1',
-            'vpv_dry_pipe', 'vpv_dry_head', 'vpv_dry_valve', 'vpv_dry_check',
+            'vpv_dry_pipe', 'vpv_dry_head', 'vpv_dry_valve', 'vpv_dry_check', 'vpv_dry_clamp',
             'vpv_lobby_shpk', 'vpv_lobby_dppk', 'vpv_lobby_hose', 'vpv_lobby_diaphragm', 'vpv_lobby_pipe',
             'vpv_comm_shpk', 'vpv_comm_dppk', 'vpv_comm_hose', 'vpv_comm_diaphragm', 'vpv_comm_pipe',
-            'vpv_paint', 'vpv_service_damper',
+            'vpv_marking', 'vpv_paint', 'vpv_service_damper',
             'vpv_shpk_z2', 'vpv_dppk_z2', 'vpv_diaphragm_z2', 'vpv_hose_z2',
             'vpv_manometer_z2',
             'vpv_pipe_z2', 'vpv_branch_z2', 'vpv_transit_z2', 'vpv_gruvlok_z2', 'vpv_clamp_z2',
-            'vpv_valve_z2', 'vpv_check_z2', 'vpv_flush_z2',
+            'vpv_valve_z2', 'vpv_check_z2', 'vpv_flush_z2', 'vpv_elbow_z2',
             'vpv_facade_z2', 'vpv_gm80_z2', 'vpv_check80_z2'
         ];
         var result = [];
@@ -1507,7 +1543,7 @@
             } else if (/Хомут/i.test(item.name)) {
                 // Крепёж — только материал
                 pushMat(item.name, item.unit, q, item.group);
-            } else if (/Кран шаровой|Кран промывочный|Клапан обратный|Патрубок фасадный|Головка ГМ/i.test(item.name)) {
+            } else if (/Кран шаровой|Кран промывочный|Клапан обратный|Патрубок фасадный|Головка ГМ|Задвижка|Заглушка эллиптическая/i.test(item.name)) {
                 // Арматура: работа + материал
                 pushWork('Монтаж: ' + item.name.replace(/\(.+?\)/g, '').trim(), item.unit, q, item.group);
                 pushMat(item.name, item.unit, q, item.group);
@@ -1543,8 +1579,8 @@
         var pipes = [], fittings = [], equipment = [], misc = [];
         items.forEach(function (it) {
             if (/Труба стальная|Монтаж трубопроводов/i.test(it.name)) pipes.push(it);
-            else if (/Муфта грувлок/i.test(it.name)) fittings.push(it);
-            else if (/ШПК|Спринклер|СПЖ|Датчик|Рукав|Узел управления|Затвор|Диафрагма|Огнетушитель|Манометр|Кран шаровой|Кран промывочный|Клапан|Патрубок|Головка/i.test(it.name)) equipment.push(it);
+            else if (/Муфта грувлок|Отвод 90|Заглушка эллиптическая/i.test(it.name)) fittings.push(it);
+            else if (/ШПК|Спринклер|СПЖ|Датчик|Рукав|Узел управления|Затвор|Диафрагма|Огнетушитель|Манометр|Кран шаровой|Кран промывочный|Клапан|Патрубок|Головка|Задвижка/i.test(it.name)) equipment.push(it);
             else misc.push(it);
         });
 
