@@ -489,8 +489,7 @@
     <input type="file" id="projectFileInput" accept=".json" style="display:none">
     <div class="container">
         <div class="main-container">
-            <h1><i class="bi bi-wind"></i> Калькулятор вентиляции</h1>
-            <p class="subtitle">Комплексный расчет системы вентиляции</p>
+            <!-- заголовок убран — отображается в портале -->
 
             <!-- Навигация по вкладкам -->
             <ul class="nav nav-tabs" id="mainTabs" role="tablist">
@@ -5196,46 +5195,56 @@
         window.addEventListener('message', function (event) {
             var msg = event.data;
             if (!msg) return;
-            if (msg.type === 'load-project-data' && msg.buildingStats) {
+            if (msg.type === 'load-project-data') {
                 var bs = msg.buildingStats;
-                if (!Array.isArray(bs) || bs.length === 0) return;
+                var areas = msg.areas;
 
                 // Суммируем данные по всем корпусам
-                var totalFloors = 0, totalApts = 0, totalBaths = 0, totalArea = 0;
+                var totalFloors = 0, totalApts = 0, totalBaths = 0;
                 var maxFloors = 0;
 
-                bs.forEach(function (b) {
-                    var nF = b.floors ? b.floors.length : 0;
-                    if (nF > maxFloors) maxFloors = nF;
-                    totalApts += (b.totalApts || 0);
-                    // Площадь (если есть)
-                    if (b.totalArea) totalArea += b.totalArea;
-                    // С/У и этажи из массива floors
-                    if (b.floors) {
-                        b.floors.forEach(function (f) {
-                            totalBaths += (f.bath || 0);
-                        });
+                if (Array.isArray(bs) && bs.length > 0) {
+                    bs.forEach(function (b) {
+                        var nF = b.floors ? b.floors.length : 0;
+                        if (nF > maxFloors) maxFloors = nF;
+                        totalApts += (b.totalApts || 0);
+                        if (b.floors) {
+                            b.floors.forEach(function (f) {
+                                totalBaths += (f.bath || 0);
+                            });
+                        }
+                    });
+                    totalFloors = maxFloors;
+
+                    var el;
+                    el = document.getElementById('numFloors');
+                    if (el) el.value = totalFloors;
+
+                    el = document.getElementById('totalApartments');
+                    if (el) el.value = totalApts;
+
+                    el = document.getElementById('bathroomCount');
+                    if (el) el.value = totalBaths;
+
+                    el = document.getElementById('sectionCount');
+                    if (el) el.value = bs.length;
+                }
+
+                // Площади из паспорта проекта
+                if (areas) {
+                    var el;
+                    if (areas.total) {
+                        el = document.getElementById('buildingArea');
+                        if (el) el.value = areas.total;
                     }
-                });
-                totalFloors = maxFloors;
-
-                // Заполняем поля «Основные характеристики»
-                var el;
-                el = document.getElementById('numFloors');
-                if (el) el.value = totalFloors;
-
-                el = document.getElementById('totalApartments');
-                if (el) el.value = totalApts;
-
-                el = document.getElementById('bathroomCount');
-                if (el) el.value = totalBaths;
-
-                el = document.getElementById('sectionCount');
-                if (el) el.value = bs.length;
-
-                if (totalArea > 0) {
-                    el = document.getElementById('buildingArea');
-                    if (el) el.value = totalArea;
+                    if (areas.aboveGround) {
+                        el = document.getElementById('aboveGroundArea');
+                        if (el) el.value = areas.aboveGround;
+                    }
+                    if (areas.underground) {
+                        el = document.getElementById('undergroundArea');
+                        if (el) el.value = areas.underground;
+                    }
                 }
 
                 // Триггерим пересчёт
@@ -5244,7 +5253,11 @@
                 });
 
                 console.log('[Ventilation] Данные из квартирографии:', {
-                    этажей: totalFloors, квартир: totalApts, СУ: totalBaths, секций: bs.length
+                    этажей: totalFloors, квартир: totalApts, СУ: totalBaths,
+                    секций: bs ? bs.length : 0,
+                    площадь: areas ? areas.total : 0,
+                    наземная: areas ? areas.aboveGround : 0,
+                    подземная: areas ? areas.underground : 0
                 });
             }
             if (msg.type === 'theme-change') {
