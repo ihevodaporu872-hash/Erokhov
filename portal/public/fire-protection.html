@@ -1604,36 +1604,9 @@
         if (isPipe) {
             var dnM = item.name.replace(/\u00a0/g, ' ').match(/DN\s*(\d+)/i);
             var dn = dnM ? parseInt(dnM[1], 10) : 65;
-            // Собираем ВСЕ фитинги этого DN для вычета (грувлоки + тройники + отводы)
-            var gruvDeduct = 0;
-            allItems.forEach(function (f) {
-                var fNorm = f.name.replace(/\u00a0/g, ' ');
-                // Грувлоки
-                if (/Муфта грувлок/i.test(fNorm)) {
-                    var fm = fNorm.match(/DN\s*(\d+)/i);
-                    if (fm && parseInt(fm[1], 10) === dn)
-                        gruvDeduct += (f.qty || 0) * fittingLen('gruvlok', dn);
-                }
-                // Тройники переходные (сухотруб)
-                if (/Тройник переходной/i.test(fNorm)) {
-                    var tm = fNorm.match(/(\d+)/);
-                    if (tm && parseInt(tm[1], 10) === dn)
-                        gruvDeduct += (f.qty || 0) * fittingLen('tee', dn);
-                }
-                // Отводы 90°
-                if (/Отвод 90/i.test(fNorm)) {
-                    var em = fNorm.match(/DN\s*(\d+)/i);
-                    if (em && parseInt(em[1], 10) === dn)
-                        gruvDeduct += (f.qty || 0) * fittingLen('elbow', dn);
-                }
-            });
-            gruvDeduct = Math.round(gruvDeduct * 10) / 10;
-            var matQty = Math.round(Math.max(0, q - gruvDeduct) * 1.02 * 10) / 10;
-            console.log('[Смета АПТ] ' + item.name.replace(/\u00a0/g, ' ') +
-                ': Работа=' + q + 'м, Вычет=' + gruvDeduct + 'м, Материал=' + matQty + 'м');
             var wn = dn >= 50 ? 'Монтаж трубопроводов стальных э/с DN\u00a0' + dn : 'Монтаж трубопроводов стальных ВГП DN\u00a0' + dn;
             push('работа', wn, 'м.п.', q);
-            push('материал', item.name, 'м.п.', matQty);
+            push('материал', item.name, 'м.п.', q);
         } else if (/Окраска/i.test(item.name)) {
             push('работа', 'Окраска трубопроводов (грунт + эмаль, 2 слоя)', 'м\u00b2', q);
             push('материал', 'Грунт ГФ-021 + Эмаль ПФ-115 (зелёная)', 'кг', Math.round(q * 0.4 * 10) / 10);
