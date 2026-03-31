@@ -602,6 +602,20 @@
                 addItem('vpv_check_z2', 'Клапан обратный ' + dnLabel, 'шт',
                     sec, '1 шт на стояк (Зона II)', 'zone2');
 
+            // Манометр с трёхходовым краном: 1 на этажное ответвление (на каждый ШПК)
+            addItem('vpv_manometer_z1', 'Манометр с трёхходовым краном (этажные ответвления ВПВ)', 'шт',
+                shpkZ1, '1 шт на каждый ШПК (Зона I)', 'zone1');
+            if (shpkZ2 > 0)
+                addItem('vpv_manometer_z2', 'Манометр с трёхходовым краном (этажные ответвления ВПВ)', 'шт',
+                    shpkZ2, '1 шт на каждый ШПК (Зона II)', 'zone2');
+
+            // Кран промывочный DN50: 1 на магистраль (= 1 на стояк)
+            addItem('vpv_flush_z1', 'Кран промывочный DN\u00a050 (магистраль ВПВ)', 'шт',
+                sec, '1 шт на стояк (Зона I)', 'zone1');
+            if (z2)
+                addItem('vpv_flush_z2', 'Кран промывочный DN\u00a050 (магистраль ВПВ)', 'шт',
+                    sec, '1 шт на стояк (Зона II)', 'zone2');
+
             // Фасадные патрубки DN80: 2 шт на зону (подключение ПА)
             addItem('vpv_facade_z1', 'Патрубок фасадный DN\u00a080 (подключение ПА)', 'шт',
                 2, 'Зона I: 2 шт на фасад здания', 'zone1');
@@ -694,16 +708,18 @@
 
         var ORDER = [
             'vpv_shpk_12', 'vpv_op5', 'vpv_shpk_z1', 'vpv_dppk_z1', 'vpv_diaphragm_z1', 'vpv_hose_z1',
+            'vpv_manometer_z1',
             'vpv_pipe_z1', 'vpv_branch_z1', 'vpv_gruvlok_z1', 'vpv_clamp_z1',
-            'vpv_valve_z1', 'vpv_check_z1',
+            'vpv_valve_z1', 'vpv_check_z1', 'vpv_flush_z1',
             'vpv_facade_z1', 'vpv_gm80_z1', 'vpv_check80_z1',
             'vpv_dry_pipe', 'vpv_dry_head', 'vpv_dry_valve', 'vpv_dry_check',
             'vpv_lobby_shpk', 'vpv_lobby_dppk', 'vpv_lobby_hose', 'vpv_lobby_diaphragm', 'vpv_lobby_pipe',
             'vpv_comm_shpk', 'vpv_comm_dppk', 'vpv_comm_hose', 'vpv_comm_diaphragm', 'vpv_comm_pipe',
             'vpv_paint', 'vpv_service_damper',
             'vpv_shpk_z2', 'vpv_dppk_z2', 'vpv_diaphragm_z2', 'vpv_hose_z2',
+            'vpv_manometer_z2',
             'vpv_pipe_z2', 'vpv_branch_z2', 'vpv_transit_z2', 'vpv_gruvlok_z2', 'vpv_clamp_z2',
-            'vpv_valve_z2', 'vpv_check_z2',
+            'vpv_valve_z2', 'vpv_check_z2', 'vpv_flush_z2',
             'vpv_facade_z2', 'vpv_gm80_z2', 'vpv_check80_z2'
         ];
         var result = [];
@@ -1483,7 +1499,7 @@
                 pushWork('Окраска трубопроводов (грунт + эмаль, 2 слоя)', 'м\u00b2', q, item.group);
                 pushMat('Грунт ГФ-021 + Эмаль ПФ-115 (зелёная)', 'кг',
                     Math.round(q * 0.4 * 10) / 10, item.group); // 0.2 кг/м² × 2 слоя
-            } else if (/ШПК|Спринклер|СПЖ|Датчик|Рукав|Узел управления|Затвор|Диафрагма|Огнетушитель/i.test(item.name)) {
+            } else if (/ШПК|Спринклер|СПЖ|Датчик|Рукав|Узел управления|Затвор|Диафрагма|Огнетушитель|Манометр/i.test(item.name)) {
                 // Оборудование: работа монтажа + материал
                 var eqWorkName = 'Монтаж: ' + item.name.replace(/\(.+?\)/g, '').trim();
                 pushWork(eqWorkName, item.unit, q, item.group);
@@ -1491,7 +1507,7 @@
             } else if (/Хомут/i.test(item.name)) {
                 // Крепёж — только материал
                 pushMat(item.name, item.unit, q, item.group);
-            } else if (/Кран шаровой|Клапан обратный|Патрубок фасадный|Головка ГМ/i.test(item.name)) {
+            } else if (/Кран шаровой|Кран промывочный|Клапан обратный|Патрубок фасадный|Головка ГМ/i.test(item.name)) {
                 // Арматура: работа + материал
                 pushWork('Монтаж: ' + item.name.replace(/\(.+?\)/g, '').trim(), item.unit, q, item.group);
                 pushMat(item.name, item.unit, q, item.group);
@@ -1528,7 +1544,7 @@
         items.forEach(function (it) {
             if (/Труба стальная|Монтаж трубопроводов/i.test(it.name)) pipes.push(it);
             else if (/Муфта грувлок/i.test(it.name)) fittings.push(it);
-            else if (/ШПК|Спринклер|СПЖ|Датчик|Рукав|Узел управления|Затвор|Диафрагма|Огнетушитель|Кран шаровой|Клапан|Патрубок|Головка/i.test(it.name)) equipment.push(it);
+            else if (/ШПК|Спринклер|СПЖ|Датчик|Рукав|Узел управления|Затвор|Диафрагма|Огнетушитель|Манометр|Кран шаровой|Кран промывочный|Клапан|Патрубок|Головка/i.test(it.name)) equipment.push(it);
             else misc.push(it);
         });
 
