@@ -1043,7 +1043,7 @@
             });
         });
         container.querySelectorAll('.fire-zone-boundary').forEach(function (el) {
-            el.addEventListener('input', function () {
+            el.addEventListener('change', function () {
                 var idx = parseInt(el.dataset.idx, 10);
                 getSettings(idx).zoneBoundary = Math.max(5, parseInt(el.value, 10) || 17);
                 renderAllAccordions();
