@@ -1576,84 +1576,75 @@
         return v ? Number(v).toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) + ' \u20bd' : '';
     }
 
-    // Генерирует массив [{name, unit, qty, materialQty, type:'работа'|'материал', group}]
+    // Преобразует один raw-item в пары работа/материал с тегом системы
+    function expandFireItem(item, allItems) {
+        var q = Math.round((item.qty || 0) * 10) / 10;
+        if (q <= 0) return [];
+        var out = [];
+
+        // Определяем систему: vpv_dry_* → 'dry', aupt_* → 'aupt', vpv_* → 'vpv'
+        var sys = 'vpv';
+        if (item._key && item._key.indexOf('aupt') === 0) sys = 'aupt';
+        else if (item._key && item._key.indexOf('vpv_dry') === 0) sys = 'dry';
+
+        function push(type, name, unit, qty) {
+            out.push({ type: type, name: name, unit: unit, qty: Math.round(qty * 10) / 10, sys: sys });
+        }
+
+        var isPipe = item.unit === 'м.п.' && /Труба стальная/i.test(item.name);
+
+        if (isPipe) {
+            var dnM = item.name.replace(/\u00a0/g, ' ').match(/DN\s*(\d+)/i);
+            var dn = dnM ? parseInt(dnM[1], 10) : 65;
+            var gruvCount = 0;
+            allItems.forEach(function (f) {
+                if (!/Муфта грувлок/i.test(f.name)) return;
+                var fm = f.name.replace(/\u00a0/g, ' ').match(/DN\s*(\d+)/i);
+                if (fm && parseInt(fm[1], 10) === dn) gruvCount += (f.qty || 0);
+            });
+            var matQty = Math.round(Math.max(0, q - gruvCount * fittingLen('gruvlok', dn)) * 1.02 * 10) / 10;
+            var wn = dn >= 50 ? 'Монтаж трубопроводов стальных э/с DN\u00a0' + dn : 'Монтаж трубопроводов стальных ВГП DN\u00a0' + dn;
+            push('работа', wn, 'м.п.', q);
+            push('материал', item.name, 'м.п.', matQty);
+        } else if (/Окраска/i.test(item.name)) {
+            push('работа', 'Окраска трубопроводов (грунт + эмаль, 2 слоя)', 'м\u00b2', q);
+            push('материал', 'Грунт ГФ-021 + Эмаль ПФ-115 (зелёная)', 'кг', Math.round(q * 0.4 * 10) / 10);
+        } else if (/Хомут|Комплект маркировки/i.test(item.name)) {
+            push('материал', item.name, item.unit, q);
+        } else if (/Муфта грувлок|Отвод 90|Заглушка|Тройник переходной/i.test(item.name)) {
+            push('материал', item.name, item.unit, q);
+        } else {
+            push('работа', 'Монтаж: ' + item.name.replace(/\(.+?\)/g, '').trim(), item.unit, q);
+            push('материал', item.name, item.unit, q);
+        }
+        return out;
+    }
+
     function calculateFireEstimateItems() {
-        if (!buildingStats || !buildingStats.length) return [];
-        var items = [];
+        if (!buildingStats || !buildingStats.length) return { vpv: [], dry: [], aupt: [] };
 
-        function pushWork(name, unit, qty, group) {
-            if (qty <= 0) return;
-            items.push({ name: name, unit: unit, qty: Math.round(qty * 10) / 10, type: 'работа', group: group || '' });
-        }
-        function pushMat(name, unit, qty, group) {
-            if (qty <= 0) return;
-            items.push({ name: name, unit: unit, qty: Math.round(qty * 10) / 10, type: 'материал', group: group || '' });
-        }
+        var vpvRaw = collectVPVItems();
+        var auptRaw = collectAUPTItems();
 
-        // Агрегируем из всех корпусов
-        var vpvItems = collectVPVItems();
-        var auptItems = collectAUPTItems();
-        var allItems = vpvItems.concat(auptItems);
+        // Тегируем _key для определения системы
+        // VPV items имеют ключи vpv_*, сухотруб vpv_dry_*
+        // Но collectVPVItems не хранит ключи — восстанавливаем по имени
+        vpvRaw.forEach(function (it) {
+            it._key = /сухотруб|ГМ-65|Вентиль пожарный|Тройник переходной.*сухотруб/i.test(it.name) ? 'vpv_dry' : 'vpv';
+        });
+        auptRaw.forEach(function (it) { it._key = 'aupt'; });
 
-        // Разделяем трубы и фитинги/оборудование
-        allItems.forEach(function (item) {
-            var q = Math.round((item.qty || 0) * 10) / 10;
-            if (q <= 0) return;
+        var allRaw = vpvRaw.concat(auptRaw);
+        var result = { vpv: [], dry: [], aupt: [] };
 
-            var isPipe = item.unit === 'м.п.' && /Труба стальная/i.test(item.name);
-            var isGrouvlok = /Муфта грувлок/i.test(item.name);
-            var isPaint = /Окраска/i.test(item.name);
-
-            if (isPipe) {
-                // Извлекаем DN для вычета фитингов
-                var dnMatch = item.name.match(/DN\s*(\d+)/i) || item.name.match(/DN\\u00a0(\d+)/);
-                var dn = dnMatch ? parseInt(dnMatch[1], 10) : 65;
-
-                // Считаем вычет: грувлоки этого DN
-                var gruvCount = 0;
-                allItems.forEach(function (f) {
-                    if (/Муфта грувлок/i.test(f.name)) {
-                        var fDN = 0;
-                        var fm = f.name.match(/DN\s*(\d+)/i) || f.name.match(/DN\\u00a0(\d+)/);
-                        if (fm) fDN = parseInt(fm[1], 10);
-                        if (fDN === dn) gruvCount += (f.qty || 0);
-                    }
-                });
-
-                var totalDeduct = gruvCount * fittingLen('gruvlok', dn);
-                var matQty = Math.round(Math.max(0, q - totalDeduct) * 1.02 * 10) / 10;
-
-                // Работа по монтажу трубы
-                var workName = dn >= 50
-                    ? 'Монтаж трубопроводов стальных электросварных DN\u00a0' + dn
-                    : 'Монтаж трубопроводов стальных ВГП DN\u00a0' + dn;
-                pushWork(workName, 'м.п.', q, item.group);
-                pushMat(item.name, 'м.п.', matQty, item.group);
-            } else if (isGrouvlok) {
-                pushMat(item.name, item.unit, q, item.group);
-            } else if (isPaint) {
-                pushWork('Окраска трубопроводов (грунт + эмаль, 2 слоя)', 'м\u00b2', q, item.group);
-                pushMat('Грунт ГФ-021 + Эмаль ПФ-115 (зелёная)', 'кг',
-                    Math.round(q * 0.4 * 10) / 10, item.group); // 0.2 кг/м² × 2 слоя
-            } else if (/ШПК|Спринклер|СПЖ|Датчик|Рукав|Узел управления|Затвор|Диафрагма|Огнетушитель|Манометр/i.test(item.name)) {
-                // Оборудование: работа монтажа + материал
-                var eqWorkName = 'Монтаж: ' + item.name.replace(/\(.+?\)/g, '').trim();
-                pushWork(eqWorkName, item.unit, q, item.group);
-                pushMat(item.name, item.unit, q, item.group);
-            } else if (/Хомут/i.test(item.name)) {
-                // Крепёж — только материал
-                pushMat(item.name, item.unit, q, item.group);
-            } else if (/Кран шаровой|Кран промывочный|Клапан обратный|Патрубок фасадный|Головка ГМ|Задвижка|Заглушка эллиптическая|Вентиль пожарный/i.test(item.name)) {
-                // Арматура: работа + материал
-                pushWork('Монтаж: ' + item.name.replace(/\(.+?\)/g, '').trim(), item.unit, q, item.group);
-                pushMat(item.name, item.unit, q, item.group);
-            } else {
-                // Прочее — только материал
-                pushMat(item.name, item.unit, q, item.group);
-            }
+        allRaw.forEach(function (item) {
+            var expanded = expandFireItem(item, allRaw);
+            expanded.forEach(function (e) {
+                result[e.sys].push(e);
+            });
         });
 
-        return items;
+        return result;
     }
 
     function renderEstimate() {
@@ -1667,49 +1658,72 @@
             return;
         }
 
-        var items = calculateFireEstimateItems();
-        if (!items.length) {
+        var data = calculateFireEstimateItems();
+        var hasAny = data.vpv.length + data.dry.length + data.aupt.length;
+        if (!hasAny) {
             el.innerHTML =
                 '<div class="no-data-banner"><i class="bi bi-info-circle-fill"></i>' +
                 '<span>Нет данных. Включите ВПВ или АУПТ в настройках корпусов.</span></div>';
             return;
         }
 
-        // Группировка: Трубопроводы → Фасонина → Оборудование → Крепёж/Окраска
-        var pipes = [], fittings = [], equipment = [], misc = [];
-        items.forEach(function (it) {
-            if (/Труба стальная|Монтаж трубопроводов/i.test(it.name)) pipes.push(it);
-            else if (/Муфта грувлок|Отвод 90|Заглушка эллиптическая|Тройник переходной/i.test(it.name)) fittings.push(it);
-            else if (/ШПК|Спринклер|СПЖ|Датчик|Рукав|Узел управления|Затвор|Диафрагма|Огнетушитель|Манометр|Кран шаровой|Кран промывочный|Клапан|Патрубок|Головка|Задвижка|Вентиль пожарный/i.test(it.name)) equipment.push(it);
-            else misc.push(it);
-        });
+        function renderSection(items, title, icon, color) {
+            if (!items.length) return '';
+            var rowNum = 1;
+            var totalPipe = 0, totalEq = 0, totalPaint = 0;
 
-        function renderGroup(groupItems, title) {
-            if (!groupItems.length) return '';
-            var totalWork = 0, totalMat = 0;
-            var rows = groupItems.map(function (it) {
-                var cls = it.type === 'работа' ? 'type-work' : 'type-material';
-                return '<tr class="' + cls + '">' +
-                    '<td>' + escHtml(it.type) + '</td>' +
+            var rows = items.map(function (it, i) {
+                var isWork = it.type === 'работа';
+                var stripe = i % 2 === 0 ? '' : ' style="background:var(--gray-50,#f9fafb)"';
+                var typeIcon = isWork
+                    ? '<span style="color:#6b7280;font-size:11px"><i class="bi bi-tools"></i> работа</span>'
+                    : '<span style="color:#1d4ed8;font-size:11px"><i class="bi bi-box-seam"></i> материал</span>';
+
+                // Итоги
+                if (!isWork) {
+                    if (it.unit === 'м.п.') totalPipe += it.qty;
+                    else if (it.unit === 'м\u00b2') totalPaint += it.qty;
+                    else totalEq += it.qty;
+                }
+
+                return '<tr' + stripe + '>' +
+                    '<td style="text-align:center;width:36px;color:var(--gray-400)">' + (rowNum++) + '</td>' +
                     '<td>' + escHtml(it.name) + '</td>' +
-                    '<td>' + it.unit + '</td>' +
-                    '<td class="riser-count">' + it.qty + '</td>' +
+                    '<td style="text-align:center;width:50px">' + it.unit + '</td>' +
+                    '<td style="text-align:right;width:70px;font-weight:600">' + it.qty + '</td>' +
+                    '<td style="width:80px">' + typeIcon + '</td>' +
                     '</tr>';
             }).join('');
-            return '<tr class="spec-group-row"><td colspan="4">' + escHtml(title) + '</td></tr>' + rows;
+
+            // Промежуточный итог
+            var subtotalParts = [];
+            if (totalPipe > 0) subtotalParts.push('<i class="bi bi-rulers"></i> Труб: <strong>' + Math.round(totalPipe * 10) / 10 + '</strong> м.п.');
+            if (totalEq > 0) subtotalParts.push('<i class="bi bi-box-seam"></i> Арматура/обор.: <strong>' + Math.round(totalEq) + '</strong> шт');
+            if (totalPaint > 0) subtotalParts.push('<i class="bi bi-paint-bucket"></i> Окраска: <strong>' + Math.round(totalPaint * 10) / 10 + '</strong> м\u00b2');
+
+            return '<div style="margin-bottom:20px">' +
+                '<div style="background:' + color + ';color:#fff;padding:10px 16px;border-radius:10px 10px 0 0;font-weight:700;font-size:14px;display:flex;align-items:center;gap:8px">' +
+                '<i class="bi ' + icon + '"></i> ' + escHtml(title) +
+                '</div>' +
+                '<div class="riser-table-wrap" style="border-radius:0 0 10px 10px;border:1px solid var(--gray-200);border-top:none">' +
+                '<table class="riser-table" style="margin:0">' +
+                '<thead><tr>' +
+                '<th style="width:36px">\u2116</th>' +
+                '<th>Наименование работ и материалов</th>' +
+                '<th style="width:50px">Ед.</th>' +
+                '<th style="width:70px">Кол-во</th>' +
+                '<th style="width:80px">Тип</th>' +
+                '</tr></thead>' +
+                '<tbody>' + rows + '</tbody>' +
+                '</table></div>' +
+                (subtotalParts.length ? '<div style="padding:8px 16px;background:var(--gray-50,#f9fafb);border:1px solid var(--gray-200);border-top:none;border-radius:0 0 10px 10px;font-size:12px;display:flex;gap:20px;flex-wrap:wrap">' + subtotalParts.join('') + '</div>' : '') +
+                '</div>';
         }
 
-        var html =
-            '<div class="riser-table-wrap"><table class="riser-table">' +
-            '<thead><tr><th style="width:70px">Тип</th><th>Наименование</th><th style="width:50px">Ед.</th><th style="width:80px">Кол-во</th></tr></thead>' +
-            '<tbody>' +
-            renderGroup(pipes, 'Трубопроводы') +
-            renderGroup(fittings, 'Фасонные изделия') +
-            renderGroup(equipment, 'Оборудование и арматура') +
-            renderGroup(misc, 'Крепёж и окраска') +
-            '</tbody></table></div>';
-
-        el.innerHTML = html;
+        el.innerHTML =
+            renderSection(data.vpv, 'Система ВПВ (Внутренний противопожарный водопровод)', 'bi-shield-check', '#2563eb') +
+            renderSection(data.dry, 'Система Сухотруба (В2.4)', 'bi-building-up', '#059669') +
+            renderSection(data.aupt, 'Система АПТ (Спринклерная)', 'bi-droplet-half', '#dc2626');
     }
 
     // Main render
