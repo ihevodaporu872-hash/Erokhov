@@ -2440,6 +2440,19 @@
         }
 
         // Отправляет building_stats в iframe пожаротушения
+        function sendBuildingStatsToVentIframe(projectId) {
+            if (!projectId) return;
+            const project = portalProjects.find(p => p.id === projectId);
+            const iframe = document.getElementById('ventCalcFrame');
+            if (!iframe || !iframe.contentWindow) return;
+            iframe.contentWindow.postMessage({
+                type: 'load-project-data',
+                projectId: projectId,
+                projectName: project ? project.name : '',
+                buildingStats: project ? (project.building_stats || null) : null
+            }, '*');
+        }
+
         function sendBuildingStatsToFireIframe(projectId) {
             if (!projectId) return;
             const project = portalProjects.find(p => p.id === projectId);
@@ -2915,6 +2928,10 @@
                 // Для conditioning — отправляем building_stats в iframe
                 if (systemType === 'conditioning' && projectId) {
                     sendBuildingStatsToCondIframe(+projectId);
+                }
+                // Для ventilation — отправляем building_stats в iframe
+                if (systemType === 'ventilation' && projectId) {
+                    sendBuildingStatsToVentIframe(+projectId);
                 }
             });
         });

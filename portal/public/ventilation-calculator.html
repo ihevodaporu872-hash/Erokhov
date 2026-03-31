@@ -5191,6 +5191,66 @@
         loadPriceDb();
         lockEstimateInputs();
         renderFittingsTab();
+
+        // ── Приём данных из портала (Квартирография) ──────────────────
+        window.addEventListener('message', function (event) {
+            var msg = event.data;
+            if (!msg) return;
+            if (msg.type === 'load-project-data' && msg.buildingStats) {
+                var bs = msg.buildingStats;
+                if (!Array.isArray(bs) || bs.length === 0) return;
+
+                // Суммируем данные по всем корпусам
+                var totalFloors = 0, totalApts = 0, totalBaths = 0, totalArea = 0;
+                var maxFloors = 0;
+
+                bs.forEach(function (b) {
+                    var nF = b.floors ? b.floors.length : 0;
+                    if (nF > maxFloors) maxFloors = nF;
+                    totalApts += (b.totalApts || 0);
+                    // Площадь (если есть)
+                    if (b.totalArea) totalArea += b.totalArea;
+                    // С/У и этажи из массива floors
+                    if (b.floors) {
+                        b.floors.forEach(function (f) {
+                            totalBaths += (f.bath || 0);
+                        });
+                    }
+                });
+                totalFloors = maxFloors;
+
+                // Заполняем поля «Основные характеристики»
+                var el;
+                el = document.getElementById('numFloors');
+                if (el) el.value = totalFloors;
+
+                el = document.getElementById('totalApartments');
+                if (el) el.value = totalApts;
+
+                el = document.getElementById('bathroomCount');
+                if (el) el.value = totalBaths;
+
+                el = document.getElementById('sectionCount');
+                if (el) el.value = bs.length;
+
+                if (totalArea > 0) {
+                    el = document.getElementById('buildingArea');
+                    if (el) el.value = totalArea;
+                }
+
+                // Триггерим пересчёт
+                document.querySelectorAll('.building-char').forEach(function (inp) {
+                    inp.dispatchEvent(new Event('input', { bubbles: true }));
+                });
+
+                console.log('[Ventilation] Данные из квартирографии:', {
+                    этажей: totalFloors, квартир: totalApts, СУ: totalBaths, секций: bs.length
+                });
+            }
+            if (msg.type === 'theme-change') {
+                document.body.classList.toggle('dark-theme', msg.theme === 'dark');
+            }
+        });
     </script>
 </body>
 </html>
