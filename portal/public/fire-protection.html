@@ -363,6 +363,11 @@
                 vpvEnabled:     true,
                 auptEnabled:    true,
                 dryRiser:       false, // сухотруб DN65 на фасаде
+                vpvDN:          65,    // диаметр основного стояка ВПВ (50/65/80)
+                zoneBoundary:   17,    // граница зон (этаж)
+                // Гидравлика РД
+                flowRate:       11.6,  // расход, л/с
+                pressure:       0.13,  // напор, МПа
                 // 1-й этаж (отметка 0.000)
                 commercial:     false, // наличие коммерческих помещений (аренда)
                 commercialCount: 1,    // количество помещений аренды
@@ -371,6 +376,10 @@
         }
         // Миграция
         if (fireSettings[idx].dryRiser === undefined) fireSettings[idx].dryRiser = false;
+        if (fireSettings[idx].vpvDN === undefined) fireSettings[idx].vpvDN = 65;
+        if (fireSettings[idx].zoneBoundary === undefined) fireSettings[idx].zoneBoundary = 17;
+        if (fireSettings[idx].flowRate === undefined) fireSettings[idx].flowRate = 11.6;
+        if (fireSettings[idx].pressure === undefined) fireSettings[idx].pressure = 0.13;
         return fireSettings[idx];
     }
 
@@ -385,21 +394,24 @@
         return b.floors ? b.floors.length : 0;
     }
 
-    /* Zone logic: floors > 17 => Zone II (floors 18+), transit through floors 1-17 */
-    var ZONE_BOUNDARY = 17;
-
-    function hasZone2(b) {
-        return getFloorCount(b) > ZONE_BOUNDARY;
+    /* Zone logic: per-building boundary (default 17) */
+    function getZoneBoundary(idx) {
+        return (fireSettings[idx] && fireSettings[idx].zoneBoundary) || 17;
     }
 
-    function zone1Floors(b) {
-        var n = getFloorCount(b);
-        return Math.min(n, ZONE_BOUNDARY);
+    function hasZone2(b, idx) {
+        return getFloorCount(b) > getZoneBoundary(idx);
     }
 
-    function zone2Floors(b) {
+    function zone1Floors(b, idx) {
         var n = getFloorCount(b);
-        return n > ZONE_BOUNDARY ? n - ZONE_BOUNDARY : 0;
+        return Math.min(n, getZoneBoundary(idx));
+    }
+
+    function zone2Floors(b, idx) {
+        var n = getFloorCount(b);
+        var zb = getZoneBoundary(idx);
+        return n > zb ? n - zb : 0;
     }
 
     /* --- Tab switching --- */
@@ -455,9 +467,12 @@
             var sec     = s.sections || 1;
             var bH      = b.height || 0;
             var floorH  = nF > 0 ? bH / nF : 3;
-            var z2      = hasZone2(b);
-            var z1F     = zone1Floors(b);
-            var z2F     = zone2Floors(b);
+            var dn      = s.vpvDN || 65;
+            var dnLabel = 'DN\u00a0' + dn;
+            var pipeGost = dn >= 50 ? 'э/с ГОСТ\u00a010704-91' : 'ВГП ГОСТ\u00a03262-75';
+            var z2      = hasZone2(b, idx);
+            var z1F     = zone1Floors(b, idx);
+            var z2F     = zone2Floors(b, idx);
 
             // Считаем общее кол-во стояков (для затворов обслуживания)
             totalRisers += sec * (z2 ? 2 : 1);
@@ -499,7 +514,7 @@
                 var diagZ2 = 2 * sec * diagZ2floors;
                 if (diagZ2 > 0)
                     addItem('vpv_diaphragm_z2', 'Диафрагма Ду50 для снижения давления', 'шт', diagZ2,
-                        'Зона II: эт. ' + (ZONE_BOUNDARY + 1) + '\u2013' + Math.min(ZONE_BOUNDARY + z2F, ZONE_BOUNDARY + 4) + ', в каждый ШПК', 'zone2');
+                        'Зона II: эт. ' + (getZoneBoundary(idx) + 1) + '\u2013' + Math.min(getZoneBoundary(idx) + z2F, getZoneBoundary(idx) + 4) + ', в каждый ШПК', 'zone2');
             }
 
             // Рукав DN65 — по 1 на каждый ШПК
@@ -509,14 +524,15 @@
                 addItem('vpv_hose_z2', 'Рукав пожарный DN\u00a065, 20 м', 'шт', shpkZ2,
                     'По 1 на каждый ШПК (Зона II)', 'zone2');
 
-            // Стояки DN65 (ГОСТ 10704-91 — электросварная, Ду >= 50)
+            // Стояки (диаметр из настроек корпуса)
             var riserLenZ1 = Math.round(floorH * z1F * sec * 10) / 10;
             var riserLenZ2 = z2 ? Math.round(floorH * z2F * sec * 10) / 10 : 0;
+            var zb = getZoneBoundary(idx);
 
-            addItem('vpv_pipe_z1', 'Труба стальная э/с ГОСТ\u00a010704-91 DN\u00a065 (стояки ВПВ)', 'м.п.',
+            addItem('vpv_pipe_z1', 'Труба стальная ' + pipeGost + ' ' + dnLabel + ' (стояки ВПВ)', 'м.п.',
                 riserLenZ1, 'Зона I: 1 стояк на секцию', 'zone1');
             if (riserLenZ2 > 0)
-                addItem('vpv_pipe_z2', 'Труба стальная э/с ГОСТ\u00a010704-91 DN\u00a065 (стояки ВПВ)', 'м.п.',
+                addItem('vpv_pipe_z2', 'Труба стальная ' + pipeGost + ' ' + dnLabel + ' (стояки ВПВ)', 'м.п.',
                     riserLenZ2, 'Зона II: 1 стояк на секцию', 'zone2');
 
             // Этажные ветки DN25 (ГОСТ 3262-75 — ВГП, Ду < 50)
@@ -531,23 +547,23 @@
 
             // Транзит Зоны II через эт. 1-11 (только труба)
             if (z2) {
-                var transitLen = Math.round(floorH * ZONE_BOUNDARY * sec * 10) / 10;
-                addItem('vpv_transit_z2', 'Труба стальная э/с ГОСТ\u00a010704-91 DN\u00a065 (транзит Зона II, эт. 1-17)', 'м.п.',
-                    transitLen, 'Транзитный стояк через Зону I (эт. 1-17)', 'zone2');
+                var transitLen = Math.round(floorH * getZoneBoundary(idx) * sec * 10) / 10;
+                addItem('vpv_transit_z2', 'Труба стальная ' + pipeGost + ' ' + dnLabel + ' (транзит Зона II, эт. 1-' + zb + ')', 'м.п.',
+                    transitLen, 'Транзитный стояк через Зону I (эт. 1-' + zb + ')', 'zone2');
             }
 
             // Муфты грувлок DN65: 2 на стык (1 стык на этаж на стояк)
             var gruvZ1 = z1F * sec * 2;
-            var gruvZ2 = z2 ? (z2F + ZONE_BOUNDARY) * sec * 2 : 0;
-            addItem('vpv_gruvlok_z1', 'Муфта грувлок DN\u00a065', 'шт', gruvZ1,
+            var gruvZ2 = z2 ? (z2F + getZoneBoundary(idx)) * sec * 2 : 0;
+            addItem('vpv_gruvlok_z1', 'Муфта грувлок ' + dnLabel, 'шт', gruvZ1,
                 '2 шт на стык, 1 стык/этаж/стояк (Зона I)', 'zone1');
             if (gruvZ2 > 0)
-                addItem('vpv_gruvlok_z2', 'Муфта грувлок DN\u00a065', 'шт', gruvZ2,
+                addItem('vpv_gruvlok_z2', 'Муфта грувлок ' + dnLabel, 'шт', gruvZ2,
                     '2 шт на стык, 1 стык/этаж/стояк (Зона II)', 'zone2');
 
             // Хомуты: через 1,5 м по всем трубам
             var totalPipeZ1 = riserLenZ1 + branchZ1;
-            var totalPipeZ2 = riserLenZ2 + branchZ2 + (z2 ? Math.round(floorH * ZONE_BOUNDARY * sec * 10) / 10 : 0);
+            var totalPipeZ2 = riserLenZ2 + branchZ2 + (z2 ? Math.round(floorH * getZoneBoundary(idx) * sec * 10) / 10 : 0);
             addItem('vpv_clamp_z1', 'Хомут стальной (крепление труб ВПВ)', 'шт',
                 Math.ceil(totalPipeZ1 / 1.5), 'Через 1,5 м (Зона I)', 'zone1');
             if (totalPipeZ2 > 0)
@@ -555,17 +571,17 @@
                     Math.ceil(totalPipeZ2 / 1.5), 'Через 1,5 м (Зона II)', 'zone2');
 
             // Кран шаровой DN65: верх/низ стояка
-            addItem('vpv_valve_z1', 'Кран шаровой DN\u00a065 (стояки ВПВ)', 'шт',
+            addItem('vpv_valve_z1', 'Кран шаровой ' + dnLabel + ' (стояки ВПВ)', 'шт',
                 sec * 2, '2 шт на стояк (верх/низ, Зона I)', 'zone1');
             if (z2)
-                addItem('vpv_valve_z2', 'Кран шаровой DN\u00a065 (стояки ВПВ)', 'шт',
+                addItem('vpv_valve_z2', 'Кран шаровой ' + dnLabel + ' (стояки ВПВ)', 'шт',
                     sec * 2, '2 шт на стояк (верх/низ, Зона II)', 'zone2');
 
             // Клапан обратный DN65: 1 на стояк
-            addItem('vpv_check_z1', 'Клапан обратный DN\u00a065', 'шт',
+            addItem('vpv_check_z1', 'Клапан обратный ' + dnLabel, 'шт',
                 sec, '1 шт на стояк (Зона I)', 'zone1');
             if (z2)
-                addItem('vpv_check_z2', 'Клапан обратный DN\u00a065', 'шт',
+                addItem('vpv_check_z2', 'Клапан обратный ' + dnLabel, 'шт',
                     sec, '1 шт на стояк (Зона II)', 'zone2');
 
             // Фасадные патрубки DN80: 2 шт на зону (подключение ПА)
@@ -637,12 +653,13 @@
 
             // ── Окраска труб ВПВ (зелёный цвет, 2 слоя) ──
             var allPipeLen = riserLenZ1 + riserLenZ2 + branchZ1 + branchZ2
-                + (z2 ? Math.round(floorH * ZONE_BOUNDARY * sec * 10) / 10 : 0)
+                + (z2 ? Math.round(floorH * getZoneBoundary(idx) * sec * 10) / 10 : 0)
                 + (s.dryRiser && bH > 0 ? bH : 0);
             if (allPipeLen > 0) {
-                // DN65: наружн. 76.1мм → 0.239 м²/м; DN25: наружн. 33.7мм → 0.106 м²/м
-                var paintArea65 = (riserLenZ1 + riserLenZ2 + (z2 ? Math.round(floorH * ZONE_BOUNDARY * sec * 10) / 10 : 0)
-                    + (s.dryRiser && bH > 0 ? bH : 0)) * 0.239;
+                // Площадь поверхности трубы: DN50→0.189, DN65→0.239, DN80→0.279 м²/м; DN25→0.106
+                var paintPerM = dn <= 50 ? 0.189 : dn <= 65 ? 0.239 : 0.279;
+                var paintArea65 = (riserLenZ1 + riserLenZ2 + (z2 ? Math.round(floorH * zb * sec * 10) / 10 : 0)
+                    + (s.dryRiser && bH > 0 ? bH : 0)) * paintPerM;
                 var paintArea25 = (branchZ1 + branchZ2) * 0.106;
                 var totalPaintArea = Math.round((paintArea65 + paintArea25) * 10) / 10;
                 addItem('vpv_paint', 'Окраска трубопроводов ВПВ (грунт + эмаль зелёная, 2 слоя)', 'м\u00b2',
@@ -698,9 +715,9 @@
             var bH      = b.height || 0;
             var floorH  = nF > 0 ? bH / nF : 3;
             var corrLen = s.corridorLength || 30;
-            var z2      = hasZone2(b);
-            var z1F     = zone1Floors(b);
-            var z2F     = zone2Floors(b);
+            var z2      = hasZone2(b, idx);
+            var z1F     = zone1Floors(b, idx);
+            var z2F     = zone2Floors(b, idx);
 
             // Если коммерция на 1 эт. — исключаем 1-й этаж из стандартного расчёта коридоров
             var hasComm = s.commercial;
@@ -782,14 +799,14 @@
 
             // Транзит Зоны II через эт. 1-11 (только труба)
             if (z2) {
-                var transitLen = Math.round(floorH * ZONE_BOUNDARY * sec * 10) / 10;
+                var transitLen = Math.round(floorH * getZoneBoundary(idx) * sec * 10) / 10;
                 addItem('aupt_transit_z2', 'Труба стальная э/с ГОСТ\u00a010704-91 DN\u00a080 (транзит Зона II, эт. 1-17)', 'м.п.',
                     transitLen, 'Транзитный стояк через Зону I (эт. 1-17)', 'zone2');
             }
 
             // Муфты грувлок DN80: 2 на стык (1 стык на этаж на стояк)
             var gruvZ1 = z1F * sec * 2;
-            var gruvZ2 = z2 ? (z2F + ZONE_BOUNDARY) * sec * 2 : 0;
+            var gruvZ2 = z2 ? (z2F + getZoneBoundary(idx)) * sec * 2 : 0;
             addItem('aupt_gruvlok_z1', 'Муфта грувлок DN\u00a080', 'шт', gruvZ1,
                 '2 шт на стык, 1 стык/этаж/стояк (Зона I)', 'zone1');
             if (gruvZ2 > 0)
@@ -799,7 +816,7 @@
             // Хомуты: через 1,5 м по стоякам + разводке
             var totalPipeZ1 = riserLenZ1 + Math.round(corrPipePerFloor * z1F * 10) / 10;
             var totalPipeZ2 = riserLenZ2 + (z2 ? Math.round(corrPipePerFloor * z2F * 10) / 10 : 0)
-                + (z2 ? Math.round(floorH * ZONE_BOUNDARY * sec * 10) / 10 : 0);
+                + (z2 ? Math.round(floorH * getZoneBoundary(idx) * sec * 10) / 10 : 0);
             addItem('aupt_clamp_z1', 'Хомут стальной (крепление труб АУПТ)', 'шт',
                 Math.ceil(totalPipeZ1 / 1.5), 'Через 1,5 м (Зона I)', 'zone1');
             if (totalPipeZ2 > 0)
@@ -865,13 +882,13 @@
             var bH     = b.height || 0;
             var sec    = s.sections || 1;
             var corrLen = s.corridorLength || 30;
-            var z2     = hasZone2(b);
+            var z2     = hasZone2(b, idx);
 
             var zoneInfo = z2
                 ? '<div class="fire-info"><i class="bi bi-layers"></i> ' +
-                  '<span class="zone-label zone-label-1">Зона I</span> эт. 1-' + ZONE_BOUNDARY + ' &nbsp;|&nbsp; ' +
-                  '<span class="zone-label zone-label-2">Зона II</span> эт. ' + (ZONE_BOUNDARY + 1) + '-' + nF +
-                  ' (транзит через эт. 1-' + ZONE_BOUNDARY + ')</div>'
+                  '<span class="zone-label zone-label-1">Зона I</span> эт. 1-' + getZoneBoundary(idx) + ' &nbsp;|&nbsp; ' +
+                  '<span class="zone-label zone-label-2">Зона II</span> эт. ' + (getZoneBoundary(idx) + 1) + '-' + nF +
+                  ' (транзит через эт. 1-' + getZoneBoundary(idx) + ')</div>'
                 : '<div class="fire-info"><i class="bi bi-layers"></i> ' +
                   '<span class="zone-label zone-label-1">Зона I</span> эт. 1-' + nF + ' (единая зона)</div>';
 
@@ -910,6 +927,29 @@
                 '<input type="number" min="1" max="20" step="1" value="' + sec + '" ' +
                 'class="fire-sections bld-num" data-idx="' + idx + '" style="width:64px">' +
                 '</div>' +
+
+                (systemPrefix === 'vpv' ?
+                    '<div class="bld-num-row" style="margin-top:8px">' +
+                    '<label><i class="bi bi-circle"></i> Диаметр основного стояка ВПВ:</label>' +
+                    '<select class="fire-vpv-dn bld-select" data-idx="' + idx + '" style="width:120px">' +
+                    '<option value="50"' + (s.vpvDN === 50 ? ' selected' : '') + '>DN 50</option>' +
+                    '<option value="65"' + (s.vpvDN === 65 ? ' selected' : '') + '>DN 65 (стандарт)</option>' +
+                    '<option value="80"' + (s.vpvDN === 80 ? ' selected' : '') + '>DN 80</option>' +
+                    '</select></div>' +
+
+                    '<div class="bld-num-row" style="margin-top:8px">' +
+                    '<label><i class="bi bi-layers"></i> Граница зон (этаж):</label>' +
+                    '<input type="number" min="5" max="50" step="1" value="' + (s.zoneBoundary || 17) + '" ' +
+                    'class="fire-zone-boundary bld-num" data-idx="' + idx + '" style="width:64px">' +
+                    '</div>' +
+
+                    '<div class="fire-info" style="margin-top:8px;background:rgba(239,68,68,.06);color:#dc2626">' +
+                    '<i class="bi bi-speedometer2"></i> ' +
+                    '<strong>Гидравлика РД:</strong> ' +
+                    'Расход <strong>' + (s.flowRate || 11.6) + '</strong> л/с · ' +
+                    'Напор <strong>' + (s.pressure || 0.13) + '</strong> МПа' +
+                    '</div>'
+                : '') +
 
                 (systemPrefix === 'aupt' ?
                     '<div class="bld-num-row" style="margin-top:8px">' +
@@ -992,6 +1032,21 @@
             el.addEventListener('input', function () {
                 var idx = parseInt(el.dataset.idx, 10);
                 getSettings(idx).lobbyArea = Math.max(0, parseFloat(el.value) || 0);
+                renderResults();
+            });
+        });
+        container.querySelectorAll('.fire-vpv-dn').forEach(function (el) {
+            el.addEventListener('change', function () {
+                var idx = parseInt(el.dataset.idx, 10);
+                getSettings(idx).vpvDN = parseInt(el.value, 10) || 65;
+                renderResults();
+            });
+        });
+        container.querySelectorAll('.fire-zone-boundary').forEach(function (el) {
+            el.addEventListener('input', function () {
+                var idx = parseInt(el.dataset.idx, 10);
+                getSettings(idx).zoneBoundary = Math.max(5, parseInt(el.value, 10) || 17);
+                renderAllAccordions();
                 renderResults();
             });
         });
@@ -1373,9 +1428,9 @@
         var totalH  = nF * FLOOR_H;
         var svgH    = totalH + PAD * 2 + 50;
 
-        var z2     = hasZone2(b);
-        var z1F    = zone1Floors(b);
-        var z2F    = zone2Floors(b);
+        var z2     = hasZone2(b, idx);
+        var z1F    = zone1Floors(b, idx);
+        var z2F    = zone2Floors(b, idx);
 
         // X positions
         var RISER_GAP   = 22;
