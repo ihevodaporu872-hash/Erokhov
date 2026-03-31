@@ -379,7 +379,11 @@
                 corridorLength: 30,    // corridor length per section, m
                 vpvEnabled:     true,
                 auptEnabled:    true,
-                dryRiser:       false, // сухотруб DN65 на фасаде
+                dryRiser:       false, // сухотруб на фасаде
+                dryPipeCount:   2,     // кол-во стояков сухотруба
+                dryBranchPerFloor: 2,  // ответвлений на стояк на этаж
+                dryMainDN:      80,    // диаметр стояка сухотруба
+                dryBranchDN:    65,    // диаметр ответвления
                 vpvDN:          65,    // диаметр основного стояка ВПВ (50/65/80)
                 zoneBoundary:   17,    // граница зон (этаж)
                 // Гидравлика РД
@@ -393,6 +397,10 @@
         }
         // Миграция
         if (fireSettings[idx].dryRiser === undefined) fireSettings[idx].dryRiser = false;
+        if (fireSettings[idx].dryPipeCount === undefined) fireSettings[idx].dryPipeCount = 2;
+        if (fireSettings[idx].dryBranchPerFloor === undefined) fireSettings[idx].dryBranchPerFloor = 2;
+        if (fireSettings[idx].dryMainDN === undefined) fireSettings[idx].dryMainDN = 80;
+        if (fireSettings[idx].dryBranchDN === undefined) fireSettings[idx].dryBranchDN = 65;
         if (fireSettings[idx].vpvDN === undefined) fireSettings[idx].vpvDN = 65;
         if (fireSettings[idx].zoneBoundary === undefined) fireSettings[idx].zoneBoundary = 17;
         if (fireSettings[idx].flowRate === undefined) fireSettings[idx].flowRate = 11.6;
@@ -692,26 +700,50 @@
                 addItem('vpv_elbow_z2', 'Отвод 90\u00b0 ' + dnLabel + ' (с учётом коэф. 1.1)', 'шт', elbowsZ2,
                     'Зона II: 2/эт./секц. \u00d7 1.1', 'zone2');
 
-            // ── Сухотруб DN65 на фасаде (В2.4) ──
+            // ── Сухотруб (В2.4) — расчёт по квартирографии ──
+            var dryTotalPipeLen = 0;
             if (s.dryRiser && bH > 0) {
-                var dryLen = Math.round(bH * 10) / 10;
-                var dryHeads = Math.max(1, Math.ceil(bH / 20));
-                addItem('vpv_dry_pipe', 'Труба стальная э/с ГОСТ\u00a010704-91 DN\u00a065 (сухотруб фасадный)', 'м.п.',
-                    dryLen, 'Высота корпуса ' + bH + ' м', 'zone1');
-                addItem('vpv_dry_head', 'Головка ГМ-65 (сухотруб, фасад)', 'шт', 2,
-                    '2 шт на фасад (верх/низ)', 'zone1');
-                addItem('vpv_dry_valve', 'Задвижка DN\u00a065 (узел ввода сухотруба)', 'шт', 1,
-                    'Узел ввода сухотруба', 'zone1');
-                addItem('vpv_dry_check', 'Клапан обратный DN\u00a065 (узел ввода сухотруба)', 'шт', 1,
-                    'Узел ввода сухотруба', 'zone1');
-                addItem('vpv_dry_clamp', 'Хомут стальной (крепление сухотруба)', 'шт',
-                    Math.ceil(dryLen / 1.5), 'Через 1,5 м', 'zone1');
+                var dryN    = s.dryPipeCount || 2;
+                var dryBpf  = s.dryBranchPerFloor || 2;
+                var dryMDN  = s.dryMainDN || 80;
+                var dryBDN  = s.dryBranchDN || 65;
+                var dryLmain = Math.max(bH - 1, 0); // высота − 1 м (отм. +0.000)
+                var dryMainTotal = Math.round(dryLmain * dryN * 10) / 10;
+                var dryBranchTotal = Math.round((nF - 1) * dryBpf * dryN * 0.35 * 10) / 10;
+                var dryBranchCount = (nF - 1) * dryBpf * dryN; // кол-во ответвлений
+
+                // Стояки
+                addItem('vpv_dry_main', 'Труба стальная э/с ГОСТ\u00a010704-91 DN\u00a0' + dryMDN + ' (сухотруб стояк)', 'м.п.',
+                    dryMainTotal, dryN + ' стояков \u00d7 ' + dryLmain + ' м', 'zone1');
+                // Ответвления
+                if (dryBranchTotal > 0)
+                    addItem('vpv_dry_branch', 'Труба стальная э/с ГОСТ\u00a010704-91 DN\u00a0' + dryBDN + ' (сухотруб ответвления)', 'м.п.',
+                        dryBranchTotal, dryBranchCount + ' отв. \u00d7 0,35 м', 'zone1');
+                // Тройник переходной
+                addItem('vpv_dry_tee', 'Тройник переходной ' + dryMDN + '\u00d7' + dryBDN + ' (сухотруб)', 'шт',
+                    dryBranchCount, '1 на каждое ответвление', 'zone1');
+                // Вентиль пожарный DN60 угловой 90°
+                addItem('vpv_dry_valve_fire', 'Вентиль пожарный DN\u00a060 угловой 90\u00b0', 'шт',
+                    dryBranchCount, '1 на каждое ответвление', 'zone1');
+                // Головки ГМ-65 (фасад)
+                addItem('vpv_dry_head', 'Головка ГМ-65 (сухотруб, фасад)', 'шт', 2 * dryN,
+                    '2 шт на стояк (верх/низ)', 'zone1');
+                // Задвижка и клапан (узел ввода)
+                addItem('vpv_dry_gate', 'Задвижка DN\u00a0' + dryMDN + ' (узел ввода сухотруба)', 'шт', dryN,
+                    '1 шт на стояк', 'zone1');
+                addItem('vpv_dry_check', 'Клапан обратный DN\u00a0' + dryMDN + ' (узел ввода сухотруба)', 'шт', dryN,
+                    '1 шт на стояк', 'zone1');
+                // Хомуты
+                addItem('vpv_dry_clamp', 'Хомут стальной (крепление сухотруба DN\u00a0' + dryMDN + ')', 'шт',
+                    Math.ceil(dryMainTotal / 1.5), 'Через 1,5 м', 'zone1');
+
+                dryTotalPipeLen = dryMainTotal + dryBranchTotal;
             }
 
             // ── Комплект маркировки (наклейки, стрелки направления) ──
             var allPipeLenForMarking = riserLenZ1 + riserLenZ2 + branchZ1 + branchZ2
                 + (z2 ? Math.round(floorH * zb * sec * 10) / 10 : 0)
-                + (s.dryRiser && bH > 0 ? bH : 0);
+                + dryTotalPipeLen;
             if (allPipeLenForMarking > 0) {
                 addItem('vpv_marking', 'Комплект маркировки (наклейки, стрелки направления потока)', 'компл.',
                     Math.ceil(allPipeLenForMarking / 20),
@@ -719,16 +751,25 @@
             }
 
             // ── Окраска труб ВПВ (зелёный цвет, 2 слоя) ──
-            var allPipeLen = riserLenZ1 + riserLenZ2 + branchZ1 + branchZ2
-                + (z2 ? Math.round(floorH * getZoneBoundary(idx) * sec * 10) / 10 : 0)
-                + (s.dryRiser && bH > 0 ? bH : 0);
-            if (allPipeLen > 0) {
-                // Площадь поверхности трубы: DN50→0.189, DN65→0.239, DN80→0.279 м²/м; DN25→0.106
-                var paintPerM = dn <= 50 ? 0.189 : dn <= 65 ? 0.239 : 0.279;
-                var paintArea65 = (riserLenZ1 + riserLenZ2 + (z2 ? Math.round(floorH * zb * sec * 10) / 10 : 0)
-                    + (s.dryRiser && bH > 0 ? bH : 0)) * paintPerM;
-                var paintArea25 = (branchZ1 + branchZ2) * 0.106;
-                var totalPaintArea = Math.round((paintArea65 + paintArea25) * 10) / 10;
+            // Площадь по DN: 25→0.106, 50→0.189, 65→0.239, 80→0.279, 100→0.359 м²/м
+            var paintSurfMap = { 25: 0.106, 50: 0.189, 65: 0.239, 80: 0.279, 100: 0.359 };
+            function paintPerM(d) { return paintSurfMap[d] || 0.239; }
+
+            var paintPerVpv = dn <= 50 ? paintPerM(50) : dn <= 65 ? paintPerM(65) : paintPerM(80);
+            var vpvPipeLen = riserLenZ1 + riserLenZ2 + (z2 ? Math.round(floorH * zb * sec * 10) / 10 : 0);
+            var paintAreaVpv = vpvPipeLen * paintPerVpv;
+            var paintAreaBranch = (branchZ1 + branchZ2) * paintPerM(25);
+            // Сухотруб
+            var paintAreaDry = 0;
+            if (s.dryRiser && dryTotalPipeLen > 0) {
+                var dryMDN2 = s.dryMainDN || 80;
+                var dryBDN2 = s.dryBranchDN || 65;
+                var dryMainLen2 = Math.round(Math.max(bH - 1, 0) * (s.dryPipeCount || 2) * 10) / 10;
+                var dryBranchLen2 = dryTotalPipeLen - dryMainLen2;
+                paintAreaDry = dryMainLen2 * paintPerM(dryMDN2) + Math.max(0, dryBranchLen2) * paintPerM(dryBDN2);
+            }
+            var totalPaintArea = Math.round((paintAreaVpv + paintAreaBranch + paintAreaDry) * 10) / 10;
+            if (totalPaintArea > 0) {
                 addItem('vpv_paint', 'Окраска трубопроводов ВПВ (грунт + эмаль зелёная, 2 слоя)', 'м\u00b2',
                     totalPaintArea, 'Расход ~0,2 кг/м\u00b2 на слой', 'zone1');
             }
@@ -748,7 +789,8 @@
             'vpv_valve_z1', 'vpv_check_z1', 'vpv_flush_z1',
             'vpv_caps', 'vpv_elbow_z1',
             'vpv_facade_z1', 'vpv_gm80_z1', 'vpv_check80_z1',
-            'vpv_dry_pipe', 'vpv_dry_head', 'vpv_dry_valve', 'vpv_dry_check', 'vpv_dry_clamp',
+            'vpv_dry_main', 'vpv_dry_branch', 'vpv_dry_tee', 'vpv_dry_valve_fire',
+            'vpv_dry_head', 'vpv_dry_gate', 'vpv_dry_check', 'vpv_dry_clamp',
             'vpv_lobby_shpk', 'vpv_lobby_dppk', 'vpv_lobby_hose', 'vpv_lobby_diaphragm', 'vpv_lobby_pipe',
             'vpv_comm_shpk', 'vpv_comm_dppk', 'vpv_comm_hose', 'vpv_comm_diaphragm', 'vpv_comm_pipe',
             'vpv_marking', 'vpv_paint', 'vpv_service_damper',
@@ -1034,8 +1076,37 @@
                     '<input type="checkbox" id="' + systemPrefix + '-dry-' + idx + '" ' +
                         'class="fire-dry-riser" data-idx="' + idx + '"' +
                         (s.dryRiser ? ' checked' : '') + '>' +
-                    '<label for="' + systemPrefix + '-dry-' + idx + '">Сухотруб DN65 на фасаде</label>' +
-                    '</div>'
+                    '<label for="' + systemPrefix + '-dry-' + idx + '">Сухотруб (В2.4)</label>' +
+                    '</div>' +
+                    (s.dryRiser ?
+                        '<div style="margin-left:24px;margin-top:6px;padding:10px;border-left:3px solid var(--accent-blue);background:rgba(59,130,246,.04);border-radius:0 8px 8px 0">' +
+                        '<div class="bld-num-row" style="margin-bottom:6px">' +
+                        '<label>Стояков сухотруба:</label>' +
+                        '<input type="number" min="1" max="10" value="' + (s.dryPipeCount || 2) + '" ' +
+                        'class="fire-dry-count bld-num" data-idx="' + idx + '" style="width:56px"></div>' +
+                        '<div class="bld-num-row" style="margin-bottom:6px">' +
+                        '<label>Ответвлений / стояк / этаж:</label>' +
+                        '<input type="number" min="1" max="10" value="' + (s.dryBranchPerFloor || 2) + '" ' +
+                        'class="fire-dry-bpf bld-num" data-idx="' + idx + '" style="width:56px"></div>' +
+                        '<div class="bld-num-row" style="margin-bottom:6px">' +
+                        '<label>DN стояка:</label>' +
+                        '<select class="fire-dry-main-dn bld-select" data-idx="' + idx + '" style="width:100px">' +
+                        '<option value="65"' + ((s.dryMainDN || 80) === 65 ? ' selected' : '') + '>DN 65</option>' +
+                        '<option value="80"' + ((s.dryMainDN || 80) === 80 ? ' selected' : '') + '>DN 80</option>' +
+                        '<option value="100"' + ((s.dryMainDN || 80) === 100 ? ' selected' : '') + '>DN 100</option>' +
+                        '</select></div>' +
+                        '<div class="bld-num-row">' +
+                        '<label>DN ответвления:</label>' +
+                        '<select class="fire-dry-branch-dn bld-select" data-idx="' + idx + '" style="width:100px">' +
+                        '<option value="50"' + ((s.dryBranchDN || 65) === 50 ? ' selected' : '') + '>DN 50</option>' +
+                        '<option value="65"' + ((s.dryBranchDN || 65) === 65 ? ' selected' : '') + '>DN 65</option>' +
+                        '</select></div>' +
+                        '<div class="fire-info" style="margin-top:8px">' +
+                        '<i class="bi bi-rulers"></i> Стояк: ' + Math.max(bH - 1, 0) + ' м \u00d7 ' + (s.dryPipeCount || 2) +
+                        ' = <strong>' + Math.round(Math.max(bH - 1, 0) * (s.dryPipeCount || 2) * 10) / 10 + ' м</strong> DN' + (s.dryMainDN || 80) +
+                        ' · Ответвления: ' + ((nF - 1) * (s.dryBranchPerFloor || 2) * (s.dryPipeCount || 2)) + ' шт' +
+                        '</div></div>'
+                    : '')
                 : '') +
 
                 syncInfo +
@@ -1124,6 +1195,35 @@
             el.addEventListener('change', function () {
                 var idx = parseInt(el.dataset.idx, 10);
                 getSettings(idx).dryRiser = el.checked;
+                renderAllAccordions();
+                renderResults();
+            });
+        });
+        container.querySelectorAll('.fire-dry-count').forEach(function (el) {
+            el.addEventListener('change', function () {
+                getSettings(parseInt(el.dataset.idx, 10)).dryPipeCount = Math.max(1, parseInt(el.value, 10) || 2);
+                renderAllAccordions();
+                renderResults();
+            });
+        });
+        container.querySelectorAll('.fire-dry-bpf').forEach(function (el) {
+            el.addEventListener('change', function () {
+                getSettings(parseInt(el.dataset.idx, 10)).dryBranchPerFloor = Math.max(1, parseInt(el.value, 10) || 2);
+                renderAllAccordions();
+                renderResults();
+            });
+        });
+        container.querySelectorAll('.fire-dry-main-dn').forEach(function (el) {
+            el.addEventListener('change', function () {
+                getSettings(parseInt(el.dataset.idx, 10)).dryMainDN = parseInt(el.value, 10) || 80;
+                renderAllAccordions();
+                renderResults();
+            });
+        });
+        container.querySelectorAll('.fire-dry-branch-dn').forEach(function (el) {
+            el.addEventListener('change', function () {
+                getSettings(parseInt(el.dataset.idx, 10)).dryBranchDN = parseInt(el.value, 10) || 65;
+                renderAllAccordions();
                 renderResults();
             });
         });
@@ -1543,7 +1643,7 @@
             } else if (/Хомут/i.test(item.name)) {
                 // Крепёж — только материал
                 pushMat(item.name, item.unit, q, item.group);
-            } else if (/Кран шаровой|Кран промывочный|Клапан обратный|Патрубок фасадный|Головка ГМ|Задвижка|Заглушка эллиптическая/i.test(item.name)) {
+            } else if (/Кран шаровой|Кран промывочный|Клапан обратный|Патрубок фасадный|Головка ГМ|Задвижка|Заглушка эллиптическая|Вентиль пожарный/i.test(item.name)) {
                 // Арматура: работа + материал
                 pushWork('Монтаж: ' + item.name.replace(/\(.+?\)/g, '').trim(), item.unit, q, item.group);
                 pushMat(item.name, item.unit, q, item.group);
@@ -1579,8 +1679,8 @@
         var pipes = [], fittings = [], equipment = [], misc = [];
         items.forEach(function (it) {
             if (/Труба стальная|Монтаж трубопроводов/i.test(it.name)) pipes.push(it);
-            else if (/Муфта грувлок|Отвод 90|Заглушка эллиптическая/i.test(it.name)) fittings.push(it);
-            else if (/ШПК|Спринклер|СПЖ|Датчик|Рукав|Узел управления|Затвор|Диафрагма|Огнетушитель|Манометр|Кран шаровой|Кран промывочный|Клапан|Патрубок|Головка|Задвижка/i.test(it.name)) equipment.push(it);
+            else if (/Муфта грувлок|Отвод 90|Заглушка эллиптическая|Тройник переходной/i.test(it.name)) fittings.push(it);
+            else if (/ШПК|Спринклер|СПЖ|Датчик|Рукав|Узел управления|Затвор|Диафрагма|Огнетушитель|Манометр|Кран шаровой|Кран промывочный|Клапан|Патрубок|Головка|Задвижка|Вентиль пожарный/i.test(it.name)) equipment.push(it);
             else misc.push(it);
         });
 
