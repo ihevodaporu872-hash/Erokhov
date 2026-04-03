@@ -1365,8 +1365,8 @@
             return '<tr class="spec-group-row"><td colspan="4">' + label + '</td></tr>' + rows;
         }
 
-        var tableHtml = renderGroup(z1Items, 'Зона I (эт. 1-17)') +
-            renderGroup(z2Items, 'Зона II (эт. 18+)');
+        var tableHtml = renderGroup(z1Items, 'В2.2 \u2014 Зона I') +
+            renderGroup(z2Items, 'В2.3 \u2014 Зона II');
 
         el.innerHTML =
             '<div class="riser-table-wrap"><table class="riser-table">' +
@@ -1380,6 +1380,11 @@
         var auptItems = collectAUPTItems();
         renderResultsTable('vpvResults', vpvItems, 'ВПВ');
         renderResultsTable('auptResults', auptItems, 'АУПТ');
+        // Обновляем спецификацию и смету если они видимы
+        var specPanel = document.getElementById('tab-specification');
+        if (specPanel && specPanel.classList.contains('active')) renderFullSpecification();
+        var estPanel = document.getElementById('tab-estimate');
+        if (estPanel && estPanel.classList.contains('active')) renderEstimate();
     }
 
     /* ===================================================================
@@ -1430,7 +1435,7 @@
             var vpvPipeM = 0, vpvEqCount = 0;
 
             if (vpvZ1.length) {
-                rows += '<tr class="spec-group-row"><td colspan="7">Зона I (этажи 1-11)</td></tr>';
+                rows += '<tr class="spec-group-row"><td colspan="7">В2.2 \u2014 Зона I</td></tr>';
                 vpvZ1.forEach(function (item) {
                     var q = Math.round(item.qty * 10) / 10;
                     if (item.unit === 'м.п.') vpvPipeM += item.qty;
@@ -1439,7 +1444,7 @@
                 });
             }
             if (vpvZ2.length) {
-                rows += '<tr class="spec-group-row"><td colspan="7">Зона II (этажи 12+, транзит через 1-11)</td></tr>';
+                rows += '<tr class="spec-group-row"><td colspan="7">В2.3 \u2014 Зона II</td></tr>';
                 vpvZ2.forEach(function (item) {
                     var q = Math.round(item.qty * 10) / 10;
                     if (item.unit === 'м.п.') vpvPipeM += item.qty;
@@ -1459,7 +1464,7 @@
             var auptPipeM = 0, auptEqCount = 0;
 
             if (auptZ1.length) {
-                rows += '<tr class="spec-group-row"><td colspan="7">Зона I (этажи 1-11)</td></tr>';
+                rows += '<tr class="spec-group-row"><td colspan="7">АУПТ \u2014 Зона I</td></tr>';
                 auptZ1.forEach(function (item) {
                     var q = Math.round(item.qty * 10) / 10;
                     if (item.unit === 'м.п.') auptPipeM += item.qty;
@@ -1468,7 +1473,7 @@
                 });
             }
             if (auptZ2.length) {
-                rows += '<tr class="spec-group-row"><td colspan="7">Зона II (этажи 12+, транзит через 1-11)</td></tr>';
+                rows += '<tr class="spec-group-row"><td colspan="7">АУПТ \u2014 Зона II</td></tr>';
                 auptZ2.forEach(function (item) {
                     var q = Math.round(item.qty * 10) / 10;
                     if (item.unit === 'м.п.') auptPipeM += item.qty;
