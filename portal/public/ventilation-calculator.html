@@ -26,6 +26,13 @@
             margin: 0;
         }
 
+        /* ── Растяжение по ширине ──────────────────────────── */
+        .tab-content, .tab-pane, .accordion,
+        .accordion-item, .accordion-body,
+        .table, table { width: 100% !important; }
+        .tab-pane .row { max-width: 100%; }
+        .nav-tabs { flex-wrap: wrap; }
+
         /* ── Тёмная тема (синхронизация с порталом) ──────────── */
         body.dark-theme {
             color: #e0e0e0;
@@ -424,7 +431,8 @@
         }
 
         .main-container {
-            max-width: 1000px;
+            max-width: 100% !important;
+            width: 100% !important;
         }
 
         /* Скорость в аккордеоне */
@@ -566,7 +574,7 @@
     <div id="saveIndicator"><i class="bi bi-check-lg"></i></div>
     <div id="toastContainer"></div>
     <input type="file" id="projectFileInput" accept=".json" style="display:none">
-    <div class="container">
+    <div class="container-fluid" style="padding:0;max-width:100%">
         <div class="main-container">
             <!-- заголовок убран — отображается в портале -->
 
