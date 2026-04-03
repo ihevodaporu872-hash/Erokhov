@@ -426,7 +426,13 @@
     }
 
     function getFloorCount(b) {
-        return b.floors ? b.floors.length : 0;
+        if (b.floors && b.floors.length > 0) return b.floors.length;
+        // Fallback: totalFloors или вычисляем из высоты
+        if (b.totalFloors) return b.totalFloors;
+        if (b.num_floors) return b.num_floors;
+        // Последний fallback: из высоты здания (ср. этаж 3.3м)
+        if (b.height && b.height > 0) return Math.round(b.height / 3.3);
+        return 0;
     }
 
     /* Zone logic: per-building boundary (default 17) */
@@ -485,7 +491,11 @@
        VPV calculation
     =================================================================== */
     function collectVPVItems() {
-        if (!buildingStats || !buildingStats.length) return [];
+        if (!buildingStats || !buildingStats.length) {
+            console.warn('[Fire VPV] buildingStats пуст или null');
+            return [];
+        }
+        console.log('[Fire VPV] Сбор данных, корпусов:', buildingStats.length);
         var acc = {};
         function addItem(key, name, unit, qty, note, group) {
             if (!qty || qty <= 0) return;
@@ -497,9 +507,13 @@
 
         buildingStats.forEach(function (b, idx) {
             var s       = getSettings(idx);
-            if (!s.vpvEnabled) return;
             var nF      = getFloorCount(b);
-            if (nF === 0) return;
+            console.log('[Fire VPV] Корпус ' + idx + ':', {
+                name: b.name, height: b.height, floors: nF,
+                vpvEnabled: s.vpvEnabled, hasFloorsArr: !!(b.floors && b.floors.length)
+            });
+            if (!s.vpvEnabled) return;
+            if (nF === 0) { console.warn('[Fire VPV] Корпус ' + idx + ': nF=0, пропуск'); return; }
             var sec     = s.sections || 1;
             var bH      = b.height || 0;
             var floorH  = nF > 0 ? bH / nF : 3;
@@ -1376,13 +1390,17 @@
     }
 
     function renderResults() {
-        var vpvItems  = collectVPVItems();
-        var auptItems = collectAUPTItems();
-        renderResultsTable('vpvResults', vpvItems, 'ВПВ');
-        renderResultsTable('auptResults', auptItems, 'АУПТ');
-        // Всегда обновляем спецификацию и смету при пересчёте
-        renderFullSpecification();
-        renderEstimate();
+        try {
+            var vpvItems  = collectVPVItems();
+            var auptItems = collectAUPTItems();
+            console.log('[Fire] renderResults: VPV=' + vpvItems.length + ' поз., AUPT=' + auptItems.length + ' поз.');
+            renderResultsTable('vpvResults', vpvItems, 'ВПВ');
+            renderResultsTable('auptResults', auptItems, 'АУПТ');
+            renderFullSpecification();
+            renderEstimate();
+        } catch (err) {
+            console.error('[Fire] Ошибка в renderResults:', err);
+        }
     }
 
     /* ===================================================================
