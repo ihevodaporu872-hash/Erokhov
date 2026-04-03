@@ -1380,11 +1380,9 @@
         var auptItems = collectAUPTItems();
         renderResultsTable('vpvResults', vpvItems, 'ВПВ');
         renderResultsTable('auptResults', auptItems, 'АУПТ');
-        // Обновляем спецификацию и смету если они видимы
-        var specPanel = document.getElementById('tab-specification');
-        if (specPanel && specPanel.classList.contains('active')) renderFullSpecification();
-        var estPanel = document.getElementById('tab-estimate');
-        if (estPanel && estPanel.classList.contains('active')) renderEstimate();
+        // Всегда обновляем спецификацию и смету при пересчёте
+        renderFullSpecification();
+        renderEstimate();
     }
 
     /* ===================================================================
@@ -1392,7 +1390,9 @@
     =================================================================== */
     function renderFullSpecification() {
         var el = document.getElementById('specContent');
-        if (!el) return;
+        if (!el) { console.log('[Fire Spec] specContent не найден'); return; }
+
+        console.log('[Fire Spec] buildingStats:', buildingStats ? buildingStats.length + ' корпусов' : 'null');
 
         if (!buildingStats || !buildingStats.length) {
             el.innerHTML =
@@ -1734,12 +1734,14 @@
 
     function renderEstimate() {
         var el = document.getElementById('estimateContent');
-        if (!el) return;
+        if (!el) { console.log('[Fire Estimate] estimateContent не найден'); return; }
+
+        console.log('[Fire Estimate] buildingStats:', buildingStats ? buildingStats.length + ' корпусов' : 'null');
 
         if (!buildingStats || !buildingStats.length) {
             el.innerHTML =
                 '<div class="no-data-banner"><i class="bi bi-info-circle-fill"></i>' +
-                '<span>Загрузите данные проекта для формирования сметы.</span></div>';
+                '<span>Загрузите данные проекта и задайте параметры.</span></div>';
             return;
         }
 
@@ -2091,6 +2093,15 @@
         if (!msg) return;
         if (msg.type === 'load-project-data') {
             buildingStats = msg.buildingStats || null;
+            console.log('[Fire] load-project-data получен:', {
+                projectId: msg.projectId,
+                buildingStats: buildingStats ? buildingStats.length + ' корпусов' : 'null',
+                firstBuilding: buildingStats && buildingStats[0] ? {
+                    name: buildingStats[0].name,
+                    floors: buildingStats[0].floors ? buildingStats[0].floors.length : 0,
+                    height: buildingStats[0].height
+                } : 'нет'
+            });
             renderAllAccordions();
             renderResults();
         }
