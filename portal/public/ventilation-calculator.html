@@ -5322,21 +5322,22 @@
 
         // Переключение активного корпуса
         function switchVentBuilding(idx) {
+            console.log('[Vent] Переключение на корпус ' + idx + ' (было: ' + ventActiveBuilding + ')');
             // Сохраняем текущий
             saveVentFormState(ventActiveBuilding);
             ventActiveBuilding = idx;
-            // Обновляем кнопки
-            document.querySelectorAll('.vent-building-btn').forEach(function (btn) {
-                btn.classList.toggle('active', parseInt(btn.dataset.idx, 10) === idx);
-            });
+            // Перерендерим кнопки (inline стили требуют полного рендера)
+            if (ventBuildingStatsCache) {
+                renderVentBuildingButtons(ventBuildingStatsCache);
+            }
             // Заполняем данные квартирографии для нового корпуса
             if (ventBuildingStatsCache && ventBuildingStatsCache[idx]) {
                 fillVentFieldsFromBuilding(ventBuildingStatsCache[idx], idx);
             }
             // Восстанавливаем снапшот (перезаписывает поля поверх квартирографии)
             restoreVentFormState(idx);
-            // Обновляем инфо
-            updateVentBuildingInfo(idx);
+            // Обновляем аккордеоны
+            if (ventBuildingStatsCache) renderVentBuildingAccordions(ventBuildingStatsCache);
             // Триггерим пересчёт
             document.querySelectorAll('.building-char').forEach(function (inp) {
                 inp.dispatchEvent(new Event('input', { bubbles: true }));
@@ -5390,8 +5391,12 @@
                     name + '</button>';
             }).join('');
             btns.querySelectorAll('.vent-building-btn').forEach(function (btn) {
-                btn.addEventListener('click', function () {
-                    switchVentBuilding(parseInt(btn.dataset.idx, 10));
+                btn.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    var newIdx = parseInt(btn.dataset.idx, 10);
+                    if (newIdx === ventActiveBuilding) return;
+                    switchVentBuilding(newIdx);
                 });
             });
             updateVentBuildingInfo(ventActiveBuilding);
