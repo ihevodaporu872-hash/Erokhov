@@ -1443,6 +1443,7 @@
         }
 
         var rows = '';
+        try {
 
         // ====== VPV ======
         var vpvItems = collectVPVItems();
@@ -1514,6 +1515,11 @@
             '<thead><tr><th>\u2116</th><th>Наименование</th><th>Ед.</th>' +
             '<th>Кол-во</th><th>Запас</th><th>С запасом</th><th>Примечание</th></tr></thead>' +
             '<tbody>' + rows + '</tbody></table></div>';
+        } catch (err) {
+            console.error('[Fire Spec] Ошибка рендера спецификации:', err);
+            el.innerHTML = '<div class="no-data-banner"><i class="bi bi-exclamation-triangle"></i>' +
+                '<span>Ошибка: ' + escHtml(err.message) + '</span></div>';
+        }
     }
 
     /* ===================================================================
@@ -1763,8 +1769,17 @@
             return;
         }
 
-        var data = calculateFireEstimateItems();
+        var data;
+        try {
+            data = calculateFireEstimateItems();
+        } catch (err) {
+            console.error('[Fire Estimate] Ошибка расчёта:', err);
+            el.innerHTML = '<div class="no-data-banner"><i class="bi bi-exclamation-triangle"></i>' +
+                '<span>Ошибка расчёта: ' + escHtml(err.message) + '</span></div>';
+            return;
+        }
         var hasAny = data.vpv.length + data.dry.length + data.aupt.length;
+        console.log('[Fire Estimate] Позиций: ВПВ=' + data.vpv.length + ', Сухотруб=' + data.dry.length + ', АПТ=' + data.aupt.length);
         if (!hasAny) {
             el.innerHTML =
                 '<div class="no-data-banner"><i class="bi bi-info-circle-fill"></i>' +
@@ -1792,11 +1807,10 @@
                 }
 
                 return '<tr' + stripe + '>' +
-                    '<td style="text-align:center;width:36px;color:var(--gray-400)">' + (rowNum++) + '</td>' +
+                    '<td style="width:90px;padding-left:8px">' + typeIcon + '</td>' +
                     '<td>' + escHtml(it.name) + '</td>' +
                     '<td style="text-align:center;width:50px">' + it.unit + '</td>' +
-                    '<td style="text-align:right;width:70px;font-weight:600">' + it.qty + '</td>' +
-                    '<td style="width:80px">' + typeIcon + '</td>' +
+                    '<td style="text-align:right;width:80px;font-weight:600">' + it.qty + '</td>' +
                     '</tr>';
             }).join('');
 
@@ -1813,11 +1827,10 @@
                 '<div class="riser-table-wrap" style="border-radius:0 0 10px 10px;border:1px solid var(--gray-200);border-top:none">' +
                 '<table class="riser-table" style="margin:0">' +
                 '<thead><tr>' +
-                '<th style="width:36px">\u2116</th>' +
+                '<th style="width:90px">Тип</th>' +
                 '<th>Наименование работ и материалов</th>' +
                 '<th style="width:50px">Ед.</th>' +
-                '<th style="width:70px">Кол-во</th>' +
-                '<th style="width:80px">Тип</th>' +
+                '<th style="width:80px">Кол-во</th>' +
                 '</tr></thead>' +
                 '<tbody>' + rows + '</tbody>' +
                 '</table></div>' +
