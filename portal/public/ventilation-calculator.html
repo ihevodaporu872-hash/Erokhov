@@ -5295,7 +5295,7 @@
             return ventBuildingSettings[idx];
         }
 
-        // Сохранить состояние всех полей ввода текущего корпуса
+        // Сохранить состояние всех полей ввода + appData текущего корпуса
         function saveVentFormState(idx) {
             var snapshot = {};
             document.querySelectorAll('#mainTabsContent input, #mainTabsContent select, #mainTabsContent textarea').forEach(function (el) {
@@ -5304,12 +5304,36 @@
                 if (el.type === 'checkbox') snapshot[key] = el.checked;
                 else snapshot[key] = el.value;
             });
-            getVentSettings(idx).formSnapshot = snapshot;
+            var vs = getVentSettings(idx);
+            vs.formSnapshot = snapshot;
+            // Сохраняем глубокую копию appData для этого корпуса
+            try {
+                vs.appDataSnapshot = JSON.parse(JSON.stringify(appData));
+            } catch (e) {
+                console.warn('[Vent] Не удалось сохранить appData для корпуса ' + idx);
+            }
+            console.log('[Vent] Сохранён снапшот корпуса ' + idx + ': ' + Object.keys(snapshot).length + ' полей');
         }
 
-        // Восстановить состояние полей из снапшота
+        // Восстановить состояние полей + appData из снапшота
         function restoreVentFormState(idx) {
-            var snap = getVentSettings(idx).formSnapshot;
+            var vs = getVentSettings(idx);
+            // Восстанавливаем appData
+            if (vs.appDataSnapshot) {
+                try {
+                    Object.keys(appData).forEach(function (k) {
+                        if (vs.appDataSnapshot[k] !== undefined) {
+                            appData[k] = JSON.parse(JSON.stringify(vs.appDataSnapshot[k]));
+                        }
+                    });
+                    restoreFormData(); // обновляет DOM из appData
+                    console.log('[Vent] Восстановлен appData корпуса ' + idx);
+                } catch (e) {
+                    console.warn('[Vent] Ошибка восстановления appData:', e);
+                }
+            }
+            // Восстанавливаем значения полей поверх
+            var snap = vs.formSnapshot;
             if (!snap) return;
             document.querySelectorAll('#mainTabsContent input, #mainTabsContent select, #mainTabsContent textarea').forEach(function (el) {
                 if (!el.id && !el.name) return;
@@ -5334,14 +5358,26 @@
             if (ventBuildingStatsCache && ventBuildingStatsCache[idx]) {
                 fillVentFieldsFromBuilding(ventBuildingStatsCache[idx], idx);
             }
-            // Восстанавливаем снапшот (перезаписывает поля поверх квартирографии)
-            restoreVentFormState(idx);
+            // Восстанавливаем снапшот если есть (перезаписывает поля поверх квартирографии)
+            var hasSnapshot = getVentSettings(idx).appDataSnapshot || getVentSettings(idx).formSnapshot;
+            if (hasSnapshot) {
+                restoreVentFormState(idx);
+            } else {
+                console.log('[Vent] Корпус ' + idx + ': нет сохранённых данных — чистый расчёт');
+            }
             // Обновляем аккордеоны
             if (ventBuildingStatsCache) renderVentBuildingAccordions(ventBuildingStatsCache);
-            // Триггерим пересчёт
+            // Триггерим пересчёт всех вкладок
             document.querySelectorAll('.building-char').forEach(function (inp) {
                 inp.dispatchEvent(new Event('input', { bubbles: true }));
             });
+            // Обновляем таблицы арматуры и решёток
+            if (typeof renderFittingsTab === 'function') {
+                try { renderFittingsTab(); } catch (e) {}
+            }
+            if (typeof updateAllStats === 'function') {
+                try { updateAllStats(); } catch (e) {}
+            }
         }
 
         // Заполняет поля «Основные характеристики» из buildingStats[idx]
