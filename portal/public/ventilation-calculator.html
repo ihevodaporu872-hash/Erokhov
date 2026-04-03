@@ -17,12 +17,91 @@
         }
 
         .main-container {
-            background: white;
+            background: transparent;
             border-radius: 0;
             box-shadow: none;
-            padding: 20px;
+            padding: 1.5rem;
             max-width: 100%;
+            width: 100%;
             margin: 0;
+        }
+
+        /* ── Тёмная тема (синхронизация с порталом) ──────────── */
+        body.dark-theme {
+            color: #e0e0e0;
+        }
+        body.dark-theme .main-container,
+        body.dark-theme .card,
+        body.dark-theme .card-body,
+        body.dark-theme .accordion-body,
+        body.dark-theme .tab-content,
+        body.dark-theme .tab-pane {
+            background: #2a2a2a !important;
+            color: #e0e0e0 !important;
+        }
+        body.dark-theme .form-control,
+        body.dark-theme .form-select {
+            background: #1e1e1e !important;
+            color: #e0e0e0 !important;
+            border-color: #444 !important;
+        }
+        body.dark-theme .form-control::placeholder {
+            color: #777 !important;
+        }
+        body.dark-theme .form-label,
+        body.dark-theme label,
+        body.dark-theme .section-title,
+        body.dark-theme h1, body.dark-theme h2, body.dark-theme h3,
+        body.dark-theme h4, body.dark-theme h5, body.dark-theme h6 {
+            color: #e0e0e0 !important;
+        }
+        body.dark-theme .text-muted {
+            color: #999 !important;
+        }
+        body.dark-theme .nav-tabs .nav-link {
+            color: #aaa !important;
+        }
+        body.dark-theme .nav-tabs .nav-link.active {
+            background: #2a2a2a !important;
+            color: #fff !important;
+            border-color: #444 #444 #2a2a2a !important;
+        }
+        body.dark-theme .table {
+            color: #e0e0e0 !important;
+            --bs-table-bg: #2a2a2a;
+            --bs-table-striped-bg: #323232;
+            --bs-table-hover-bg: #363636;
+            border-color: #444 !important;
+        }
+        body.dark-theme .table th,
+        body.dark-theme .table td {
+            border-color: #444 !important;
+        }
+        body.dark-theme .btn-outline-secondary {
+            color: #aaa !important;
+            border-color: #555 !important;
+        }
+        body.dark-theme .btn-outline-secondary:hover {
+            background: #363636 !important;
+            color: #fff !important;
+        }
+        body.dark-theme .alert {
+            background: #323232 !important;
+            color: #e0e0e0 !important;
+            border-color: #444 !important;
+        }
+        body.dark-theme .badge {
+            opacity: 0.9;
+        }
+        body.dark-theme .collapse .card-body {
+            background: #252525 !important;
+            border-color: #444 !important;
+        }
+        body.dark-theme .stat-card,
+        body.dark-theme .info-badge {
+            background: #323232 !important;
+            color: #e0e0e0 !important;
+            border-color: #444 !important;
         }
 
         h1 {
