@@ -609,6 +609,10 @@
 
                 <!-- Вкладка: Основные характеристики здания -->
                 <div class="tab-pane fade show active" id="power" role="tabpanel">
+
+                    <!-- Аккордеоны корпусов из квартирографии -->
+                    <div id="ventBuildingAccordions" style="margin-bottom:16px"></div>
+
                     <div class="section-title">Площади здания</div>
                     <div class="row">
                         <div class="col-md-4 mb-3">
@@ -5270,6 +5274,72 @@
         lockEstimateInputs();
         renderFittingsTab();
 
+        // ── Аккордеоны корпусов (из квартирографии) ──────────────────
+        function renderVentBuildingAccordions(bs) {
+            var container = document.getElementById('ventBuildingAccordions');
+            if (!container || !bs || !bs.length) {
+                if (container) container.innerHTML = '';
+                return;
+            }
+
+            var html = '<div class="section-title" style="margin-bottom:8px">' +
+                '<i class="bi bi-building"></i> Корпуса проекта (' + bs.length + ')' +
+                '</div>';
+
+            html += bs.map(function (b, idx) {
+                var name = b.name || ('Корпус ' + (b.num || idx + 1));
+                var nF = b.floors ? b.floors.length : (b.height ? Math.round(b.height / 3.3) : 0);
+                var bH = b.height || 0;
+                var apts = b.totalApts || 0;
+                var baths = 0, kitchens = 0;
+                if (b.floors) b.floors.forEach(function (f) {
+                    baths += (f.bath || 0);
+                    kitchens += (f.kitchens || 0);
+                });
+                var avgFH = nF > 0 ? Math.round(bH / nF * 10) / 10 : 0;
+                var shaftLen = Math.round(Math.max(bH - 1, 0) * 10) / 10;
+                var taps = baths + kitchens; // врезки ВЕ = С/У + кухни
+
+                return '<div class="accordion mb-2" id="ventAccord' + idx + '">' +
+                    '<div class="accordion-item" style="border:1px solid #dee2e6;border-radius:8px;overflow:hidden">' +
+                    '<h2 class="accordion-header">' +
+                    '<button class="accordion-button' + (idx > 0 ? ' collapsed' : '') + '" type="button" ' +
+                    'data-bs-toggle="collapse" data-bs-target="#ventCollapse' + idx + '"' +
+                    ' style="font-size:14px;font-weight:600;padding:10px 16px">' +
+                    '<i class="bi bi-building me-2"></i>' + name +
+                    '<span style="margin-left:auto;font-weight:400;font-size:12px;color:#6c757d">' +
+                    nF + ' эт. · ' + apts + ' кв. · ' + bH + ' м</span>' +
+                    '</button></h2>' +
+                    '<div id="ventCollapse' + idx + '" class="accordion-collapse collapse' + (idx === 0 ? ' show' : '') + '">' +
+                    '<div class="accordion-body" style="padding:12px 16px;font-size:13px">' +
+
+                    '<div class="row g-2 mb-2">' +
+                    '<div class="col-4"><span style="color:#6c757d">Высота:</span> <strong>' + bH + ' м</strong></div>' +
+                    '<div class="col-4"><span style="color:#6c757d">Этажей:</span> <strong>' + nF + '</strong></div>' +
+                    '<div class="col-4"><span style="color:#6c757d">Ср. этаж:</span> <strong>' + avgFH + ' м</strong></div>' +
+                    '</div>' +
+                    '<div class="row g-2 mb-2">' +
+                    '<div class="col-4"><span style="color:#6c757d">Квартир:</span> <strong>' + apts + '</strong></div>' +
+                    '<div class="col-4"><span style="color:#6c757d">С/У:</span> <strong>' + baths + '</strong></div>' +
+                    '<div class="col-4"><span style="color:#6c757d">Кухонь:</span> <strong>' + kitchens + '</strong></div>' +
+                    '</div>' +
+
+                    '<div style="background:rgba(59,130,246,.06);border-radius:6px;padding:8px 12px;margin-top:8px">' +
+                    '<div style="font-weight:600;font-size:12px;color:#2563eb;margin-bottom:4px">' +
+                    '<i class="bi bi-wind"></i> Расчётные параметры вентиляции</div>' +
+                    '<div class="row g-1" style="font-size:12px">' +
+                    '<div class="col-6">Длина шахты (height−1): <strong>' + shaftLen + ' м</strong></div>' +
+                    '<div class="col-6">Врезки ВЕ (С/У+кухни): <strong>' + taps + ' шт</strong></div>' +
+                    '<div class="col-6">Решётки приточные: <strong>' + apts + ' шт</strong> (по квартирам)</div>' +
+                    '<div class="col-6">Решётки вытяжные: <strong>' + taps + ' шт</strong> (по врезкам)</div>' +
+                    '</div></div>' +
+
+                    '</div></div></div></div>';
+            }).join('');
+
+            container.innerHTML = html;
+        }
+
         // ── Приём данных из портала (Квартирография) ──────────────────
         window.addEventListener('message', function (event) {
             var msg = event.data;
@@ -5279,7 +5349,7 @@
                 var areas = msg.areas;
 
                 // Суммируем данные по всем корпусам
-                var totalFloors = 0, totalApts = 0, totalBaths = 0;
+                var totalFloors = 0, totalApts = 0, totalBaths = 0, totalKitchens = 0;
                 var maxFloors = 0;
 
                 if (Array.isArray(bs) && bs.length > 0) {
@@ -5290,6 +5360,7 @@
                         if (b.floors) {
                             b.floors.forEach(function (f) {
                                 totalBaths += (f.bath || 0);
+                                totalKitchens += (f.kitchens || 0);
                             });
                         }
                     });
@@ -5307,11 +5378,13 @@
 
                     el = document.getElementById('sectionCount');
                     if (el) el.value = bs.length;
+
+                    // ── Аккордеоны по корпусам ──
+                    renderVentBuildingAccordions(bs);
                 }
 
                 // Площади из паспорта проекта
                 if (areas) {
-                    var el;
                     if (areas.total) {
                         el = document.getElementById('buildingArea');
                         if (el) el.value = areas.total;
@@ -5332,11 +5405,9 @@
                 });
 
                 console.log('[Ventilation] Данные из квартирографии:', {
-                    этажей: totalFloors, квартир: totalApts, СУ: totalBaths,
-                    секций: bs ? bs.length : 0,
-                    площадь: areas ? areas.total : 0,
-                    наземная: areas ? areas.aboveGround : 0,
-                    подземная: areas ? areas.underground : 0
+                    корпусов: bs ? bs.length : 0,
+                    этажей: totalFloors, квартир: totalApts,
+                    СУ: totalBaths, кухонь: totalKitchens
                 });
             }
             if (msg.type === 'theme-change') {
