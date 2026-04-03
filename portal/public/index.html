@@ -1877,6 +1877,12 @@
                 const pidx = portalProjects.findIndex(p => p.id === projectId);
                 if (pidx !== -1 && project.building_stats) {
                     portalProjects[pidx].building_stats = project.building_stats;
+                    // Распространяем на проекты без данных (единая квартирография)
+                    portalProjects.forEach(function (p) {
+                        if (!p.building_stats || !p.building_stats.length) {
+                            p.building_stats = project.building_stats;
+                        }
+                    });
                 }
 
                 // Восстанавливаем данные по корпусам из Supabase
@@ -2051,13 +2057,25 @@
                 if (projectViewProjectId) {
                     try {
                         await updateProjectBuildingStats(projectViewProjectId, result);
-                        // Обновляем building_stats в локальном списке проектов
+                        // Обновляем building_stats для ТЕКУЩЕГО проекта
                         const idx = portalProjects.findIndex(p => p.id === projectViewProjectId);
                         if (idx !== -1) portalProjects[idx].building_stats = result;
                     } catch (err) {
                         console.error('Ошибка сохранения данных по корпусам:', err);
                     }
                 }
+
+                // Распространяем building_stats на ВСЕ проекты без данных
+                // (единая квартирография для всех систем: ВС, ВО, АПТ, Вент)
+                portalProjects.forEach(function (p) {
+                    if (!p.building_stats || !p.building_stats.length) {
+                        p.building_stats = result;
+                        console.log('[Portal] building_stats распространён на проект:', p.name);
+                    }
+                });
+
+                // Отправляем данные во все iframe систем
+                sendBuildingStatsToAllIframes();
 
                 if (statusEl) statusEl.innerHTML = '<i class="bi bi-check-circle me-1" style="color: #22c55e;"></i>Загружено';
                 setTimeout(() => { if (statusEl) statusEl.textContent = ''; }, 3000);
@@ -2440,16 +2458,47 @@
         }
 
         // Отправляет building_stats в iframe пожаротушения
+        // Отправляет building_stats во ВСЕ iframe систем (после загрузки CSV)
+        function sendBuildingStatsToAllIframes() {
+            var systems = [
+                { type: 'fire-safety', fn: sendBuildingStatsToFireIframe },
+                { type: 'ventilation', fn: sendBuildingStatsToVentIframe },
+                { type: 'sewage',      fn: sendBuildingStatsToSewageIframe },
+                { type: 'conditioning', fn: sendBuildingStatsToCondIframe }
+            ];
+            systems.forEach(function (s) {
+                var pid = getSystemProjectId(s.type);
+                if (pid && s.fn) {
+                    try { s.fn(pid); } catch (e) { console.warn('[Portal] Не удалось отправить в ' + s.type, e); }
+                }
+            });
+            // Водоснабжение — своя функция
+            var wsPid = getSystemProjectId('water-supply');
+            if (wsPid) {
+                try { sendProjectToIframe(wsPid); } catch (e) {}
+            }
+            console.log('[Portal] building_stats отправлен во все iframe');
+        }
+
         function sendBuildingStatsToVentIframe(projectId) {
             if (!projectId) return;
             const project = portalProjects.find(p => p.id === projectId);
             const iframe = document.getElementById('ventCalcFrame');
             if (!iframe || !iframe.contentWindow) return;
+            // Если у проекта нет building_stats — берём из любого другого
+            var bs = project ? project.building_stats : null;
+            if (!bs || !bs.length) {
+                var donor = portalProjects.find(function (p) { return p.building_stats && p.building_stats.length > 0; });
+                if (donor) {
+                    bs = donor.building_stats;
+                    if (project) project.building_stats = bs;
+                }
+            }
             iframe.contentWindow.postMessage({
                 type: 'load-project-data',
                 projectId: projectId,
                 projectName: project ? project.name : '',
-                buildingStats: project ? (project.building_stats || null) : null,
+                buildingStats: bs || null,
                 areas: project ? {
                     total: project.total_area || parseFloat(document.getElementById('inputTotalArea')?.value) || 0,
                     aboveGround: project.above_ground_area || parseFloat(document.getElementById('inputAboveGroundArea')?.value) || 0,
@@ -2463,11 +2512,21 @@
             const project = portalProjects.find(p => p.id === projectId);
             const iframe = document.getElementById('fireCalcFrame');
             if (!iframe || !iframe.contentWindow) return;
+            // Если у проекта нет building_stats — берём из любого другого
+            var bs = project ? project.building_stats : null;
+            if (!bs || !bs.length) {
+                var donor = portalProjects.find(function (p) { return p.building_stats && p.building_stats.length > 0; });
+                if (donor) {
+                    bs = donor.building_stats;
+                    if (project) project.building_stats = bs; // кешируем
+                    console.log('[Portal] building_stats для fire взят из проекта:', donor.name);
+                }
+            }
             iframe.contentWindow.postMessage({
                 type: 'load-project-data',
                 projectId: projectId,
                 projectName: project ? project.name : '',
-                buildingStats: project ? (project.building_stats || null) : null
+                buildingStats: bs || null
             }, '*');
         }
 
