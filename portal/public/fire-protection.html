@@ -515,8 +515,8 @@
             if (!s.vpvEnabled) return;
             if (nF === 0) { console.warn('[Fire VPV] Корпус ' + idx + ': nF=0, пропуск'); return; }
             var sec     = s.sections || 1;
-            var bH      = b.height || 0;
-            var floorH  = nF > 0 ? bH / nF : 3;
+            var bH      = b.height || (nF * 3.3); // fallback: 3.3м на этаж
+            var floorH  = nF > 0 ? bH / nF : 3.3;
             // Per-zone DN и стояки
             var z1DN     = s.z1DN || 65;
             var z2DN     = s.z2DN || 65;
@@ -844,7 +844,7 @@
             var nF      = getFloorCount(b);
             if (nF === 0) return;
             var sec     = s.sections || 1;
-            var bH      = b.height || 0;
+            var bH      = b.height || (nF * 3.3);
             var floorH  = nF > 0 ? bH / nF : 3;
             var corrLen = s.corridorLength || 30;
             var z2      = hasZone2(b, idx);
@@ -1392,14 +1392,29 @@
     function renderResults() {
         try {
             var vpvItems  = collectVPVItems();
-            var auptItems = collectAUPTItems();
-            console.log('[Fire] renderResults: VPV=' + vpvItems.length + ' поз., AUPT=' + auptItems.length + ' поз.');
-            renderResultsTable('vpvResults', vpvItems, 'ВПВ');
-            renderResultsTable('auptResults', auptItems, 'АУПТ');
-            renderFullSpecification();
-            renderEstimate();
+            console.log('[Fire] collectVPVItems: ' + vpvItems.length + ' поз.');
         } catch (err) {
-            console.error('[Fire] Ошибка в renderResults:', err);
+            console.error('[Fire] ОШИБКА в collectVPVItems:', err.message, err.stack);
+            var el1 = document.getElementById('vpvResults');
+            if (el1) el1.innerHTML = '<div class="no-data-banner" style="color:red"><i class="bi bi-exclamation-triangle"></i> Ошибка ВПВ: ' + err.message + '</div>';
+            var vpvItems = [];
+        }
+        try {
+            var auptItems = collectAUPTItems();
+            console.log('[Fire] collectAUPTItems: ' + auptItems.length + ' поз.');
+        } catch (err) {
+            console.error('[Fire] ОШИБКА в collectAUPTItems:', err.message, err.stack);
+            var el2 = document.getElementById('auptResults');
+            if (el2) el2.innerHTML = '<div class="no-data-banner" style="color:red"><i class="bi bi-exclamation-triangle"></i> Ошибка АУПТ: ' + err.message + '</div>';
+            var auptItems = [];
+        }
+        renderResultsTable('vpvResults', vpvItems, 'ВПВ');
+        renderResultsTable('auptResults', auptItems, 'АУПТ');
+        try { renderFullSpecification(); } catch (err) {
+            console.error('[Fire] ОШИБКА в renderFullSpecification:', err.message, err.stack);
+        }
+        try { renderEstimate(); } catch (err) {
+            console.error('[Fire] ОШИБКА в renderEstimate:', err.message, err.stack);
         }
     }
 
@@ -1879,7 +1894,7 @@
         var b   = buildingStats[vizBldIdx] || buildingStats[0];
         var s   = getSettings(vizBldIdx);
         var nF  = getFloorCount(b);
-        var bH  = b.height || 0;
+        var bH  = b.height || (nF * 3.3);
         var sec = s.sections || 1;
         var showVPV  = (vizFilter === 'all' || vizFilter === 'VPV') && s.vpvEnabled;
         var showAUPT = (vizFilter === 'all' || vizFilter === 'AUPT') && s.auptEnabled;
