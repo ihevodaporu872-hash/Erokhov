@@ -570,6 +570,15 @@
         <div class="main-container">
             <!-- заголовок убран — отображается в портале -->
 
+            <!-- Селектор корпуса -->
+            <div id="ventBuildingSelector" style="display:none;margin-bottom:12px;padding:10px 16px;background:linear-gradient(135deg,#f97316 0%,#ea580c 100%);border-radius:10px;color:#fff">
+                <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+                    <span style="font-weight:700;font-size:13px"><i class="bi bi-building me-1"></i>Корпус:</span>
+                    <div id="ventBuildingBtns" style="display:flex;gap:6px;flex-wrap:wrap"></div>
+                    <span id="ventBuildingInfo" style="margin-left:auto;font-size:12px;opacity:.85"></span>
+                </div>
+            </div>
+
             <!-- Навигация по вкладкам -->
             <ul class="nav nav-tabs" id="mainTabs" role="tablist">
                 <li class="nav-item" role="presentation">
@@ -5276,11 +5285,116 @@
 
         // ── Per-building настройки вентиляции ──────────────────────────
         var ventBuildingSettings = {};
+        var ventActiveBuilding = 0;
+        var ventBuildingStatsCache = null; // кеш buildingStats
+
         function getVentSettings(idx) {
             if (!ventBuildingSettings[idx]) {
-                ventBuildingSettings[idx] = { totalRooms: 0 }; // 0 = авто (из квартир)
+                ventBuildingSettings[idx] = { totalRooms: 0, formSnapshot: null };
             }
             return ventBuildingSettings[idx];
+        }
+
+        // Сохранить состояние всех полей ввода текущего корпуса
+        function saveVentFormState(idx) {
+            var snapshot = {};
+            document.querySelectorAll('#mainTabsContent input, #mainTabsContent select, #mainTabsContent textarea').forEach(function (el) {
+                if (!el.id && !el.name) return;
+                var key = el.id || el.name;
+                if (el.type === 'checkbox') snapshot[key] = el.checked;
+                else snapshot[key] = el.value;
+            });
+            getVentSettings(idx).formSnapshot = snapshot;
+        }
+
+        // Восстановить состояние полей из снапшота
+        function restoreVentFormState(idx) {
+            var snap = getVentSettings(idx).formSnapshot;
+            if (!snap) return;
+            document.querySelectorAll('#mainTabsContent input, #mainTabsContent select, #mainTabsContent textarea').forEach(function (el) {
+                if (!el.id && !el.name) return;
+                var key = el.id || el.name;
+                if (snap[key] === undefined) return;
+                if (el.type === 'checkbox') el.checked = snap[key];
+                else el.value = snap[key];
+            });
+        }
+
+        // Переключение активного корпуса
+        function switchVentBuilding(idx) {
+            // Сохраняем текущий
+            saveVentFormState(ventActiveBuilding);
+            ventActiveBuilding = idx;
+            // Обновляем кнопки
+            document.querySelectorAll('.vent-building-btn').forEach(function (btn) {
+                btn.classList.toggle('active', parseInt(btn.dataset.idx, 10) === idx);
+            });
+            // Заполняем данные квартирографии для нового корпуса
+            if (ventBuildingStatsCache && ventBuildingStatsCache[idx]) {
+                fillVentFieldsFromBuilding(ventBuildingStatsCache[idx], idx);
+            }
+            // Восстанавливаем снапшот (перезаписывает поля поверх квартирографии)
+            restoreVentFormState(idx);
+            // Обновляем инфо
+            updateVentBuildingInfo(idx);
+            // Триггерим пересчёт
+            document.querySelectorAll('.building-char').forEach(function (inp) {
+                inp.dispatchEvent(new Event('input', { bubbles: true }));
+            });
+        }
+
+        // Заполняет поля «Основные характеристики» из buildingStats[idx]
+        function fillVentFieldsFromBuilding(b, idx) {
+            var nF = b.floors ? b.floors.length : (b.height ? Math.round(b.height / 3.3) : 0);
+            var apts = b.totalApts || 0;
+            var baths = 0, kitchens = 0;
+            if (b.floors) b.floors.forEach(function (f) {
+                baths += (f.bath || 0);
+                kitchens += (f.kitchens || 0);
+            });
+
+            var el;
+            el = document.getElementById('numFloors'); if (el) el.value = nF;
+            el = document.getElementById('totalApartments'); if (el) el.value = apts;
+            el = document.getElementById('bathroomCount'); if (el) el.value = baths;
+            el = document.getElementById('sectionCount'); if (el) el.value = 1;
+        }
+
+        // Обновляет инфо-строку селектора
+        function updateVentBuildingInfo(idx) {
+            var info = document.getElementById('ventBuildingInfo');
+            if (!info || !ventBuildingStatsCache || !ventBuildingStatsCache[idx]) return;
+            var b = ventBuildingStatsCache[idx];
+            var nF = b.floors ? b.floors.length : (b.height ? Math.round(b.height / 3.3) : 0);
+            info.textContent = (b.name || 'Корпус ' + (idx + 1)) + ': ' + nF + ' эт., ' + (b.totalApts || 0) + ' кв., ' + (b.height || 0) + ' м';
+        }
+
+        // Рендер кнопок корпусов
+        function renderVentBuildingButtons(bs) {
+            var sel = document.getElementById('ventBuildingSelector');
+            var btns = document.getElementById('ventBuildingBtns');
+            if (!sel || !btns) return;
+            if (!bs || bs.length <= 1) {
+                sel.style.display = 'none';
+                return;
+            }
+            sel.style.display = '';
+            btns.innerHTML = bs.map(function (b, idx) {
+                var name = b.name || ('Корпус ' + (b.num || idx + 1));
+                var isActive = idx === ventActiveBuilding;
+                return '<button class="btn btn-sm vent-building-btn' + (isActive ? ' active' : '') + '" ' +
+                    'data-idx="' + idx + '" ' +
+                    'style="background:' + (isActive ? '#fff' : 'rgba(255,255,255,.2)') + ';' +
+                    'color:' + (isActive ? '#ea580c' : '#fff') + ';' +
+                    'border:1px solid rgba(255,255,255,.4);border-radius:6px;font-size:12px;font-weight:600;padding:4px 12px">' +
+                    name + '</button>';
+            }).join('');
+            btns.querySelectorAll('.vent-building-btn').forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    switchVentBuilding(parseInt(btn.dataset.idx, 10));
+                });
+            });
+            updateVentBuildingInfo(ventActiveBuilding);
         }
 
         // ── Аккордеоны корпусов (из квартирографии) ──────────────────
@@ -5390,43 +5504,23 @@
                 var bs = msg.buildingStats;
                 var areas = msg.areas;
 
-                // Суммируем данные по всем корпусам
-                var totalFloors = 0, totalApts = 0, totalBaths = 0, totalKitchens = 0;
-                var maxFloors = 0;
+                // Кешируем buildingStats
+                ventBuildingStatsCache = bs;
+                ventActiveBuilding = 0;
+                ventBuildingSettings = {}; // сброс настроек при смене проекта
 
                 if (Array.isArray(bs) && bs.length > 0) {
-                    bs.forEach(function (b) {
-                        var nF = b.floors ? b.floors.length : 0;
-                        if (nF > maxFloors) maxFloors = nF;
-                        totalApts += (b.totalApts || 0);
-                        if (b.floors) {
-                            b.floors.forEach(function (f) {
-                                totalBaths += (f.bath || 0);
-                                totalKitchens += (f.kitchens || 0);
-                            });
-                        }
-                    });
-                    totalFloors = maxFloors;
-
-                    var el;
-                    el = document.getElementById('numFloors');
-                    if (el) el.value = totalFloors;
-
-                    el = document.getElementById('totalApartments');
-                    if (el) el.value = totalApts;
-
-                    el = document.getElementById('bathroomCount');
-                    if (el) el.value = totalBaths;
-
-                    el = document.getElementById('sectionCount');
-                    if (el) el.value = bs.length;
-
-                    // ── Аккордеоны по корпусам ──
+                    // Рендерим кнопки корпусов
+                    renderVentBuildingButtons(bs);
                     renderVentBuildingAccordions(bs);
+
+                    // Заполняем поля для первого корпуса
+                    fillVentFieldsFromBuilding(bs[0], 0);
                 }
 
                 // Площади из паспорта проекта
                 if (areas) {
+                    var el;
                     if (areas.total) {
                         el = document.getElementById('buildingArea');
                         if (el) el.value = areas.total;
@@ -5448,8 +5542,7 @@
 
                 console.log('[Ventilation] Данные из квартирографии:', {
                     корпусов: bs ? bs.length : 0,
-                    этажей: totalFloors, квартир: totalApts,
-                    СУ: totalBaths, кухонь: totalKitchens
+                    активный: ventActiveBuilding
                 });
             }
             if (msg.type === 'theme-change') {
