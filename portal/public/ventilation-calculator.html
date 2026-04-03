@@ -5274,6 +5274,15 @@
         lockEstimateInputs();
         renderFittingsTab();
 
+        // ── Per-building настройки вентиляции ──────────────────────────
+        var ventBuildingSettings = {};
+        function getVentSettings(idx) {
+            if (!ventBuildingSettings[idx]) {
+                ventBuildingSettings[idx] = { totalRooms: 0 }; // 0 = авто (из квартир)
+            }
+            return ventBuildingSettings[idx];
+        }
+
         // ── Аккордеоны корпусов (из квартирографии) ──────────────────
         function renderVentBuildingAccordions(bs) {
             var container = document.getElementById('ventBuildingAccordions');
@@ -5299,6 +5308,9 @@
                 var avgFH = nF > 0 ? Math.round(bH / nF * 10) / 10 : 0;
                 var shaftLen = Math.round(Math.max(bH - 1, 0) * 10) / 10;
                 var taps = baths + kitchens; // врезки ВЕ = С/У + кухни
+                var vs = getVentSettings(idx);
+                // Если totalRooms не задан — авто = кол-во квартир
+                var effectiveRooms = vs.totalRooms > 0 ? vs.totalRooms : apts;
 
                 return '<div class="accordion mb-2" id="ventAccord' + idx + '">' +
                     '<div class="accordion-item" style="border:1px solid #dee2e6;border-radius:8px;overflow:hidden">' +
@@ -5324,13 +5336,33 @@
                     '<div class="col-4"><span style="color:#6c757d">Кухонь:</span> <strong>' + kitchens + '</strong></div>' +
                     '</div>' +
 
+                    // ── Ручной ввод комнат для притока ──
+                    '<div style="background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.2);border-radius:6px;padding:8px 12px;margin-top:8px">' +
+                    '<div style="font-weight:600;font-size:12px;color:#b45309;margin-bottom:6px">' +
+                    '<i class="bi bi-door-open"></i> Приточные системы (П1/ПД)</div>' +
+                    '<div class="row g-2 align-items-center">' +
+                    '<div class="col-md-6">' +
+                    '<label style="font-size:12px;color:#6c757d">🏠 Общее количество комнат (для притока):</label>' +
+                    '</div>' +
+                    '<div class="col-md-3">' +
+                    '<input type="number" min="0" step="1" value="' + (vs.totalRooms || '') + '" ' +
+                    'placeholder="' + apts + ' (авто)" ' +
+                    'class="form-control form-control-sm vent-rooms-input" data-idx="' + idx + '" ' +
+                    'style="font-size:12px">' +
+                    '</div>' +
+                    '<div class="col-md-3" style="font-size:11px;color:#6c757d">' +
+                    (vs.totalRooms > 0 ? 'Ручной: ' + vs.totalRooms : 'Авто: ' + apts + ' (по квартирам)') +
+                    '</div>' +
+                    '</div></div>' +
+
+                    // ── Расчётные параметры ──
                     '<div style="background:rgba(59,130,246,.06);border-radius:6px;padding:8px 12px;margin-top:8px">' +
                     '<div style="font-weight:600;font-size:12px;color:#2563eb;margin-bottom:4px">' +
                     '<i class="bi bi-wind"></i> Расчётные параметры вентиляции</div>' +
                     '<div class="row g-1" style="font-size:12px">' +
                     '<div class="col-6">Длина шахты (height−1): <strong>' + shaftLen + ' м</strong></div>' +
                     '<div class="col-6">Врезки ВЕ (С/У+кухни): <strong>' + taps + ' шт</strong></div>' +
-                    '<div class="col-6">Решётки приточные: <strong>' + apts + ' шт</strong> (по квартирам)</div>' +
+                    '<div class="col-6">Расчёт притока: <strong>' + effectiveRooms + ' комнат</strong> → <strong>' + effectiveRooms + ' решёток</strong></div>' +
                     '<div class="col-6">Решётки вытяжные: <strong>' + taps + ' шт</strong> (по врезкам)</div>' +
                     '</div></div>' +
 
@@ -5338,6 +5370,16 @@
             }).join('');
 
             container.innerHTML = html;
+
+            // Обработчик ввода комнат
+            container.querySelectorAll('.vent-rooms-input').forEach(function (inp) {
+                inp.addEventListener('change', function () {
+                    var idx = parseInt(inp.dataset.idx, 10);
+                    var val = parseInt(inp.value, 10) || 0;
+                    getVentSettings(idx).totalRooms = val;
+                    renderVentBuildingAccordions(bs);
+                });
+            });
         }
 
         // ── Приём данных из портала (Квартирография) ──────────────────
