@@ -195,6 +195,7 @@
                 <div class="tabs-nav" id="vrfTabs">
                     <button class="tab-btn active" data-tab="residential"><i class="bi bi-building"></i>Параметры</button>
                     <button class="tab-btn" data-tab="specification"><i class="bi bi-list-ul"></i>Спецификация</button>
+                    <button class="tab-btn" data-tab="estimate"><i class="bi bi-calculator"></i>Смета</button>
                     <button class="tab-btn" data-tab="visualization"><i class="bi bi-diagram-3"></i>Визуализация</button>
                 </div>
             </div>
@@ -245,6 +246,22 @@
                                 <button class="btn-export-excel" id="btnExportExcel">
                                     <i class="bi bi-file-earmark-spreadsheet"></i> Экспорт в CSV
                                 </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ========== ESTIMATE ========== -->
+                <div class="tab-panel" id="tab-estimate">
+                    <div class="control-panel">
+                        <div class="panel-section">
+                            <h3 class="panel-section-title">
+                                <span class="panel-section-icon panel-section-icon-result"></span>
+                                Смета по системам кондиционирования
+                            </h3>
+                            <div id="estimateContent">
+                                <div class="no-data-banner"><i class="bi bi-info-circle-fill"></i>
+                                <span>Загрузите данные проекта и задайте параметры.</span></div>
                             </div>
                         </div>
                     </div>
@@ -406,6 +423,7 @@
             var panel = document.getElementById(targetId);
             if (panel) panel.classList.add('active');
             if (btn.dataset.tab === 'specification') renderFullSpecification();
+            if (btn.dataset.tab === 'estimate') renderEstimate();
             if (btn.dataset.tab === 'visualization') renderVisualization();
         });
     });
@@ -645,11 +663,48 @@
             }
 
             // ════════════════ АСУД: ШЛЮЗ СВЯЗИ ════════════════
-            // 1 шлюз на каждые 16 наружных блоков (или минимум 1)
             var gatewayCount = Math.max(1, Math.ceil(outdoorCount / 16));
             addItem('vrf_asud_gateway', 'Шлюз связи АСУД (контроллер давления/температуры)', 'шт',
                 gatewayCount,
                 '1 шлюз на ~16 блоков. Мониторинг: давление, температура, аварии.', 'dev');
+
+            // ════════════════ ДРЕНАЖНАЯ СИСТЕМА (К3 конденсат) ════════════════
+            // 2 м дренажа на каждый внутренний блок (BS-блок) + вертикальный стояк
+            var drainPerBlock = 2; // м горизонтального дренажа на блок
+            var drainHoriz = totalAptsVRF * sec * drainPerBlock;
+            var drainVertical = riserLen * sec; // вертикальный стояк дренажа = высота стояка VRF
+            var drainTotal = Math.round((drainHoriz + drainVertical) * 10) / 10;
+            addItem('vrf_drain_pipe', 'Труба ПВХ DN32 (дренаж конденсата)', 'м.п.',
+                drainTotal,
+                'Горизонт: ' + drainHoriz + ' м (' + (totalAptsVRF * sec) + ' блоков × ' + drainPerBlock + ' м) + верт: ' + Math.round(drainVertical * 10) / 10 + ' м', 'dev');
+
+            // Капельные воронки с гидрозатвором — 1 на каждый дренажный стояк
+            addItem('vrf_drain_funnel', 'Воронка капельная с гидрозатвором (дренажный стояк)', 'шт',
+                sec, '1 шт на секцию (точка подключения к ВК)', 'dev');
+
+            // Теплоизоляция дренажа (от запотевания)
+            addItem('vrf_drain_insul', 'Теплоизоляция дренажа (K-Flex, 9 мм)', 'м.п.',
+                drainTotal, 'По всей длине дренажных труб', 'dev');
+
+            // Кронштейны для наружных блоков (если фасад)
+            addItem('vrf_bracket', 'Кронштейн фасадный для наружного блока VRF', 'компл.',
+                outdoorCount, '1 компл. на блок (если фасадное размещение)', 'dev');
+
+            // Декоративные короба
+            var decorLen = Math.round(branchPipeTotal * 0.3 * 10) / 10; // 30% от МОП-разводки
+            if (decorLen > 0)
+                addItem('vrf_decor_duct', 'Короб декоративный для фреонопроводов (МОП)', 'м.п.',
+                    decorLen, '~30% от разводки МОП (' + branchPipeTotal + ' м)', 'dev');
+
+            // Дозаправка хладагента (превышение стандартной трассы)
+            // 20 г на метр трассы сверх стандартных 15 м
+            var stdLen = 15; // стандартная длина без дозаправки
+            var excessLen = Math.max(0, riserLen - stdLen);
+            if (excessLen > 0) {
+                var refillKg = Math.round(excessLen * sec * 0.02 * 10) / 10;
+                addItem('vrf_refill', 'Хладагент R410A (дозаправка, превыш. ' + stdLen + ' м)', 'кг',
+                    refillKg, excessLen.toFixed(0) + ' м × ' + sec + ' секц. × 20 г/м', 'dev');
+            }
         });
 
         // Сортировка
@@ -663,6 +718,8 @@
             'vrf_roof_cladding', 'vrf_roof_solder', 'vrf_roof_nitrogen',
             'vrf_roof_vibro', 'vrf_roof_heating', 'vrf_roof_frame',
             'vrf_asud_gateway',
+            'vrf_drain_pipe', 'vrf_drain_funnel', 'vrf_drain_insul',
+            'vrf_bracket', 'vrf_decor_duct', 'vrf_refill',
             'vrf_pent_mini', 'vrf_pent_outdoor', 'vrf_pent_frame', 'vrf_pent_vibro',
             'vrf_comm_bracket',
             'vrf_rest_pipe_liquid', 'vrf_rest_pipe_gas_hp', 'vrf_rest_pipe_gas_lp', 'vrf_rest_outdoor'
@@ -946,6 +1003,10 @@
 
         html += '</tbody></table>';
         container.innerHTML = html;
+
+        // Обновляем спецификацию и смету
+        try { renderFullSpecification(); } catch (e) {}
+        try { renderEstimate(); } catch (e) {}
     }
 
     /* ===================================================================
@@ -1099,6 +1160,78 @@
 
     setupTooltip();
     setupPanZoom();
+
+    /* ===================================================================
+       ESTIMATE (Смета)
+    =================================================================== */
+    function renderEstimate() {
+        var el = document.getElementById('estimateContent');
+        if (!el) return;
+
+        if (!buildingStats || !buildingStats.length) {
+            el.innerHTML = '<div class="no-data-banner"><i class="bi bi-info-circle-fill"></i>' +
+                '<span>Загрузите данные проекта и задайте параметры.</span></div>';
+            return;
+        }
+
+        var items;
+        try { items = collectVRFItems(); } catch (err) {
+            console.error('[Cond Estimate] Ошибка:', err);
+            el.innerHTML = '<div class="no-data-banner" style="color:red"><i class="bi bi-exclamation-triangle"></i> Ошибка: ' + escHtml(err.message) + '</div>';
+            return;
+        }
+
+        if (!items || !items.length) {
+            el.innerHTML = '<div class="no-data-banner"><i class="bi bi-info-circle-fill"></i>' +
+                '<span>Нет данных. Проверьте настройки корпусов.</span></div>';
+            return;
+        }
+
+        // Группировка: Оборудование / Трассы / Дренаж / Крепёж
+        var equipment = [], pipes = [], drain = [], misc = [];
+        items.forEach(function (it) {
+            if (/Наружный блок|Mini-VRF|Буферный|BS-блок|Датчик утечки/i.test(it.name)) equipment.push(it);
+            else if (/Труба медная|Изоляция|Припой|Азот|Фреон/i.test(it.name)) pipes.push(it);
+            else if (/Дренаж|дренаж|конденсат|Воронка капельная/i.test(it.name)) drain.push(it);
+            else misc.push(it);
+        });
+
+        function renderSection(sectionItems, title, icon, color) {
+            if (!sectionItems.length) return '';
+            var rowNum = 1;
+            var rows = sectionItems.map(function (it, i) {
+                var stripe = i % 2 === 0 ? '' : ' style="background:var(--gray-50,#f9fafb)"';
+                // Определяем тип: трубы → работа+материал, оборудование → работа+материал
+                var isPipe = it.unit === 'м.п.';
+                return '<tr' + stripe + '>' +
+                    '<td style="width:90px;padding-left:8px"><span style="color:#1d4ed8;font-size:11px"><i class="bi bi-box-seam"></i> материал</span></td>' +
+                    '<td>' + escHtml(it.name) + '</td>' +
+                    '<td style="text-align:center;width:50px">' + it.unit + '</td>' +
+                    '<td style="text-align:right;width:80px;font-weight:600">' + (Math.round(it.qty * 10) / 10) + '</td>' +
+                    '</tr>' +
+                    '<tr' + stripe + '>' +
+                    '<td style="width:90px;padding-left:8px"><span style="color:#6b7280;font-size:11px"><i class="bi bi-tools"></i> работа</span></td>' +
+                    '<td>Монтаж: ' + escHtml(it.name.replace(/\(.+?\)/g, '').trim()) + '</td>' +
+                    '<td style="text-align:center;width:50px">' + it.unit + '</td>' +
+                    '<td style="text-align:right;width:80px;font-weight:600">' + (Math.round(it.qty * 10) / 10) + '</td>' +
+                    '</tr>';
+            }).join('');
+
+            return '<div style="margin-bottom:20px">' +
+                '<div style="background:' + color + ';color:#fff;padding:10px 16px;border-radius:10px 10px 0 0;font-weight:700;font-size:14px;display:flex;align-items:center;gap:8px">' +
+                '<i class="bi ' + icon + '"></i> ' + escHtml(title) + '</div>' +
+                '<div style="border:1px solid var(--gray-200);border-top:none;border-radius:0 0 10px 10px">' +
+                '<table class="riser-table" style="margin:0;width:100%">' +
+                '<thead><tr><th style="width:90px">Тип</th><th>Наименование</th><th style="width:50px">Ед.</th><th style="width:80px">Кол-во</th></tr></thead>' +
+                '<tbody>' + rows + '</tbody></table></div></div>';
+        }
+
+        el.innerHTML =
+            renderSection(equipment, 'Оборудование VRF', 'bi-cpu', '#0277BD') +
+            renderSection(pipes, 'Трассы (фреонопроводы)', 'bi-bezier2', '#E65100') +
+            renderSection(drain, 'Дренажная система', 'bi-droplet', '#2E7D32') +
+            renderSection(misc, 'Крепёж, короба, прочее', 'bi-tools', '#5D4037');
+    }
 
     // Main render
     function renderVisualization() {
