@@ -395,7 +395,10 @@
     }
 
     function getFloorCount(b) {
-        return b.floors ? b.floors.length : 0;
+        if (b.floors && b.floors.length > 0) return b.floors.length;
+        if (b.totalFloors) return b.totalFloors;
+        if (b.height && b.height > 0) return Math.round(b.height / 3.3);
+        return 0;
     }
 
     function getAptsOnFloor(b, floorIdx) {
@@ -445,7 +448,8 @@
             var nF     = getFloorCount(b);
             if (nF === 0) return;
             var sec    = s.sections || 1;
-            var fH     = s.floorHeight || 3.0;
+            var bH     = b.height || (nF * 3.3);
+            var fH     = (nF > 0 && bH > 0) ? (bH / nF) : (s.floorHeight || 3.3);
             var roofG  = s.roofGap || 1.5;
             var hasComm  = s.commercial;
             var hasRest  = s.restaurant;
@@ -627,10 +631,11 @@
 
             // Азот для пайки (продувка при пайке)
             // ~0.5 л на стык
-            var nitrogenL = Math.round(roofSticks * 0.5);
-            addItem('vrf_roof_nitrogen', 'Азот технический (продувка при пайке)', 'л',
+            // Азот: ×3 (пайка + опрессовка всех этажей + продувка перед заправкой)
+            var nitrogenL = Math.round(roofSticks * 0.5 * 3);
+            addItem('vrf_roof_nitrogen', 'Азот технический (пайка + опрессовка + продувка)', 'л',
                 nitrogenL,
-                '~' + roofSticks + ' стыков × 0.5 л', 'dev');
+                '~' + roofSticks + ' стыков × 0.5 л × 3 (опрессовка всех этажей)', 'dev');
 
             // ════════════════ ОБВЯЗКА ОБОРУДОВАНИЯ НА КРОВЛЕ ════════════════
             // Виброопоры: 4 шт на каждый наружный блок
@@ -669,36 +674,89 @@
                 '1 шлюз на ~16 блоков. Мониторинг: давление, температура, аварии.', 'dev');
 
             // ════════════════ ДРЕНАЖНАЯ СИСТЕМА (К3 конденсат) ════════════════
-            // 2 м дренажа на каждый внутренний блок (BS-блок) + вертикальный стояк
-            var drainPerBlock = 2; // м горизонтального дренажа на блок
+            var drainPerBlock = 2;
             var drainHoriz = totalAptsVRF * sec * drainPerBlock;
-            var drainVertical = riserLen * sec; // вертикальный стояк дренажа = высота стояка VRF
+            var drainVertical = riserLen * sec;
             var drainTotal = Math.round((drainHoriz + drainVertical) * 10) / 10;
             addItem('vrf_drain_pipe', 'Труба ПВХ DN32 (дренаж конденсата)', 'м.п.',
                 drainTotal,
-                'Горизонт: ' + drainHoriz + ' м (' + (totalAptsVRF * sec) + ' блоков × ' + drainPerBlock + ' м) + верт: ' + Math.round(drainVertical * 10) / 10 + ' м', 'dev');
+                'Горизонт: ' + drainHoriz + 'м + верт: ' + Math.round(drainVertical * 10) / 10 + 'м', 'dev');
 
-            // Капельные воронки с гидрозатвором — 1 на каждый дренажный стояк
-            addItem('vrf_drain_funnel', 'Воронка капельная с гидрозатвором (дренажный стояк)', 'шт',
-                sec, '1 шт на секцию (точка подключения к ВК)', 'dev');
+            // Воронки HL21 — 1 на каждую квартиру
+            addItem('vrf_drain_funnel', 'Воронка HL21 с гидрозатвором (дренаж)', 'шт',
+                totalAptsVRF * sec, '1 шт на квартиру', 'dev');
 
-            // Теплоизоляция дренажа (от запотевания)
+            // Сифон с разрывом струи — 1 на квартиру
+            addItem('vrf_drain_siphon', 'Сифон с разрывом струи (дренаж VRF)', 'шт',
+                totalAptsVRF * sec, '1 шт на квартиру (предотвращение запаха из ВК)', 'dev');
+
+            // Теплоизоляция дренажа
             addItem('vrf_drain_insul', 'Теплоизоляция дренажа (K-Flex, 9 мм)', 'м.п.',
                 drainTotal, 'По всей длине дренажных труб', 'dev');
 
-            // Кронштейны для наружных блоков (если фасад)
-            addItem('vrf_bracket', 'Кронштейн фасадный для наружного блока VRF', 'компл.',
-                outdoorCount, '1 компл. на блок (если фасадное размещение)', 'dev');
+            // ════════════════ КОНСЕРВАЦИЯ И ОПРЕССОВКА ════════════════
+            // Клапан Шредера — 1 на квартиру
+            addItem('vrf_schrader', 'Клапан Шредера (для опрессовки и заправки)', 'шт',
+                totalAptsVRF * sec, '1 шт на квартиру', 'dev');
 
-            // Декоративные короба
-            var decorLen = Math.round(branchPipeTotal * 0.3 * 10) / 10; // 30% от МОП-разводки
+            // Медные заглушки — 2 на квартиру (на 2 трубы в квартире)
+            addItem('vrf_copper_cap', 'Заглушка медная (консервация трасс)', 'шт',
+                totalAptsVRF * sec * 2, '2 шт на квартиру (газ + жидкость)', 'dev');
+
+            // ════════════════ ОГНЕЗАЩИТА (EI60) ════════════════
+            // Огнезащитный мат ПРОМИЗОЛ EI60 — площадь = периметр трассы 3 труб × длина проходки
+            // Периметр 3-х труб: π × (Ø12.7 + Ø28.6 + Ø15.9) мм ≈ 0.18 м
+            var fireMatPerBox = 0.18 * 0.25; // периметр × толщина перекрытия (0.25 м)
+            var fireMatTotal = Math.round(fireBoxes * fireMatPerBox * 10) / 10;
+            addItem('vrf_fire_mat', 'Огнезащитный мат ПРОМИЗОЛ EI60 (проходки перекрытий)', 'м\u00b2',
+                fireMatTotal,
+                fireBoxes + ' проходок × ' + fireMatPerBox.toFixed(3) + ' м\u00b2', 'dev');
+
+            // Огнестойкий герметик
+            addItem('vrf_fire_sealant', 'Герметик огнестойкий (проходки перекрытий)', 'кг',
+                Math.round(fireBoxes * 0.5 * 10) / 10,
+                '0,5 кг на проходку', 'dev');
+
+            // ════════════════ ЭЛЕКТРОСНАБЖЕНИЕ VRF ════════════════
+            var totalCableLen = Math.round((riserTotal + branchPipeTotal) * 10) / 10;
+
+            // Силовой кабель ВВГнг 3×2.5
+            addItem('vrf_power_cable', 'Кабель ВВГнг 3\u00d72.5 мм\u00b2 (силовое питание VRF)', 'м.п.',
+                totalCableLen,
+                'По длине трасс (стояки + МОП)', 'dev');
+
+            // Сигнальный кабель (экранированный)
+            addItem('vrf_signal_cable', 'Кабель сигнальный экранированный 2\u00d70.75 мм\u00b2', 'м.п.',
+                totalCableLen,
+                'По длине трасс (стояки + МОП)', 'dev');
+
+            // Автоматический выключатель 16А — 1 на квартиру
+            addItem('vrf_breaker', 'Автомат. выключатель 16А (1P, C16) для VRF', 'шт',
+                totalAptsVRF * sec,
+                '1 шт на квартиру', 'dev');
+
+            // ════════════════ ГИЛЬЗЫ (пересечения стен/перекрытий) ════════════════
+            // Гильза DN100, длина 0.25 м — на каждое пересечение перекрытия
+            var sleeveCount = sec * vrfFloors; // = fireBoxes
+            addItem('vrf_sleeve', 'Гильза стальная DN100 (L=0,25 м, пересечение перекрытия)', 'шт',
+                sleeveCount, '1 шт на секцию на этаж', 'dev');
+
+            // Минвата для набивки гильз
+            addItem('vrf_sleeve_wool', 'Минвата базальтовая (набивка гильз)', 'кг',
+                Math.round(sleeveCount * 0.3 * 10) / 10,
+                '0,3 кг на гильзу', 'dev');
+
+            // ════════════════ КРЕПЁЖ И ПРОЧЕЕ ════════════════
+            addItem('vrf_bracket', 'Кронштейн фасадный для наружного блока VRF', 'компл.',
+                outdoorCount, '1 компл. на блок', 'dev');
+
+            var decorLen = Math.round(branchPipeTotal * 0.3 * 10) / 10;
             if (decorLen > 0)
                 addItem('vrf_decor_duct', 'Короб декоративный для фреонопроводов (МОП)', 'м.п.',
-                    decorLen, '~30% от разводки МОП (' + branchPipeTotal + ' м)', 'dev');
+                    decorLen, '~30% от разводки МОП', 'dev');
 
-            // Дозаправка хладагента (превышение стандартной трассы)
-            // 20 г на метр трассы сверх стандартных 15 м
-            var stdLen = 15; // стандартная длина без дозаправки
+            // ════════════════ ДОЗАПРАВКА ХЛАДАГЕНТА ════════════════
+            var stdLen = 15;
             var excessLen = Math.max(0, riserLen - stdLen);
             if (excessLen > 0) {
                 var refillKg = Math.round(excessLen * sec * 0.02 * 10) / 10;
@@ -713,12 +771,17 @@
             'vrf_branch_liquid', 'vrf_branch_gas_hp', 'vrf_branch_gas_lp',
             'vrf_insulation',
             'vrf_bs_block', 'vrf_outdoor', 'vrf_buffer',
-            'vrf_leak_sensor', 'vrf_fire_duct', 'vrf_fire_box', 'vrf_freon',
+            'vrf_leak_sensor',
+            'vrf_fire_duct', 'vrf_fire_box', 'vrf_fire_mat', 'vrf_fire_sealant',
+            'vrf_freon',
             'vrf_roof_pipe_liquid', 'vrf_roof_pipe_gas_hp', 'vrf_roof_pipe_gas_lp',
             'vrf_roof_cladding', 'vrf_roof_solder', 'vrf_roof_nitrogen',
             'vrf_roof_vibro', 'vrf_roof_heating', 'vrf_roof_frame',
             'vrf_asud_gateway',
-            'vrf_drain_pipe', 'vrf_drain_funnel', 'vrf_drain_insul',
+            'vrf_power_cable', 'vrf_signal_cable', 'vrf_breaker',
+            'vrf_drain_pipe', 'vrf_drain_funnel', 'vrf_drain_siphon', 'vrf_drain_insul',
+            'vrf_schrader', 'vrf_copper_cap',
+            'vrf_sleeve', 'vrf_sleeve_wool',
             'vrf_bracket', 'vrf_decor_duct', 'vrf_refill',
             'vrf_pent_mini', 'vrf_pent_outdoor', 'vrf_pent_frame', 'vrf_pent_vibro',
             'vrf_comm_bracket',
@@ -1188,11 +1251,13 @@
         }
 
         // Группировка: Оборудование / Трассы / Дренаж / Крепёж
-        var equipment = [], pipes = [], drain = [], misc = [];
+        var equipment = [], pipes = [], drain = [], electrical = [], fireItems = [], misc = [];
         items.forEach(function (it) {
-            if (/Наружный блок|Mini-VRF|Буферный|BS-блок|Датчик утечки/i.test(it.name)) equipment.push(it);
-            else if (/Труба медная|Изоляция|Припой|Азот|Фреон/i.test(it.name)) pipes.push(it);
-            else if (/Дренаж|дренаж|конденсат|Воронка капельная/i.test(it.name)) drain.push(it);
+            if (/Наружный блок|Mini-VRF|Буферный|BS-блок|Датчик утечки|Шлюз связи/i.test(it.name)) equipment.push(it);
+            else if (/Труба медная|Изоляция из вспен|Припой|Азот|Фреон|Хладагент|Клапан Шредера|Заглушка медная/i.test(it.name)) pipes.push(it);
+            else if (/Дренаж|дренаж|конденсат|Воронка|Сифон с разрывом|K-Flex/i.test(it.name)) drain.push(it);
+            else if (/Кабель|Автомат.*выключатель/i.test(it.name)) electrical.push(it);
+            else if (/Огнестойк|Огнезащит|Герметик огнестойк|ПРОМИЗОЛ|Гильза стальная|Минвата/i.test(it.name)) fireItems.push(it);
             else misc.push(it);
         });
 
@@ -1228,7 +1293,9 @@
 
         el.innerHTML =
             renderSection(equipment, 'Оборудование VRF', 'bi-cpu', '#0277BD') +
-            renderSection(pipes, 'Трассы (фреонопроводы)', 'bi-bezier2', '#E65100') +
+            renderSection(pipes, 'Трассы и хладагент', 'bi-bezier2', '#E65100') +
+            renderSection(electrical, 'Электроснабжение VRF', 'bi-lightning-charge', '#F57F17') +
+            renderSection(fireItems, 'Огнезащита (EI60) и гильзы', 'bi-shield-exclamation', '#C62828') +
             renderSection(drain, 'Дренажная система', 'bi-droplet', '#2E7D32') +
             renderSection(misc, 'Крепёж, короба, прочее', 'bi-tools', '#5D4037');
     }
