@@ -461,13 +461,20 @@
             var vrfFloors = hasPent ? residFloors - 1 : residFloors;
             if (vrfFloors < 0) vrfFloors = 0;
 
-            // Подсчёт квартир поэтажно (реальные данные из buildingStats)
-            var totalAptsVRF = 0;  // все квартиры на VRF-этажах
+            // Подсчёт квартир поэтажно с разбивкой по спецэтажам
+            var totalAptsVRF = 0;   // все квартиры на VRF-этажах
+            var aptsFloor2 = 0;     // квартиры на 2-м этаже (увеличенная трасса)
+            var aptsFloor34plus = 0; // квартиры на 34+ этажах (увеличенный DN)
+            var aptsTypical = 0;    // квартиры на типовых этажах (3–33)
             for (var fi = 0; fi < nF; fi++) {
                 var floorNum = fi + 1; // 1-based
                 if (hasComm && floorNum === 1) continue;
                 if (hasPent && floorNum === nF) continue;
-                totalAptsVRF += getRealAptsOnFloor(b, s, floorNum);
+                var aptsOnF = getRealAptsOnFloor(b, s, floorNum);
+                totalAptsVRF += aptsOnF;
+                if (floorNum === 2) aptsFloor2 += aptsOnF;
+                else if (floorNum >= 34) aptsFloor34plus += aptsOnF;
+                else aptsTypical += aptsOnF;
             }
 
             // ════════════════ МАГИСТРАЛИ (Вертикаль) ════════════════
@@ -511,7 +518,74 @@
                 branchPipeTotal,
                 'По формуле: L_кор / (N_кв / 2) × N_кв', 'dev');
 
-            // ════════════════ ИЗОЛЯЦИЯ НГ (вспененный каучук) ════════════════
+            // ════════════════ ВНУТРИКВАРТИРНАЯ РАЗВОДКА ════════════════
+            // Нормы на 1 квартиру (м): типовой / 2-й этаж / 34+ этаж
+            // Ø6.35: 28.8 / 31.0 / 0 (заменяется на Ø19.05)
+            // Ø9.52: 38.8 / 41.8 / 38.5
+            // Ø15.88: 10 (все этажи)
+            // Ø19.05: 0 / 0 / 38.6 (только 34+)
+            var totalAptsSec = totalAptsVRF * sec;
+            var aptF2 = aptsFloor2 * sec;
+            var apt34 = aptsFloor34plus * sec;
+            var aptTyp = aptsTypical * sec;
+
+            var pipe635 = Math.round((aptTyp * 28.8 + aptF2 * 31.0) * 10) / 10;
+            var pipe952 = Math.round((aptTyp * 38.8 + aptF2 * 41.8 + apt34 * 38.5) * 10) / 10;
+            var pipe1588 = Math.round(totalAptsSec * 10 * 10) / 10;
+            var pipe1905 = Math.round(apt34 * 38.6 * 10) / 10;
+
+            if (pipe635 > 0)
+                addItem('vrf_apt_635', 'Труба медная Ø6.35 мм (внутриквартирная разводка)', 'м.п.',
+                    pipe635, 'Типовой 28.8м + 2эт 31.0м на кв.', 'dev');
+            if (pipe952 > 0)
+                addItem('vrf_apt_952', 'Труба медная Ø9.52 мм (внутриквартирная разводка)', 'м.п.',
+                    pipe952, 'Типовой 38.8м + 2эт 41.8м + 34+ 38.5м', 'dev');
+            if (pipe1588 > 0)
+                addItem('vrf_apt_1588', 'Труба медная Ø15.88 мм (внутриквартирная разводка)', 'м.п.',
+                    pipe1588, totalAptsSec + ' кв. × 10 м', 'dev');
+            if (pipe1905 > 0)
+                addItem('vrf_apt_1905', 'Труба медная Ø19.05 мм (внутриквартирная, эт. 34+)', 'м.п.',
+                    pipe1905, apt34 + ' кв. × 38.6 м (замена Ø6.35)', 'dev');
+
+            // Теплоизоляция Energoflex Black Star (внутриквартирная)
+            var insul635 = Math.round((aptTyp * 21.7 + aptF2 * 21.7) * 10) / 10;
+            var insul952 = Math.round(totalAptsSec * 29.0 * 10) / 10;
+            var insulSplit635 = Math.round((aptTyp * 7.0 + aptF2 * 7.0) * 10) / 10;
+            var insulSplit952 = Math.round(totalAptsSec * 9.8 * 10) / 10;
+            var totalAptInsul = insul635 + insul952;
+            var totalAptSplit = insulSplit635 + insulSplit952;
+
+            if (totalAptInsul > 0)
+                addItem('vrf_apt_insul', 'Теплоизоляция Energoflex Black Star (внутрикв.)', 'м.п.',
+                    totalAptInsul, 'Ø6.35: ' + insul635 + 'м + Ø9.52: ' + insul952 + 'м', 'dev');
+            if (totalAptSplit > 0)
+                addItem('vrf_apt_insul_split', 'Теплоизоляция Energoflex Black Star Split (защитная)', 'м.п.',
+                    totalAptSplit, 'Ø6.35: ' + insulSplit635 + 'м + Ø9.52: ' + insulSplit952 + 'м', 'dev');
+
+            // Заглушки медные внутриквартирные (3 шт на кв — разных DN)
+            addItem('vrf_apt_caps', 'Заглушки медные под пайку (внутриквартирные, разные DN)', 'шт',
+                totalAptsSec * 3, '3 шт на квартиру', 'dev');
+
+            // Огнезащита МОП per-apt: мат + профиль + крепёж
+            addItem('vrf_apt_fire_mat', 'Мат ПРОМИЗОЛ-Микс Проплейт EI60 (участок МОП)', 'шт',
+                totalAptsSec, '1 шт (0.25 м\u00b2) на квартиру', 'dev');
+            addItem('vrf_apt_fire_profile', 'Шляпный профиль стальной (крепление мата)', 'м.п.',
+                Math.round(totalAptsSec * 4.0 * 10) / 10, '4.0 м на квартиру', 'dev');
+            addItem('vrf_apt_lug', 'Люверс латунный (крепление огнезащиты)', 'шт',
+                totalAptsSec * 28, '28 шт на квартиру', 'dev');
+            addItem('vrf_apt_screw', 'Саморез по бетону (крепление огнезащиты)', 'шт',
+                totalAptsSec * 28, '28 шт на квартиру', 'dev');
+            addItem('vrf_apt_washer', 'Шайба усиленная (крепление огнезащиты)', 'шт',
+                totalAptsSec * 28, '28 шт на квартиру', 'dev');
+
+            // Человеко-часы на прокладку внутриквартирных трасс
+            var aptPipeTotal = pipe635 + pipe952 + pipe1588 + pipe1905;
+            var aptManHours = Math.round(aptPipeTotal * 0.65 * 10) / 10;
+            if (aptManHours > 0)
+                addItem('vrf_apt_labor', 'Трудозатраты на прокладку внутриквартирных трасс', 'чел/ч',
+                    aptManHours, aptPipeTotal.toFixed(0) + ' м.п. × 0.65 чел/ч', 'dev');
+
+            // ════════════════ ИЗОЛЯЦИЯ НГ (вспененный каучук) — МОП и магистрали ════════════════
             var totalPipeLen = riserTotal * 3 + branchPipeTotal * 3;
             addItem('vrf_insulation', 'Трубная изоляция из вспененного каучука (НГ — негорючая)', 'м.п.',
                 Math.round(totalPipeLen * 10) / 10,
@@ -525,8 +599,8 @@
 
             // ════════════════ Наружные блоки VRF ════════════════
             var outdoorCount = Math.ceil(totalBS / 8) || 1;
-            addItem('vrf_outdoor', 'Наружный блок VRF (кровля)', 'шт', outdoorCount,
-                '1 блок на ~8 квартир', 'dev');
+            addItem('vrf_outdoor', 'Наружный блок VRF (кровля) — поставка и монтаж силами собственника', 'шт', outdoorCount,
+                '1 блок на ~8 квартир. Учёт для габаритов/веса.', 'dev');
 
             // ════════════════ Буферные блоки (эт. 2–7) ════════════════
             if (s.bufferFloors) {
@@ -769,6 +843,11 @@
         var ORDER = [
             'vrf_pipe_liquid', 'vrf_pipe_gas_hp', 'vrf_pipe_gas_lp',
             'vrf_branch_liquid', 'vrf_branch_gas_hp', 'vrf_branch_gas_lp',
+            'vrf_apt_635', 'vrf_apt_952', 'vrf_apt_1588', 'vrf_apt_1905',
+            'vrf_apt_insul', 'vrf_apt_insul_split', 'vrf_apt_caps',
+            'vrf_apt_fire_mat', 'vrf_apt_fire_profile',
+            'vrf_apt_lug', 'vrf_apt_screw', 'vrf_apt_washer',
+            'vrf_apt_labor',
             'vrf_insulation',
             'vrf_bs_block', 'vrf_outdoor', 'vrf_buffer',
             'vrf_leak_sensor',
@@ -1254,10 +1333,10 @@
         var equipment = [], pipes = [], drain = [], electrical = [], fireItems = [], misc = [];
         items.forEach(function (it) {
             if (/Наружный блок|Mini-VRF|Буферный|BS-блок|Датчик утечки|Шлюз связи/i.test(it.name)) equipment.push(it);
-            else if (/Труба медная|Изоляция из вспен|Припой|Азот|Фреон|Хладагент|Клапан Шредера|Заглушка медная/i.test(it.name)) pipes.push(it);
+            else if (/Труба медная|Изоляция.*вспен|Energoflex|Припой|Азот|Фреон|Хладагент|Клапан Шредера|Заглушк.*медн|Трудозатраты/i.test(it.name)) pipes.push(it);
             else if (/Дренаж|дренаж|конденсат|Воронка|Сифон с разрывом|K-Flex/i.test(it.name)) drain.push(it);
             else if (/Кабель|Автомат.*выключатель/i.test(it.name)) electrical.push(it);
-            else if (/Огнестойк|Огнезащит|Герметик огнестойк|ПРОМИЗОЛ|Гильза стальная|Минвата/i.test(it.name)) fireItems.push(it);
+            else if (/Огнестойк|Огнезащит|Герметик огнестойк|ПРОМИЗОЛ|Гильза стальная|Минвата|Шляпный профиль|Люверс|Саморез.*бетон|Шайба усилен/i.test(it.name)) fireItems.push(it);
             else misc.push(it);
         });
 
